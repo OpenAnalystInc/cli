@@ -62,8 +62,30 @@
   <div class="hdr">
     <div class="oa">O A</div>
     <div class="title">OpenAnalyst CLI</div>
-    <div class="sub">One CLI, Every LLM Provider &mdash; All Claude Code &amp; OpenAI Features Built In</div>
+    <div class="sub">One CLI, Every LLM Provider &mdash; Persistent Conversations Across Models</div>
     <div class="ver">v1.0.1</div>
+  </div>
+
+  <!-- USP Banner -->
+  <div class="card" style="border-color:rgba(14,165,233,0.4);background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(139,92,246,0.06))">
+    <h2 style="font-size:18px;margin-bottom:12px"><span class="ic cy" style="font-size:16px">&#9889;</span> Switch Models Mid-Conversation &mdash; Session Persists</h2>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">The game-changer: switch between <strong style="color:var(--text)">any LLM provider</strong> mid-conversation. Your session ID, chat history, tool results, and context carry over seamlessly. No other CLI does this.</p>
+    <div class="cb"><div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span></div>
+<pre class="cd"><span class="gn">&gt;</span> Explain this codebase                     <span class="cm"># openanalyst-beta answers</span>
+
+<span class="gn">&gt;</span> /model gpt-4o
+  Model updated
+  Previous         openanalyst-beta
+  Current          gpt-4o
+  Preserved msgs   3                         <span class="cm"># conversation carries over</span>
+
+<span class="gn">&gt;</span> Now fix the bug you found                 <span class="cm"># gpt-4o sees full history</span>
+
+<span class="gn">&gt;</span> /model grok
+  Preserved msgs   5                         <span class="cm"># still the same session</span>
+
+<span class="gn">&gt;</span> /model sonnet
+  Preserved msgs   7                         <span class="cm"># 4 providers, 1 conversation</span></pre></div>
   </div>
 
   <!-- 1. Install -->
@@ -217,7 +239,7 @@
   <div class="card">
     <div class="num">06</div>
     <h2><span class="ic pk">&#9879;</span> Built-in Tools</h2>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">The AI agent can use these tools automatically during conversations &mdash; same as Claude Code and Codex.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">The AI agent uses these tools automatically during conversations &mdash; works with every supported provider.</p>
     <div class="fg">
       <div class="fc"><div class="fn">Bash</div><div class="fd">Execute shell commands, run scripts, install packages</div></div>
       <div class="fc"><div class="fn">ReadFile</div><div class="fd">Read any file with line numbers, offsets, and limits</div></div>
@@ -239,7 +261,7 @@
     <div class="num">07</div>
     <h2><span class="ic gn">&#10003;</span> Features</h2>
     <div class="fg">
-      <div class="fc"><div class="fn">Multi-Provider LLM</div><div class="fd">Switch between 6 providers with one flag. Auto-detects from model name.</div></div>
+      <div class="fc"><div class="fn">Cross-Provider /model Switch</div><div class="fd">Switch from OpenAnalyst to GPT to Grok to Claude mid-conversation. Session, history, and context persist.</div></div>
       <div class="fc"><div class="fn">OPENANALYST.md</div><div class="fd">Project-specific AI instructions. Detected automatically in directory tree.</div></div>
       <div class="fc"><div class="fn">Session Persistence</div><div class="fd">Save, resume, list, and export conversation sessions.</div></div>
       <div class="fc"><div class="fn">Streaming Output</div><div class="fd">Real-time streaming with syntax-highlighted Markdown rendering.</div></div>

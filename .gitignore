@@ -19,6 +19,6 @@ rust/target/
 .DS_Store
 Thumbs.db
 
-# Claude Code artifacts (if running claude alongside)
+# Upstream Claude Code artifacts (if running alongside)
 .claude/settings.local.json
 .claude/sessions/

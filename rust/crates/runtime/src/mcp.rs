@@ -1,6 +1,6 @@
 use crate::config::{McpServerConfig, ScopedMcpServerConfig};
 
-const CLAUDEAI_SERVER_PREFIX: &str = "claude.ai ";
+const MANAGED_SERVER_PREFIX: &str = "openanalyst ";
 const CCR_PROXY_PATH_MARKERS: [&str; 2] = ["/v2/session_ingress/shttp/mcp/", "/v2/ccr-sessions/"];
 
 #[must_use]
@@ -13,7 +13,7 @@ pub fn normalize_name_for_mcp(name: &str) -> String {
         })
         .collect::<String>();
 
-    if name.starts_with(CLAUDEAI_SERVER_PREFIX) {
+    if name.starts_with(MANAGED_SERVER_PREFIX) {
         normalized = collapse_underscores(&normalized)
             .trim_matches('_')
             .to_string();
@@ -111,7 +111,7 @@ pub fn scoped_mcp_config_hash(config: &ScopedMcpServerConfig) -> String {
         ),
         McpServerConfig::Sdk(sdk) => format!("sdk|{}", sdk.name),
         McpServerConfig::ManagedProxy(proxy) => {
-            format!("claudeai-proxy|{}|{}", proxy.url, proxy.id)
+            format!("openanalyst-proxy|{}|{}", proxy.url, proxy.id)
         }
     };
     stable_hex_hash(&rendered)
