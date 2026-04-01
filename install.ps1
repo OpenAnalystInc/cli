@@ -1,10 +1,14 @@
+# ─────────────────────────────────────────────────
 # OpenAnalyst CLI Installer — Windows PowerShell
-# Usage: irm https://openanalyst.com/install.ps1 | iex
+#
+# Usage:
+#   irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex
+# ─────────────────────────────────────────────────
 
 $ErrorActionPreference = "Stop"
+$Repo = "AnitChaudhry/openanalyst-cli"
 $BinaryName = "openanalyst.exe"
 $InstallDir = "$env:USERPROFILE\.openanalyst\bin"
-$RepoDir = Split-Path -Parent $MyInvocation.MyCommand.Definition
 
 Write-Host ""
 Write-Host "  ######   #####" -ForegroundColor Cyan
@@ -17,65 +21,83 @@ Write-Host " OpenAnalyst CLI Installer" -ForegroundColor White
 Write-Host " --------------------------" -ForegroundColor DarkGray
 Write-Host ""
 
-# Check Rust
-if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-    Write-Host " [!] Rust/Cargo not found. Install from https://rustup.rs" -ForegroundColor Red
-    Write-Host "     winget install Rustlang.Rustup" -ForegroundColor Yellow
-    exit 1
-}
+$Target = "x86_64-pc-windows-msvc"
+Write-Host " Platform:  Windows x64" -ForegroundColor DarkGray
+Write-Host " Install:   $InstallDir" -ForegroundColor DarkGray
+Write-Host ""
 
-# Build
-Write-Host " [1/3] Building release binary..." -ForegroundColor DarkGray
-Push-Location "$RepoDir\rust"
-cargo build --release --quiet 2>&1
-Pop-Location
-
-$BinaryPath = "$RepoDir\rust\target\release\$BinaryName"
-if (-not (Test-Path $BinaryPath)) {
-    Write-Host " [!] Build failed - binary not found" -ForegroundColor Red
-    exit 1
-}
-
-# Install
-Write-Host " [2/3] Installing to $InstallDir..." -ForegroundColor DarkGray
+# Create install dir
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-Copy-Item $BinaryPath "$InstallDir\$BinaryName" -Force
+
+$Downloaded = $false
+
+# Try downloading prebuilt binary from latest release
+Write-Host " [1/3] Fetching latest release..." -ForegroundColor DarkGray
+try {
+    $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{"User-Agent"="openanalyst-cli"} -ErrorAction Stop
+    $Version = $Release.tag_name -replace "^v", ""
+    $AssetUrl = "https://github.com/$Repo/releases/download/v$Version/openanalyst-$Target.exe"
+
+    Write-Host " [2/3] Downloading v$Version..." -ForegroundColor DarkGray
+    try {
+        Invoke-WebRequest -Uri $AssetUrl -OutFile "$InstallDir\$BinaryName" -ErrorAction Stop
+        $Downloaded = $true
+        Write-Host " Downloaded prebuilt binary" -ForegroundColor Green
+    } catch {
+        Write-Host " No prebuilt binary, will build from source" -ForegroundColor DarkGray
+    }
+} catch {
+    Write-Host " Could not fetch release info, will build from source" -ForegroundColor DarkGray
+}
+
+# Fall back to building from source
+if (-not $Downloaded) {
+    if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
+        Write-Host ""
+        Write-Host " Rust is required to build from source." -ForegroundColor Red
+        Write-Host " Install: winget install Rustlang.Rustup" -ForegroundColor Yellow
+        Write-Host " Or visit: https://rustup.rs" -ForegroundColor Yellow
+        exit 1
+    }
+
+    Write-Host " [2/3] Building from source (this takes a few minutes)..." -ForegroundColor DarkGray
+
+    $TempDir = Join-Path $env:TEMP "openanalyst-build-$(Get-Random)"
+    git clone --depth 1 "https://github.com/$Repo.git" $TempDir 2>$null
+    Push-Location "$TempDir\rust"
+    cargo build --release -p openanalyst-cli 2>&1
+    Pop-Location
+    Copy-Item "$TempDir\rust\target\release\$BinaryName" "$InstallDir\$BinaryName" -Force
+    Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
+    Write-Host " Built from source" -ForegroundColor Green
+}
 
 # Add to PATH
-Write-Host " [3/3] Configuring system PATH..." -ForegroundColor DarkGray
+Write-Host " [3/3] Configuring PATH..." -ForegroundColor DarkGray
 $CurrentPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($CurrentPath -notlike "*$InstallDir*") {
     [Environment]::SetEnvironmentVariable("Path", "$InstallDir;$CurrentPath", "User")
     $env:Path = "$InstallDir;$env:Path"
-    Write-Host " Added $InstallDir to user PATH" -ForegroundColor Green
+    Write-Host " Added to user PATH" -ForegroundColor Green
 } else {
     Write-Host " PATH already configured" -ForegroundColor DarkGray
 }
 
 Write-Host ""
-Write-Host " -- Installation complete --" -ForegroundColor Green
+Write-Host " Installation complete" -ForegroundColor Green
 Write-Host ""
 
-# Show version
 & "$InstallDir\$BinaryName" --version 2>&1 | ForEach-Object { Write-Host " $_" }
 
 Write-Host ""
-Write-Host " Configure your API credentials:" -ForegroundColor White
+Write-Host " Configure your API:" -ForegroundColor White
 Write-Host ""
-Write-Host '   # OpenAnalyst API' -ForegroundColor DarkGray
 Write-Host '   $env:OPENANALYST_AUTH_TOKEN = "your-api-key-here"' -ForegroundColor Cyan
-Write-Host ""
-Write-Host '   # Or use Anthropic / OpenAI / OpenRouter / Bedrock' -ForegroundColor DarkGray
-Write-Host '   $env:ANTHROPIC_API_KEY = "sk-ant-..."' -ForegroundColor Yellow
-Write-Host '   $env:OPENAI_API_KEY = "sk-..."' -ForegroundColor Yellow
-Write-Host '   $env:OPENROUTER_API_KEY = "sk-or-..."' -ForegroundColor Yellow
-Write-Host ""
-Write-Host '   # Override default model' -ForegroundColor DarkGray
-Write-Host '   $env:ANTHROPIC_DEFAULT_SONNET_MODEL = "openanalyst-beta"' -ForegroundColor Cyan
 Write-Host ""
 Write-Host " Start using:" -ForegroundColor White
 Write-Host ""
 Write-Host "   > openanalyst" -ForegroundColor Green
 Write-Host ""
-Write-Host " Note: Restart your terminal for PATH changes to take effect." -ForegroundColor DarkGray
+Write-Host " Restart terminal for PATH to take effect." -ForegroundColor DarkGray
+Write-Host " Questions? anit@openanalyst.com" -ForegroundColor DarkGray
 Write-Host ""
