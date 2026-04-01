@@ -724,7 +724,7 @@ fn parse_mcp_server_config(
         "sdk" => Ok(McpServerConfig::Sdk(McpSdkServerConfig {
             name: expect_string(object, "name", context)?.to_string(),
         })),
-        "claudeai-proxy" => Ok(McpServerConfig::ManagedProxy(McpManagedProxyServerConfig {
+        "openanalyst-proxy" => Ok(McpServerConfig::ManagedProxy(McpManagedProxyServerConfig {
             url: expect_string(object, "url", context)?.to_string(),
             id: expect_string(object, "id", context)?.to_string(),
         })),

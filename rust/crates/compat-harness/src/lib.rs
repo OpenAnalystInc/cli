@@ -191,7 +191,7 @@ pub fn extract_bootstrap_plan(source: &str) -> BootstrapPlan {
     if source.contains("--dump-system-prompt") {
         phases.push(BootstrapPhase::SystemPromptFastPath);
     }
-    if source.contains("--claude-in-chrome-mcp") {
+    if source.contains("--openanalyst-in-chrome-mcp") {
         phases.push(BootstrapPhase::ChromeMcpFastPath);
     }
     if source.contains("--daemon-worker") {

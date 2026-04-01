@@ -80,16 +80,16 @@ struct RepoDetection {
 pub(crate) fn initialize_repo(cwd: &Path) -> Result<InitReport, Box<dyn std::error::Error>> {
     let mut artifacts = Vec::new();
 
-    let claw_dir = cwd.join(".openanalyst");
+    let oa_dir = cwd.join(".openanalyst");
     artifacts.push(InitArtifact {
         name: ".openanalyst/",
-        status: ensure_dir(&claw_dir)?,
+        status: ensure_dir(&oa_dir)?,
     });
 
-    let claw_json = cwd.join(".openanalyst.json");
+    let oa_json = cwd.join(".openanalyst.json");
     artifacts.push(InitArtifact {
         name: ".openanalyst.json",
-        status: write_file_if_missing(&claw_json, STARTER_OPENANALYST_JSON)?,
+        status: write_file_if_missing(&oa_json, STARTER_OPENANALYST_JSON)?,
     });
 
     let gitignore = cwd.join(".gitignore");
@@ -98,11 +98,11 @@ pub(crate) fn initialize_repo(cwd: &Path) -> Result<InitReport, Box<dyn std::err
         status: ensure_gitignore_entries(&gitignore)?,
     });
 
-    let claw_md = cwd.join("OPENANALYST.md");
+    let oa_md = cwd.join("OPENANALYST.md");
     let content = render_init_openanalyst_md(cwd);
     artifacts.push(InitArtifact {
         name: "OPENANALYST.md",
-        status: write_file_if_missing(&claw_md, &content)?,
+        status: write_file_if_missing(&oa_md, &content)?,
     });
 
     Ok(InitReport {
@@ -374,9 +374,9 @@ mod tests {
         let gitignore = fs::read_to_string(root.join(".gitignore")).expect("read gitignore");
         assert!(gitignore.contains(".openanalyst/settings.local.json"));
         assert!(gitignore.contains(".openanalyst/sessions/"));
-        let claw_md = fs::read_to_string(root.join("OPENANALYST.md")).expect("read openanalyst md");
-        assert!(claw_md.contains("Languages: Rust."));
-        assert!(claw_md.contains("cargo clippy --workspace --all-targets -- -D warnings"));
+        let oa_md = fs::read_to_string(root.join("OPENANALYST.md")).expect("read openanalyst md");
+        assert!(oa_md.contains("Languages: Rust."));
+        assert!(oa_md.contains("cargo clippy --workspace --all-targets -- -D warnings"));
 
         fs::remove_dir_all(root).expect("cleanup temp dir");
     }
