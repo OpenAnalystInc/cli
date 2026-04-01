@@ -323,6 +323,10 @@ fn generate_random_token(bytes: usize) -> io::Result<String> {
     Ok(base64url_encode(&buffer))
 }
 
+pub fn credentials_config_home() -> io::Result<PathBuf> {
+    credentials_home_dir()
+}
+
 fn credentials_home_dir() -> io::Result<PathBuf> {
     if let Some(path) = std::env::var_os("OPENANALYST_CONFIG_HOME") {
         return Ok(PathBuf::from(path));

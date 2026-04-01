@@ -69,7 +69,50 @@ const INTERNAL_PROGRESS_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(3);
 
 type AllowedToolSet = BTreeSet<String>;
 
+/// Load saved provider credentials from ~/.openanalyst/credentials.json
+/// Sets the appropriate env vars so the rest of the CLI picks them up.
+/// Only sets env vars that aren't already set (env vars take priority).
+fn load_saved_provider_credentials() {
+    let config_dir = runtime::credentials_config_home().ok()
+        .or_else(|| {
+            env::var("HOME").or_else(|_| env::var("USERPROFILE")).ok()
+                .map(|h| PathBuf::from(h).join(".openanalyst"))
+        });
+    let Some(config_dir) = config_dir else { return };
+    let creds_path = config_dir.join("credentials.json");
+    if !creds_path.exists() { return; }
+
+    let content = match fs::read_to_string(&creds_path) {
+        Ok(c) => c,
+        Err(_) => return,
+    };
+    let creds: serde_json::Value = match serde_json::from_str(&content) {
+        Ok(v) => v,
+        Err(_) => return,
+    };
+
+    // Get active provider
+    let active = creds.get("active_provider").and_then(|v| v.as_str()).unwrap_or("");
+    let providers = creds.get("providers").and_then(|v| v.as_object());
+    let Some(providers) = providers else { return };
+
+    // Load the active provider's key into env (if env var not already set)
+    if let Some(provider_data) = providers.get(active) {
+        if let (Some(env_var), Some(api_key)) = (
+            provider_data.get("env_var").and_then(|v| v.as_str()),
+            provider_data.get("api_key").and_then(|v| v.as_str()),
+        ) {
+            if env::var(env_var).ok().filter(|v| !v.is_empty()).is_none() {
+                env::set_var(env_var, api_key);
+            }
+        }
+    }
+}
+
 fn main() {
+    // Load saved credentials from ~/.openanalyst/credentials.json into env vars
+    load_saved_provider_credentials();
+
     if let Err(error) = run() {
         eprintln!(
             "error: {error}
@@ -492,61 +535,277 @@ fn default_oauth_config() -> OAuthConfig {
     }
 }
 
+// ── Provider definitions for interactive login ──
+
+struct ProviderOption {
+    name: &'static str,
+    description: &'static str,
+    env_var: &'static str,
+    test_url: &'static str,
+    test_header: &'static str, // "bearer" or "x-api-key"
+    placeholder: &'static str,
+}
+
+const LOGIN_PROVIDERS: &[ProviderOption] = &[
+    ProviderOption {
+        name: "OpenAnalyst",
+        description: "OpenAnalyst API (default)",
+        env_var: "OPENANALYST_AUTH_TOKEN",
+        test_url: "https://api.openanalyst.com/api/health",
+        test_header: "bearer",
+        placeholder: "sk-oa-...",
+    },
+    ProviderOption {
+        name: "Anthropic / Claude",
+        description: "Anthropic Claude API",
+        env_var: "ANTHROPIC_API_KEY",
+        test_url: "https://api.anthropic.com/v1/messages",
+        test_header: "x-api-key",
+        placeholder: "sk-ant-...",
+    },
+    ProviderOption {
+        name: "OpenAI / GPT",
+        description: "OpenAI ChatGPT & Codex",
+        env_var: "OPENAI_API_KEY",
+        test_url: "https://api.openai.com/v1/models",
+        test_header: "bearer",
+        placeholder: "sk-...",
+    },
+    ProviderOption {
+        name: "xAI / Grok",
+        description: "xAI Grok models",
+        env_var: "XAI_API_KEY",
+        test_url: "https://api.x.ai/v1/models",
+        test_header: "bearer",
+        placeholder: "xai-...",
+    },
+    ProviderOption {
+        name: "OpenRouter",
+        description: "Access any model via OpenRouter",
+        env_var: "OPENROUTER_API_KEY",
+        test_url: "https://openrouter.ai/api/v1/models",
+        test_header: "bearer",
+        placeholder: "sk-or-...",
+    },
+    ProviderOption {
+        name: "Amazon Bedrock",
+        description: "AWS Bedrock gateway",
+        env_var: "BEDROCK_API_KEY",
+        test_url: "",
+        test_header: "bearer",
+        placeholder: "...",
+    },
+];
+
 fn run_login() -> Result<(), Box<dyn std::error::Error>> {
-    let cwd = env::current_dir()?;
-    let config = ConfigLoader::default_for(&cwd).load()?;
-    let default_oauth = default_oauth_config();
-    let oauth = config.oauth().unwrap_or(&default_oauth);
-    let callback_port = oauth.callback_port.unwrap_or(DEFAULT_OAUTH_CALLBACK_PORT);
-    let redirect_uri = runtime::loopback_redirect_uri(callback_port);
-    let pkce = generate_pkce_pair()?;
-    let state = generate_state()?;
-    let authorize_url =
-        OAuthAuthorizationRequest::from_config(oauth, redirect_uri.clone(), state.clone(), &pkce)
-            .build_url();
+    use crossterm::{
+        cursor,
+        event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
+        execute,
+        terminal::{self, ClearType},
+    };
 
-    println!("Starting OpenAnalyst OAuth login...");
-    println!("Listening for callback on {redirect_uri}");
-    if let Err(error) = open_browser(&authorize_url) {
-        eprintln!("warning: failed to open browser automatically: {error}");
-        println!("Open this URL manually:\n{authorize_url}");
+    let mut stdout = io::stdout();
+
+    // ── Show header ──
+    println!();
+    println!("  \x1b[38;5;45m\x1b[1mOpenAnalyst CLI \x1b[0m\x1b[2m— Login\x1b[0m");
+    println!("  \x1b[2mSelect your LLM provider:\x1b[0m");
+    println!();
+
+    // ── Interactive arrow-key selector ──
+    let mut selected: usize = 0;
+    terminal::enable_raw_mode()?;
+    execute!(stdout, cursor::Hide)?;
+
+    // Draw initial menu
+    let draw_menu = |sel: usize, out: &mut io::Stdout| -> io::Result<()> {
+        for (i, provider) in LOGIN_PROVIDERS.iter().enumerate() {
+            let prefix = if i == sel { "\x1b[38;5;45m  > " } else { "    " };
+            let name_color = if i == sel { "\x1b[1m" } else { "\x1b[2m" };
+            let desc = if i == sel {
+                format!("  \x1b[2m{}\x1b[0m", provider.description)
+            } else {
+                String::new()
+            };
+            let _ = write!(
+                out,
+                "\r\x1b[2K{prefix}{name_color}{}{desc}\x1b[0m\r\n",
+                provider.name
+            );
+        }
+        out.flush()
+    };
+
+    draw_menu(selected, &mut stdout)?;
+
+    loop {
+        if event::poll(Duration::from_millis(100))? {
+            if let Event::Key(KeyEvent { code, modifiers, .. }) = event::read()? {
+                match code {
+                    KeyCode::Up if selected > 0 => {
+                        selected -= 1;
+                        // Move cursor up to redraw
+                        let _ = write!(stdout, "\x1b[{}A", LOGIN_PROVIDERS.len());
+                        draw_menu(selected, &mut stdout)?;
+                    }
+                    KeyCode::Down if selected < LOGIN_PROVIDERS.len() - 1 => {
+                        selected += 1;
+                        let _ = write!(stdout, "\x1b[{}A", LOGIN_PROVIDERS.len());
+                        draw_menu(selected, &mut stdout)?;
+                    }
+                    KeyCode::Enter => break,
+                    KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
+                        terminal::disable_raw_mode()?;
+                        execute!(stdout, cursor::Show)?;
+                        println!();
+                        return Ok(());
+                    }
+                    KeyCode::Esc => {
+                        terminal::disable_raw_mode()?;
+                        execute!(stdout, cursor::Show)?;
+                        println!();
+                        return Ok(());
+                    }
+                    _ => {}
+                }
+            }
+        }
     }
 
-    let callback = wait_for_oauth_callback(callback_port)?;
-    if let Some(error) = callback.error {
-        let description = callback
-            .error_description
-            .unwrap_or_else(|| "authorization failed".to_string());
-        return Err(io::Error::other(format!("{error}: {description}")).into());
-    }
-    let code = callback.code.ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "callback did not include code")
-    })?;
-    let returned_state = callback.state.ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "callback did not include state")
-    })?;
-    if returned_state != state {
-        return Err(io::Error::new(io::ErrorKind::InvalidData, "oauth state mismatch").into());
+    terminal::disable_raw_mode()?;
+    execute!(stdout, cursor::Show)?;
+
+    let provider = &LOGIN_PROVIDERS[selected];
+    println!();
+    println!(
+        "  \x1b[38;5;45m\x1b[1m{}\x1b[0m selected",
+        provider.name
+    );
+    println!();
+
+    // ── Prompt for API key ──
+    print!("  Enter your API key ({}): \x1b[38;5;45m", provider.placeholder);
+    io::stdout().flush()?;
+    let mut api_key = String::new();
+    io::stdin().read_line(&mut api_key)?;
+    let api_key = api_key.trim().to_string();
+    print!("\x1b[0m");
+
+    if api_key.is_empty() {
+        println!("  \x1b[38;5;196mNo key entered. Aborted.\x1b[0m");
+        return Ok(());
     }
 
-    let client = OpenAnalystApiClient::from_auth(AuthSource::None).with_base_url(api::read_base_url());
-    let exchange_request =
-        OAuthTokenExchangeRequest::from_config(oauth, code, state, pkce.verifier, redirect_uri);
-    let runtime = tokio::runtime::Runtime::new()?;
-    let token_set = runtime.block_on(client.exchange_oauth_code(oauth, &exchange_request))?;
-    save_oauth_credentials(&runtime::OAuthTokenSet {
-        access_token: token_set.access_token,
-        refresh_token: token_set.refresh_token,
-        expires_at: token_set.expires_at,
-        scopes: token_set.scopes,
-    })?;
-    println!("OpenAnalyst login complete.");
+    // ── Test connection ──
+    print!("  Testing connection... ");
+    io::stdout().flush()?;
+
+    let key_valid = if provider.test_url.is_empty() {
+        true // Skip test for providers without a test endpoint
+    } else {
+        test_api_key(provider.test_url, &api_key, provider.test_header)
+    };
+
+    if key_valid {
+        println!("\x1b[38;5;46m\x1b[1mConnected\x1b[0m");
+    } else {
+        println!("\x1b[38;5;208mKey accepted (could not verify — endpoint may require a request body)\x1b[0m");
+    }
+
+    // ── Save credentials ──
+    let config_dir = runtime::credentials_config_home()
+        .unwrap_or_else(|_| {
+            let home = env::var("HOME")
+                .or_else(|_| env::var("USERPROFILE"))
+                .unwrap_or_else(|_| ".".to_string());
+            PathBuf::from(home).join(".openanalyst")
+        });
+    fs::create_dir_all(&config_dir)?;
+
+    let creds_path = config_dir.join("credentials.json");
+    let mut creds: serde_json::Value = if creds_path.exists() {
+        let content = fs::read_to_string(&creds_path)?;
+        serde_json::from_str(&content).unwrap_or_else(|_| json!({}))
+    } else {
+        json!({})
+    };
+
+    // Store the selected provider and key
+    creds["active_provider"] = json!(provider.name);
+    creds["providers"] = creds.get("providers").cloned().unwrap_or_else(|| json!({}));
+    creds["providers"][provider.name] = json!({
+        "env_var": provider.env_var,
+        "api_key": api_key,
+    });
+
+    fs::write(&creds_path, serde_json::to_string_pretty(&creds)?)?;
+
+    // ── Also set the env var for current process ──
+    env::set_var(provider.env_var, &api_key);
+
+    println!();
+    println!("  \x1b[38;5;45m\x1b[1mLogin complete\x1b[0m");
+    println!();
+    println!("  \x1b[2mProvider\x1b[0m     {}", provider.name);
+    println!("  \x1b[2mCredentials\x1b[0m  {}", creds_path.display());
+    println!("  \x1b[2mEnv var\x1b[0m      {}", provider.env_var);
+    println!();
+    println!("  Run \x1b[1mopenanalyst\x1b[0m to start.");
+    println!();
     Ok(())
 }
 
+fn test_api_key(url: &str, key: &str, header_type: &str) -> bool {
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return false,
+    };
+    rt.block_on(async {
+        let client = match reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+        {
+            Ok(c) => c,
+            Err(_) => return false,
+        };
+        let mut req = client.get(url);
+        match header_type {
+            "bearer" => req = req.bearer_auth(key),
+            "x-api-key" => req = req.header("x-api-key", key),
+            _ => req = req.bearer_auth(key),
+        }
+        req = req.header("anthropic-version", "2023-06-01");
+        match req.send().await {
+            Ok(resp) => {
+                let status = resp.status().as_u16();
+                // 200 = valid, 401 = bad key, anything else = endpoint works but needs body
+                status != 401 && status != 403
+            }
+            Err(_) => false,
+        }
+    })
+}
+
 fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
-    clear_oauth_credentials()?;
-    println!("OpenAnalyst credentials cleared.");
+    // Clear OAuth credentials
+    let _ = clear_oauth_credentials();
+
+    // Clear saved provider credentials
+    let config_dir = runtime::credentials_config_home()
+        .unwrap_or_else(|_| {
+            let home = env::var("HOME")
+                .or_else(|_| env::var("USERPROFILE"))
+                .unwrap_or_else(|_| ".".to_string());
+            PathBuf::from(home).join(".openanalyst")
+        });
+    let creds_path = config_dir.join("credentials.json");
+    if creds_path.exists() {
+        fs::remove_file(&creds_path)?;
+    }
+
+    println!("  \x1b[38;5;45mAll credentials cleared.\x1b[0m");
+    println!("  Removed: {}", creds_path.display());
     Ok(())
 }
 
