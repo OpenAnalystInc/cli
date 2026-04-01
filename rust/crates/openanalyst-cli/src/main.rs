@@ -69,9 +69,9 @@ const INTERNAL_PROGRESS_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(3);
 
 type AllowedToolSet = BTreeSet<String>;
 
-/// Load saved provider credentials from ~/.openanalyst/credentials.json
-/// Sets the appropriate env vars so the rest of the CLI picks them up.
-/// Only sets env vars that aren't already set (env vars take priority).
+/// Load ALL saved provider credentials from ~/.openanalyst/credentials.json
+/// Sets env vars for EVERY saved provider so /model switching works across providers.
+/// Env vars already set by the user take priority (not overwritten).
 fn load_saved_provider_credentials() {
     let config_dir = runtime::credentials_config_home().ok()
         .or_else(|| {
@@ -91,18 +91,18 @@ fn load_saved_provider_credentials() {
         Err(_) => return,
     };
 
-    // Get active provider
-    let active = creds.get("active_provider").and_then(|v| v.as_str()).unwrap_or("");
     let providers = creds.get("providers").and_then(|v| v.as_object());
     let Some(providers) = providers else { return };
 
-    // Load the active provider's key into env (if env var not already set)
-    if let Some(provider_data) = providers.get(active) {
+    // Load ALL provider keys into env — this is what makes /model switching work.
+    // If user ran `openanalyst login` for OpenAnalyst, OpenAI, and Grok,
+    // all three keys are loaded so /model gpt-4o or /model grok just works.
+    for (_name, provider_data) in providers {
         if let (Some(env_var), Some(api_key)) = (
             provider_data.get("env_var").and_then(|v| v.as_str()),
             provider_data.get("api_key").and_then(|v| v.as_str()),
         ) {
-            if env::var(env_var).ok().filter(|v| !v.is_empty()).is_none() {
+            if !api_key.is_empty() && env::var(env_var).ok().filter(|v| !v.is_empty()).is_none() {
                 env::set_var(env_var, api_key);
             }
         }
@@ -1749,8 +1749,12 @@ impl LiveCli {
         let previous = self.model.clone();
         let session = self.runtime.session().clone();
         let message_count = session.messages.len();
-        self.runtime = build_runtime(
-            session,
+
+        // Detect the target provider for a clear error message
+        let target_provider = api::detect_provider_kind(&model);
+
+        match build_runtime(
+            session.clone(),
             model.clone(),
             self.system_prompt.clone(),
             true,
@@ -1758,13 +1762,43 @@ impl LiveCli {
             self.allowed_tools.clone(),
             self.permission_mode,
             None,
-        )?;
-        self.model.clone_from(&model);
-        println!(
-            "{}",
-            format_model_switch_report(&previous, &model, message_count)
-        );
-        Ok(true)
+        ) {
+            Ok(new_runtime) => {
+                self.runtime = new_runtime;
+                self.model.clone_from(&model);
+                println!(
+                    "{}",
+                    format_model_switch_report(&previous, &model, message_count)
+                );
+                println!(
+                    "  \x1b[2mProvider\x1b[0m         {}",
+                    target_provider.display_name()
+                );
+                println!(
+                    "  \x1b[2mSession\x1b[0m          \x1b[38;5;45mpersisted\x1b[0m ({message_count} messages carried over)"
+                );
+                Ok(true)
+            }
+            Err(error) => {
+                // Restore original session — don't lose conversation
+                println!(
+                    "  \x1b[38;5;196mCannot switch to {model}\x1b[0m — {error}"
+                );
+                println!(
+                    "  \x1b[2mProvider {} requires credentials.\x1b[0m",
+                    target_provider.display_name()
+                );
+                println!(
+                    "  Run \x1b[1mopenanalyst login\x1b[0m and add {} credentials.",
+                    target_provider.display_name()
+                );
+                println!(
+                    "  \x1b[2mCurrent model unchanged:\x1b[0m {}",
+                    self.model
+                );
+                Ok(false)
+            }
+        }
     }
 
     fn set_permissions(
