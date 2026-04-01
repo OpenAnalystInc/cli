@@ -1729,6 +1729,34 @@ impl LiveCli {
                     self.runtime.usage().turns(),
                 )
             );
+            // Show available models grouped by provider with auth status
+            println!("\n  \x1b[1mAvailable models\x1b[0m (based on configured keys):\n");
+            let providers: &[(&str, &str, &[&str])] = &[
+                ("OpenAnalyst", "OPENANALYST_AUTH_TOKEN", &["openanalyst-beta"]),
+                ("Anthropic",   "ANTHROPIC_API_KEY",     &["opus", "sonnet", "haiku"]),
+                ("OpenAI",      "OPENAI_API_KEY",        &["gpt-4o", "gpt-4.1", "o3", "o4-mini", "codex-mini"]),
+                ("xAI",         "XAI_API_KEY",           &["grok", "grok-3", "grok-mini"]),
+                ("OpenRouter",  "OPENROUTER_API_KEY",    &["openrouter/auto", "openrouter/<model>"]),
+                ("Bedrock",     "BEDROCK_API_KEY",       &["bedrock/<model>"]),
+            ];
+            for (name, env_key, models) in providers {
+                let has_key = env::var(env_key).ok().filter(|v| !v.is_empty()).is_some();
+                // Also check secondary key for OA/Anthropic
+                let has_key = has_key || (*name == "OpenAnalyst" &&
+                    env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty()).is_some());
+                let has_key = has_key || (*name == "Anthropic" &&
+                    env::var("ANTHROPIC_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some());
+
+                let icon = if has_key { "\x1b[38;5;46m●\x1b[0m" } else { "\x1b[38;5;240m○\x1b[0m" };
+                let name_style = if has_key { "\x1b[1m" } else { "\x1b[2m" };
+                let model_list = models.join(", ");
+                let status = if has_key { "" } else { " \x1b[2m(run: openanalyst login)\x1b[0m" };
+                println!("  {icon} {name_style}{name}\x1b[0m{status}");
+                if has_key {
+                    println!("    \x1b[38;5;45m{model_list}\x1b[0m");
+                }
+            }
+            println!("\n  \x1b[2mSwitch: /model <name>\x1b[0m");
             return Ok(false);
         };
 
