@@ -3,78 +3,57 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenAnalyst CLI — Get Started</title>
+<title>OpenAnalyst CLI — Documentation</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-  :root {
-    --bg:#0a0e17;--card:#111827;--code:#0d1321;--border:#1e293b;
-    --text:#e2e8f0;--dim:#64748b;--muted:#94a3b8;
-    --accent:#0ea5e9;--accent2:#38bdf8;--glow:rgba(14,165,233,0.15);
-    --green:#22c55e;--yellow:#eab308;--purple:#a78bfa;--cyan:#22d3ee;--pink:#f472b6;
-  }
+  :root{--bg:#0a0e17;--card:#111827;--code:#0d1321;--border:#1e293b;--text:#e2e8f0;--dim:#64748b;--muted:#94a3b8;--accent:#0ea5e9;--accent2:#38bdf8;--glow:rgba(14,165,233,0.15);--green:#22c55e;--yellow:#eab308;--purple:#a78bfa;--cyan:#22d3ee;--pink:#f472b6;--orange:#f97316;--red:#ef4444}
   *{margin:0;padding:0;box-sizing:border-box}
   body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
   body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 0%,rgba(14,165,233,0.08),transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(139,92,246,0.06),transparent 50%);pointer-events:none}
-  .wrap{max-width:860px;margin:0 auto;padding:40px 24px;position:relative;z-index:1}
-
-  /* Header */
+  .wrap{max-width:900px;margin:0 auto;padding:40px 24px;position:relative;z-index:1}
   .hdr{text-align:center;margin-bottom:48px}
   .oa{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;padding:6px 14px;border:2px solid var(--accent);border-radius:8px;color:var(--accent);letter-spacing:4px;box-shadow:0 0 20px var(--glow),inset 0 0 20px var(--glow);margin-bottom:16px}
   .title{font-family:'JetBrains Mono',monospace;font-size:44px;font-weight:700;letter-spacing:-2px;background:linear-gradient(135deg,var(--accent),var(--cyan),var(--accent2));background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:sh 3s ease-in-out infinite}
   @keyframes sh{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
   .sub{color:var(--muted);font-size:16px;margin-top:4px}
   .ver{display:inline-block;background:var(--glow);border:1px solid rgba(14,165,233,0.3);color:var(--accent2);font-family:'JetBrains Mono',monospace;font-size:13px;padding:4px 12px;border-radius:20px;margin-top:12px}
-
-  /* Cards */
   .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;margin-bottom:24px;position:relative;overflow:hidden;transition:border-color .3s}
   .card:hover{border-color:rgba(14,165,233,0.3)}
   .card .num{position:absolute;top:20px;right:28px;font-family:'JetBrains Mono',monospace;font-size:64px;font-weight:700;color:rgba(14,165,233,0.07);line-height:1}
   .card h2{font-size:20px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:10px}
-  .card h2 .ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-  .ic.bl{background:var(--glow);color:var(--accent)}
-  .ic.gn{background:rgba(34,197,94,.15);color:var(--green)}
-  .ic.or{background:rgba(249,115,22,.15);color:#f97316}
-  .ic.pu{background:rgba(167,139,250,.15);color:var(--purple)}
-
-  /* Tabs */
-  .tabs{display:flex;gap:0}
-  .tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--dim);background:0;border:1px solid var(--border);border-bottom:0;border-radius:8px 8px 0 0;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}
-  .tab.on{background:var(--code);color:var(--accent);border-color:var(--border)}
-  .tc{display:none}.tc.on{display:block}
-  .tc .cb{border-top-left-radius:0;margin-top:0}
-
-  /* Code */
+  .ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .ic.bl{background:var(--glow);color:var(--accent)}.ic.gn{background:rgba(34,197,94,.15);color:var(--green)}.ic.or{background:rgba(249,115,22,.15);color:var(--orange)}.ic.pu{background:rgba(167,139,250,.15);color:var(--purple)}.ic.pk{background:rgba(244,114,182,.15);color:var(--pink)}.ic.cy{background:rgba(34,211,238,.15);color:var(--cyan)}
+  .tabs{display:flex;gap:0}.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--dim);background:0;border:1px solid var(--border);border-bottom:0;border-radius:8px 8px 0 0;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.tab.on{background:var(--code);color:var(--accent)}.tc{display:none}.tc.on{display:block}.tc .cb{border-top-left-radius:0;margin-top:0}
   .cb{background:var(--code);border:1px solid var(--border);border-radius:10px;margin:12px 0;overflow:hidden}
   .ch{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)}
   .cl{font-size:12px;font-weight:500;color:var(--dim);display:flex;align-items:center;gap:6px}
   .dt{width:8px;height:8px;border-radius:50%}.d1{background:#ef4444}.d2{background:#eab308}.d3{background:#22c55e}
-  .cp{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}
-  .cp:hover{background:var(--glow);border-color:var(--accent);color:var(--accent)}
+  .cp{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.cp:hover{background:var(--glow);border-color:var(--accent);color:var(--accent)}
   pre.cd{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:13.5px;line-height:1.8;overflow-x:auto;white-space:pre;color:var(--text)}
   .cm{color:var(--dim)}.kw{color:var(--pink)}.vr{color:var(--purple)}.st{color:var(--yellow)}.gn{color:var(--green)}.cn{color:var(--cyan)}
-
-  /* Provider grid */
   .pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:16px}
-  .pc{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:16px;transition:.2s}
-  .pc:hover{border-color:rgba(14,165,233,.3)}
-  .pc.df{border-color:rgba(14,165,233,.3);background:var(--glow)}
-  .pn{font-weight:600;font-size:14px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
-  .pn .bd{font-size:10px;font-weight:500;padding:2px 6px;border-radius:4px;background:rgba(14,165,233,.2);color:var(--accent)}
-  .pe{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--purple);margin:4px 0}
-  .pm{font-size:12px;color:var(--dim)}
-
-  /* Usage table */
-  .ut{width:100%;margin-top:12px;border-collapse:collapse}
-  .ut td{padding:10px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}
-  .ut td:first-child{font-family:'JetBrains Mono',monospace;color:var(--green);padding-right:16px;white-space:nowrap}
-  .ut td:last-child{color:var(--dim)}
-
-  /* Footer */
-  .ft{text-align:center;margin-top:48px;padding-top:32px;border-top:1px solid var(--border);color:var(--dim);font-size:13px}
-  .ft a{color:var(--accent);text-decoration:none}
-  .ft a:hover{text-decoration:underline}
-
-  @media(max-width:640px){.wrap{padding:24px 16px}.title{font-size:28px}.card{padding:24px}.pg{grid-template-columns:1fr}}
+  .pc{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:16px;transition:.2s}.pc:hover{border-color:rgba(14,165,233,.3)}.pc.df{border-color:rgba(14,165,233,.3);background:var(--glow)}
+  .pn{font-weight:600;font-size:14px;margin-bottom:4px;display:flex;align-items:center;gap:8px}.pn .bd{font-size:10px;font-weight:500;padding:2px 6px;border-radius:4px;background:rgba(14,165,233,.2);color:var(--accent)}
+  .pe{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--purple);margin:4px 0}.pm{font-size:12px;color:var(--dim)}
+  .ut{width:100%;margin-top:12px;border-collapse:collapse}.ut td{padding:10px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}.ut td:first-child{font-family:'JetBrains Mono',monospace;color:var(--green);padding-right:16px;white-space:nowrap}.ut td:last-child{color:var(--dim)}
+  /* Command reference table */
+  .cmd-table{width:100%;border-collapse:collapse;margin-top:12px}
+  .cmd-table th{text-align:left;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:1px;padding:8px 0;border-bottom:1px solid var(--border)}
+  .cmd-table td{padding:8px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}
+  .cmd-table td:first-child{font-family:'JetBrains Mono',monospace;color:var(--cyan);padding-right:16px;white-space:nowrap}
+  .cmd-table td:last-child{color:var(--muted)}
+  .cmd-cat{font-size:12px;font-weight:600;color:var(--accent);padding:14px 0 6px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(14,165,233,.15)}
+  .tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px;font-weight:500}
+  .tag-r{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.2)}
+  .tag-n{background:rgba(234,179,8,.12);color:var(--yellow);border:1px solid rgba(234,179,8,.2)}
+  /* Features grid */
+  .fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:16px}
+  .fc{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:16px;transition:.2s}.fc:hover{border-color:rgba(14,165,233,.3)}
+  .fc .fn{font-weight:600;font-size:14px;margin-bottom:4px;color:var(--text)}.fc .fd{font-size:12px;color:var(--dim);line-height:1.5}
+  .ft{text-align:center;margin-top:48px;padding-top:32px;border-top:1px solid var(--border);color:var(--dim);font-size:13px}.ft a{color:var(--accent);text-decoration:none}.ft a:hover{text-decoration:underline}
+  .note{background:rgba(14,165,233,.06);border:1px solid rgba(14,165,233,.15);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--muted);margin:16px 0;line-height:1.6}
+  .note strong{color:var(--accent)}
+  @media(max-width:640px){.wrap{padding:24px 16px}.title{font-size:28px}.card{padding:24px}.pg,.fg{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
@@ -83,7 +62,7 @@
   <div class="hdr">
     <div class="oa">O A</div>
     <div class="title">OpenAnalyst CLI</div>
-    <div class="sub">One CLI, Every LLM Provider</div>
+    <div class="sub">One CLI, Every LLM Provider &mdash; All Claude Code &amp; OpenAI Features Built In</div>
     <div class="ver">v1.0.1</div>
   </div>
 
@@ -96,16 +75,12 @@
       <button class="tab" onclick="sw(event,'i2')">Windows</button>
     </div>
     <div id="i1" class="tc on">
-      <div class="cb">
-        <div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span><button class="cp" onclick="cc(this)">Copy</button></div>
-<pre class="cd"><span class="gn">curl</span> <span class="cn">-fsSL</span> https://install.openanalyst.com | <span class="gn">bash</span></pre>
-      </div>
+      <div class="cb"><div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span><button class="cp" onclick="cc(this)">Copy</button></div>
+<pre class="cd"><span class="gn">curl</span> <span class="cn">-fsSL</span> https://install.openanalyst.com | <span class="gn">bash</span></pre></div>
     </div>
     <div id="i2" class="tc">
-      <div class="cb">
-        <div class="ch"><span class="cl">PowerShell</span><button class="cp" onclick="cc(this)">Copy</button></div>
-<pre class="cd"><span class="gn">irm</span> https://install.openanalyst.com/win | <span class="gn">iex</span></pre>
-      </div>
+      <div class="cb"><div class="ch"><span class="cl">PowerShell</span><button class="cp" onclick="cc(this)">Copy</button></div>
+<pre class="cd"><span class="gn">irm</span> https://install.openanalyst.com/win | <span class="gn">iex</span></pre></div>
     </div>
   </div>
 
@@ -113,98 +88,185 @@
   <div class="card">
     <div class="num">02</div>
     <h2><span class="ic gn">&#9881;</span> Configure</h2>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Set your API key for any provider you have access to.</p>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Set your API key. The CLI auto-detects the provider from your model or key.</p>
     <div class="tabs">
       <button class="tab on" onclick="sw(event,'c1')">macOS / Linux</button>
       <button class="tab" onclick="sw(event,'c2')">Windows</button>
     </div>
     <div id="c1" class="tc on">
-      <div class="cb">
-        <div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; ~/.zshrc</span><button class="cp" onclick="cc(this)">Copy</button></div>
-<pre class="cd"><span class="cm"># Pick your provider (set one or more)</span>
-
-<span class="kw">export</span> <span class="vr">OPENANALYST_AUTH_TOKEN</span>=<span class="st">"your-openanalyst-key"</span>     <span class="cm"># OpenAnalyst</span>
-<span class="kw">export</span> <span class="vr">ANTHROPIC_API_KEY</span>=<span class="st">"sk-ant-..."</span>                   <span class="cm"># Claude</span>
-<span class="kw">export</span> <span class="vr">OPENAI_API_KEY</span>=<span class="st">"sk-..."</span>                         <span class="cm"># GPT / Codex</span>
-<span class="kw">export</span> <span class="vr">OPENROUTER_API_KEY</span>=<span class="st">"sk-or-..."</span>                  <span class="cm"># OpenRouter</span>
-<span class="kw">export</span> <span class="vr">XAI_API_KEY</span>=<span class="st">"xai-..."</span>                          <span class="cm"># Grok</span>
-<span class="kw">export</span> <span class="vr">BEDROCK_API_KEY</span>=<span class="st">"..."</span>                          <span class="cm"># Bedrock</span></pre>
-      </div>
+      <div class="cb"><div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; ~/.zshrc</span><button class="cp" onclick="cc(this)">Copy</button></div>
+<pre class="cd"><span class="cm"># Set one or more provider keys</span>
+<span class="kw">export</span> <span class="vr">OPENANALYST_AUTH_TOKEN</span>=<span class="st">"your-key"</span>      <span class="cm"># OpenAnalyst</span>
+<span class="kw">export</span> <span class="vr">ANTHROPIC_API_KEY</span>=<span class="st">"sk-ant-..."</span>        <span class="cm"># Claude</span>
+<span class="kw">export</span> <span class="vr">OPENAI_API_KEY</span>=<span class="st">"sk-..."</span>              <span class="cm"># GPT / Codex</span>
+<span class="kw">export</span> <span class="vr">OPENROUTER_API_KEY</span>=<span class="st">"sk-or-..."</span>       <span class="cm"># OpenRouter</span>
+<span class="kw">export</span> <span class="vr">XAI_API_KEY</span>=<span class="st">"xai-..."</span>               <span class="cm"># Grok</span>
+<span class="kw">export</span> <span class="vr">BEDROCK_API_KEY</span>=<span class="st">"..."</span>               <span class="cm"># Bedrock</span></pre></div>
     </div>
     <div id="c2" class="tc">
-      <div class="cb">
-        <div class="ch"><span class="cl">PowerShell</span><button class="cp" onclick="cc(this)">Copy</button></div>
-<pre class="cd"><span class="cm"># Pick your provider (set one or more)</span>
-
-<span class="vr">$env:OPENANALYST_AUTH_TOKEN</span> = <span class="st">"your-openanalyst-key"</span>     <span class="cm"># OpenAnalyst</span>
-<span class="vr">$env:ANTHROPIC_API_KEY</span> = <span class="st">"sk-ant-..."</span>                   <span class="cm"># Claude</span>
-<span class="vr">$env:OPENAI_API_KEY</span> = <span class="st">"sk-..."</span>                         <span class="cm"># GPT / Codex</span>
-<span class="vr">$env:OPENROUTER_API_KEY</span> = <span class="st">"sk-or-..."</span>                  <span class="cm"># OpenRouter</span>
-<span class="vr">$env:XAI_API_KEY</span> = <span class="st">"xai-..."</span>                          <span class="cm"># Grok</span>
-<span class="vr">$env:BEDROCK_API_KEY</span> = <span class="st">"..."</span>                          <span class="cm"># Bedrock</span></pre>
-      </div>
+      <div class="cb"><div class="ch"><span class="cl">PowerShell</span><button class="cp" onclick="cc(this)">Copy</button></div>
+<pre class="cd"><span class="vr">$env:OPENANALYST_AUTH_TOKEN</span> = <span class="st">"your-key"</span>      <span class="cm"># OpenAnalyst</span>
+<span class="vr">$env:ANTHROPIC_API_KEY</span> = <span class="st">"sk-ant-..."</span>        <span class="cm"># Claude</span>
+<span class="vr">$env:OPENAI_API_KEY</span> = <span class="st">"sk-..."</span>              <span class="cm"># GPT / Codex</span>
+<span class="vr">$env:OPENROUTER_API_KEY</span> = <span class="st">"sk-or-..."</span>       <span class="cm"># OpenRouter</span></pre></div>
     </div>
   </div>
 
   <!-- 3. Use -->
   <div class="card">
     <div class="num">03</div>
-    <h2><span class="ic or">&#9654;</span> Use</h2>
-    <div class="cb">
-      <div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span></div>
+    <h2><span class="ic or">&#9654;</span> Start Using</h2>
+    <div class="cb"><div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span></div>
 <pre class="cd"><span class="gn">$</span> openanalyst
+<span class="cm"># Connected &middot; Model: openanalyst-beta</span>
 
-<span class="cm"># Connected to OpenAnalyst API</span>
-<span class="cm"># Model: openanalyst-beta</span></pre>
-    </div>
-    <table class="ut">
-      <tr><td>openanalyst</td><td>Start interactive session</td></tr>
-      <tr><td>openanalyst "explain this code"</td><td>Quick one-shot prompt</td></tr>
-      <tr><td>openanalyst --model gpt-4o "hello"</td><td>Use OpenAI</td></tr>
-      <tr><td>openanalyst --model sonnet "fix bug"</td><td>Use Claude</td></tr>
-      <tr><td>openanalyst --model grok "review"</td><td>Use Grok</td></tr>
-      <tr><td>openanalyst init</td><td>Setup project config</td></tr>
-      <tr><td>/help</td><td>Show all commands (inside REPL)</td></tr>
-      <tr><td>/model gpt-4o</td><td>Switch model mid-session</td></tr>
-    </table>
+<span class="gn">$</span> openanalyst <span class="st">"explain this codebase"</span>
+<span class="cm"># One-shot prompt</span>
+
+<span class="gn">$</span> openanalyst <span class="cn">--model</span> gpt-4o <span class="st">"summarize this repo"</span>
+<span class="cm"># Use OpenAI</span>
+
+<span class="gn">$</span> openanalyst <span class="cn">--model</span> sonnet <span class="st">"fix the bug in main.rs"</span>
+<span class="cm"># Use Claude</span>
+
+<span class="gn">$</span> openanalyst init
+<span class="cm"># Create project config (OPENANALYST.md)</span></pre></div>
   </div>
 
   <!-- 4. Providers -->
   <div class="card">
     <div class="num">04</div>
-    <h2><span class="ic pu">&#9733;</span> Providers</h2>
+    <h2><span class="ic pu">&#9733;</span> Supported Providers</h2>
     <div class="pg">
-      <div class="pc df">
-        <div class="pn">OpenAnalyst <span class="bd">DEFAULT</span></div>
-        <div class="pe">OPENANALYST_AUTH_TOKEN</div>
-        <div class="pm">openanalyst-beta</div>
-      </div>
-      <div class="pc">
-        <div class="pn">Anthropic / Claude</div>
-        <div class="pe">ANTHROPIC_API_KEY</div>
-        <div class="pm">opus, sonnet, haiku</div>
-      </div>
-      <div class="pc">
-        <div class="pn">OpenAI / GPT</div>
-        <div class="pe">OPENAI_API_KEY</div>
-        <div class="pm">gpt-4o, gpt-4.1, o3, codex-mini</div>
-      </div>
-      <div class="pc">
-        <div class="pn">xAI / Grok</div>
-        <div class="pe">XAI_API_KEY</div>
-        <div class="pm">grok, grok-3, grok-mini</div>
-      </div>
-      <div class="pc">
-        <div class="pn">OpenRouter</div>
-        <div class="pe">OPENROUTER_API_KEY</div>
-        <div class="pm">Any model via openrouter/*</div>
-      </div>
-      <div class="pc">
-        <div class="pn">Amazon Bedrock</div>
-        <div class="pe">BEDROCK_API_KEY</div>
-        <div class="pm">Any model via bedrock/*</div>
-      </div>
+      <div class="pc df"><div class="pn">OpenAnalyst <span class="bd">DEFAULT</span></div><div class="pe">OPENANALYST_AUTH_TOKEN</div><div class="pm">openanalyst-beta</div></div>
+      <div class="pc"><div class="pn">Anthropic / Claude</div><div class="pe">ANTHROPIC_API_KEY</div><div class="pm">opus, sonnet, haiku, claude-*</div></div>
+      <div class="pc"><div class="pn">OpenAI / GPT</div><div class="pe">OPENAI_API_KEY</div><div class="pm">gpt-4o, gpt-4.1, o3, o4-mini, codex-mini</div></div>
+      <div class="pc"><div class="pn">xAI / Grok</div><div class="pe">XAI_API_KEY</div><div class="pm">grok, grok-3, grok-mini</div></div>
+      <div class="pc"><div class="pn">OpenRouter</div><div class="pe">OPENROUTER_API_KEY</div><div class="pm">openrouter/* (any model)</div></div>
+      <div class="pc"><div class="pn">Amazon Bedrock</div><div class="pe">BEDROCK_API_KEY</div><div class="pm">bedrock/* (any model)</div></div>
     </div>
+  </div>
+
+  <!-- 5. Commands Reference -->
+  <div class="card">
+    <div class="num">05</div>
+    <h2><span class="ic cy">&#9000;</span> Command Reference</h2>
+    <div class="note"><strong>All commands work identically</strong> regardless of which LLM provider you use &mdash; OpenAnalyst, Claude, OpenAI, Grok, or OpenRouter. Same skills, same tools, same slash commands.</div>
+
+    <h3 style="font-size:15px;font-weight:600;margin:20px 0 8px;color:var(--text)">CLI Commands</h3>
+    <table class="cmd-table">
+      <tr><th>Command</th><th>Description</th></tr>
+      <tr><td>openanalyst</td><td>Start interactive REPL session</td></tr>
+      <tr><td>openanalyst "prompt"</td><td>One-shot prompt, then exit</td></tr>
+      <tr><td>openanalyst prompt "text"</td><td>Explicit prompt mode (supports --output-format json)</td></tr>
+      <tr><td>openanalyst --model MODEL</td><td>Use a specific model (auto-detects provider)</td></tr>
+      <tr><td>openanalyst --resume FILE</td><td>Resume a saved session</td></tr>
+      <tr><td>openanalyst init</td><td>Create OPENANALYST.md and project config</td></tr>
+      <tr><td>openanalyst login</td><td>Authenticate via OAuth</td></tr>
+      <tr><td>openanalyst logout</td><td>Clear stored credentials</td></tr>
+      <tr><td>openanalyst agents</td><td>List configured agents</td></tr>
+      <tr><td>openanalyst skills</td><td>List available skills</td></tr>
+      <tr><td>openanalyst --version</td><td>Print version info</td></tr>
+    </table>
+
+    <h3 style="font-size:15px;font-weight:600;margin:24px 0 8px;color:var(--text)">Interactive Slash Commands</h3>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px"><span class="tag tag-r">resume-safe</span> commands also work with <code style="color:var(--cyan)">--resume session.json</code></p>
+
+    <table class="cmd-table">
+      <tr><td colspan="2" class="cmd-cat">Session</td></tr>
+      <tr><td>/help <span class="tag tag-r">resume</span></td><td>Show all available commands</td></tr>
+      <tr><td>/status <span class="tag tag-r">resume</span></td><td>Model, permissions, tokens, cost, git branch, session info</td></tr>
+      <tr><td>/cost <span class="tag tag-r">resume</span></td><td>Show cumulative token usage and cost breakdown</td></tr>
+      <tr><td>/model [name]</td><td>Show or switch model mid-session (e.g. <code style="color:var(--cyan)">/model gpt-4o</code>)</td></tr>
+      <tr><td>/clear [--confirm] <span class="tag tag-r">resume</span></td><td>Start a fresh session</td></tr>
+      <tr><td>/compact <span class="tag tag-r">resume</span></td><td>Compact conversation history to save context</td></tr>
+      <tr><td>/session [list|switch] <span class="tag tag-r">resume</span></td><td>List or switch between saved sessions</td></tr>
+      <tr><td>/export [file] <span class="tag tag-r">resume</span></td><td>Export conversation transcript to a file</td></tr>
+      <tr><td>/resume &lt;path&gt;</td><td>Load a saved session into the REPL</td></tr>
+
+      <tr><td colspan="2" class="cmd-cat">Code &amp; Git</td></tr>
+      <tr><td>/diff <span class="tag tag-r">resume</span></td><td>Show git diff of workspace changes</td></tr>
+      <tr><td>/commit</td><td>Generate commit message and create a git commit</td></tr>
+      <tr><td>/commit-push-pr [ctx]</td><td>Commit, push branch, and open a pull request</td></tr>
+      <tr><td>/pr [context]</td><td>Draft or create a GitHub pull request</td></tr>
+      <tr><td>/issue [context]</td><td>Draft or create a GitHub issue</td></tr>
+      <tr><td>/branch [list|create|switch]</td><td>Manage git branches</td></tr>
+      <tr><td>/worktree [list|add|remove]</td><td>Manage git worktrees</td></tr>
+      <tr><td>/teleport &lt;symbol&gt;</td><td>Jump to a file or symbol in the workspace</td></tr>
+
+      <tr><td colspan="2" class="cmd-cat">Analysis &amp; Planning</td></tr>
+      <tr><td>/bughunter [scope]</td><td>Scan codebase for likely bugs</td></tr>
+      <tr><td>/ultraplan [task]</td><td>Deep multi-step planning with reasoning</td></tr>
+      <tr><td>/debug-tool-call</td><td>Replay last tool call with debug output</td></tr>
+
+      <tr><td colspan="2" class="cmd-cat">Config &amp; Memory</td></tr>
+      <tr><td>/config [section] <span class="tag tag-r">resume</span></td><td>Inspect config (env, hooks, model, plugins)</td></tr>
+      <tr><td>/memory <span class="tag tag-r">resume</span></td><td>Show loaded OPENANALYST.md instruction files</td></tr>
+      <tr><td>/init <span class="tag tag-r">resume</span></td><td>Create starter OPENANALYST.md for this repo</td></tr>
+      <tr><td>/permissions [mode]</td><td>Show or switch permission mode</td></tr>
+      <tr><td>/version <span class="tag tag-r">resume</span></td><td>Show CLI version and build info</td></tr>
+
+      <tr><td colspan="2" class="cmd-cat">Extensions</td></tr>
+      <tr><td>/agents <span class="tag tag-r">resume</span></td><td>List configured agents</td></tr>
+      <tr><td>/skills <span class="tag tag-r">resume</span></td><td>List available skills</td></tr>
+      <tr><td>/plugin [list|install|enable|disable]</td><td>Manage plugins</td></tr>
+    </table>
+  </div>
+
+  <!-- 6. Built-in Tools -->
+  <div class="card">
+    <div class="num">06</div>
+    <h2><span class="ic pk">&#9879;</span> Built-in Tools</h2>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">The AI agent can use these tools automatically during conversations &mdash; same as Claude Code and Codex.</p>
+    <div class="fg">
+      <div class="fc"><div class="fn">Bash</div><div class="fd">Execute shell commands, run scripts, install packages</div></div>
+      <div class="fc"><div class="fn">ReadFile</div><div class="fd">Read any file with line numbers, offsets, and limits</div></div>
+      <div class="fc"><div class="fn">WriteFile</div><div class="fd">Create new files with content</div></div>
+      <div class="fc"><div class="fn">EditFile</div><div class="fd">Precise string replacements in existing files</div></div>
+      <div class="fc"><div class="fn">GlobSearch</div><div class="fd">Find files by pattern (e.g. **/*.ts)</div></div>
+      <div class="fc"><div class="fn">GrepSearch</div><div class="fd">Search file contents with regex</div></div>
+      <div class="fc"><div class="fn">WebSearch</div><div class="fd">Search the web for documentation and answers</div></div>
+      <div class="fc"><div class="fn">WebFetch</div><div class="fd">Fetch content from URLs</div></div>
+      <div class="fc"><div class="fn">Agent</div><div class="fd">Launch sub-agents for parallel tasks</div></div>
+      <div class="fc"><div class="fn">TodoWrite</div><div class="fd">Track tasks and progress within a session</div></div>
+      <div class="fc"><div class="fn">NotebookEdit</div><div class="fd">Edit Jupyter notebook cells</div></div>
+      <div class="fc"><div class="fn">Skill</div><div class="fd">Invoke registered skills and workflows</div></div>
+    </div>
+  </div>
+
+  <!-- 7. Features -->
+  <div class="card">
+    <div class="num">07</div>
+    <h2><span class="ic gn">&#10003;</span> Features</h2>
+    <div class="fg">
+      <div class="fc"><div class="fn">Multi-Provider LLM</div><div class="fd">Switch between 6 providers with one flag. Auto-detects from model name.</div></div>
+      <div class="fc"><div class="fn">OPENANALYST.md</div><div class="fd">Project-specific AI instructions. Detected automatically in directory tree.</div></div>
+      <div class="fc"><div class="fn">Session Persistence</div><div class="fd">Save, resume, list, and export conversation sessions.</div></div>
+      <div class="fc"><div class="fn">Streaming Output</div><div class="fd">Real-time streaming with syntax-highlighted Markdown rendering.</div></div>
+      <div class="fc"><div class="fn">Permission System</div><div class="fd">read-only, workspace-write, or danger-full-access modes.</div></div>
+      <div class="fc"><div class="fn">Git Integration</div><div class="fd">Commit, branch, PR, issue creation &mdash; all from slash commands.</div></div>
+      <div class="fc"><div class="fn">Config Hierarchy</div><div class="fd">.openanalyst.json &rarr; .openanalyst/settings.json &rarr; settings.local.json</div></div>
+      <div class="fc"><div class="fn">Plugin System</div><div class="fd">Install, enable, and manage custom tool plugins.</div></div>
+      <div class="fc"><div class="fn">Cost Tracking</div><div class="fd">Per-turn and cumulative token usage and cost display.</div></div>
+      <div class="fc"><div class="fn">Cross-Platform</div><div class="fd">Native binaries for macOS, Linux, and Windows.</div></div>
+    </div>
+  </div>
+
+  <!-- 8. Project Config -->
+  <div class="card">
+    <div class="num">08</div>
+    <h2><span class="ic bl">&#128193;</span> Project Config Files</h2>
+    <table class="cmd-table">
+      <tr><th>File</th><th>Purpose</th></tr>
+      <tr><td>OPENANALYST.md</td><td>Project instructions for the AI (auto-detected in parent dirs)</td></tr>
+      <tr><td>.openanalyst.json</td><td>Shared project defaults (permissions, model, tools)</td></tr>
+      <tr><td>.openanalyst/settings.json</td><td>Project-level settings</td></tr>
+      <tr><td>.openanalyst/settings.local.json</td><td>Machine-local overrides (gitignored)</td></tr>
+      <tr><td>.openanalyst/sessions/</td><td>Saved conversation sessions</td></tr>
+      <tr><td>.openanalyst/skills/</td><td>Custom skill definitions</td></tr>
+      <tr><td>.openanalyst/agents/</td><td>Custom agent configurations</td></tr>
+      <tr><td>.openanalyst/commands/</td><td>Custom slash commands</td></tr>
+    </table>
   </div>
 
   <div class="ft">
