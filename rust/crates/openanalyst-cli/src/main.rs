@@ -1586,7 +1586,7 @@ impl LiveCli {
         let mut spinner = Spinner::new();
         let mut stdout = io::stdout();
         spinner.tick(
-            "📊 Thinking...",
+            "Thinking...",
             TerminalRenderer::new().color_theme(),
             &mut stdout,
         )?;
@@ -1595,7 +1595,7 @@ impl LiveCli {
         match result {
             Ok(_) => {
                 spinner.finish(
-                    "✨ Done",
+                    "Done",
                     TerminalRenderer::new().color_theme(),
                     &mut stdout,
                 )?;
@@ -1605,7 +1605,7 @@ impl LiveCli {
             }
             Err(error) => {
                 spinner.fail(
-                    "❌ Request failed",
+                    "Request failed",
                     TerminalRenderer::new().color_theme(),
                     &mut stdout,
                 )?;
