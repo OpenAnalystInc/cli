@@ -53,14 +53,19 @@ OpenAnalyst CLI is a **unified AI agent CLI** that connects to multiple LLM prov
 
 ### 1. Install
 
-**macOS / Linux:**
+**macOS / Linux (curl):**
 ```bash
-./install.sh
+curl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash
+```
+
+**npm (all platforms):**
+```bash
+npm install -g @openanalyst/cli
 ```
 
 **Windows PowerShell:**
 ```powershell
-.\install.ps1
+irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex
 ```
 
 **Or build from source:**
@@ -221,7 +226,7 @@ OpenAnalyst Inc acknowledges that:
 4. This project is not a commercial product and is not offered as a service
 5. Any use of Anthropic's API through this tool is subject to Anthropic's Terms of Service
 
-If Anthropic or its representatives have concerns about this project, please contact: **legal@openanalyst.com**
+If Anthropic or its representatives have concerns about this project, please contact: **anit@openanalyst.com**
 
 ### Third-Party Acknowledgements
 

@@ -1,0 +1,42 @@
+{
+  "name": "@openanalyst/cli",
+  "version": "1.0.1",
+  "description": "OpenAnalyst CLI — AI-powered code analysis agent with multi-provider LLM support",
+  "bin": {
+    "openanalyst": "./bin/cli.js"
+  },
+  "scripts": {
+    "postinstall": "node scripts/postinstall.js",
+    "build": "node scripts/build.js"
+  },
+  "files": [
+    "bin/",
+    "scripts/",
+    "rust/",
+    "src/",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": [
+    "cli",
+    "ai",
+    "openanalyst",
+    "code-analysis",
+    "llm",
+    "agent"
+  ],
+  "author": "OpenAnalyst Inc",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/AnitChaudhry/openanalyst-cli.git"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "os": [
+    "darwin",
+    "linux",
+    "win32"
+  ]
+}
