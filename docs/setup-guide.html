@@ -3,771 +3,219 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenAnalyst CLI — Setup Guide</title>
+<title>OpenAnalyst CLI — Get Started</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-
   :root {
-    --bg: #0a0e17;
-    --bg-card: #111827;
-    --bg-code: #0d1321;
-    --border: #1e293b;
-    --border-glow: #0ea5e9;
-    --text: #e2e8f0;
-    --text-dim: #64748b;
-    --text-muted: #94a3b8;
-    --accent: #0ea5e9;
-    --accent-light: #38bdf8;
-    --accent-glow: rgba(14, 165, 233, 0.15);
-    --green: #22c55e;
-    --yellow: #eab308;
-    --orange: #f97316;
-    --purple: #a78bfa;
-    --pink: #f472b6;
-    --cyan: #22d3ee;
-    --red: #ef4444;
+    --bg:#0a0e17;--card:#111827;--code:#0d1321;--border:#1e293b;
+    --text:#e2e8f0;--dim:#64748b;--muted:#94a3b8;
+    --accent:#0ea5e9;--accent2:#38bdf8;--glow:rgba(14,165,233,0.15);
+    --green:#22c55e;--yellow:#eab308;--purple:#a78bfa;--cyan:#22d3ee;--pink:#f472b6;
   }
+  *{margin:0;padding:0;box-sizing:border-box}
+  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
+  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 0%,rgba(14,165,233,0.08),transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(139,92,246,0.06),transparent 50%);pointer-events:none}
+  .wrap{max-width:860px;margin:0 auto;padding:40px 24px;position:relative;z-index:1}
 
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+  /* Header */
+  .hdr{text-align:center;margin-bottom:48px}
+  .oa{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;padding:6px 14px;border:2px solid var(--accent);border-radius:8px;color:var(--accent);letter-spacing:4px;box-shadow:0 0 20px var(--glow),inset 0 0 20px var(--glow);margin-bottom:16px}
+  .title{font-family:'JetBrains Mono',monospace;font-size:44px;font-weight:700;letter-spacing:-2px;background:linear-gradient(135deg,var(--accent),var(--cyan),var(--accent2));background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:sh 3s ease-in-out infinite}
+  @keyframes sh{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+  .sub{color:var(--muted);font-size:16px;margin-top:4px}
+  .ver{display:inline-block;background:var(--glow);border:1px solid rgba(14,165,233,0.3);color:var(--accent2);font-family:'JetBrains Mono',monospace;font-size:13px;padding:4px 12px;border-radius:20px;margin-top:12px}
 
-  body {
-    font-family: 'Inter', -apple-system, sans-serif;
-    background: var(--bg);
-    color: var(--text);
-    line-height: 1.6;
-    min-height: 100vh;
-  }
+  /* Cards */
+  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;margin-bottom:24px;position:relative;overflow:hidden;transition:border-color .3s}
+  .card:hover{border-color:rgba(14,165,233,0.3)}
+  .card .num{position:absolute;top:20px;right:28px;font-family:'JetBrains Mono',monospace;font-size:64px;font-weight:700;color:rgba(14,165,233,0.07);line-height:1}
+  .card h2{font-size:20px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:10px}
+  .card h2 .ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
+  .ic.bl{background:var(--glow);color:var(--accent)}
+  .ic.gn{background:rgba(34,197,94,.15);color:var(--green)}
+  .ic.or{background:rgba(249,115,22,.15);color:#f97316}
+  .ic.pu{background:rgba(167,139,250,.15);color:var(--purple)}
 
-  /* Animated gradient background */
-  body::before {
-    content: '';
-    position: fixed;
-    top: 0; left: 0; right: 0; bottom: 0;
-    background:
-      radial-gradient(ellipse at 20% 0%, rgba(14, 165, 233, 0.08) 0%, transparent 50%),
-      radial-gradient(ellipse at 80% 100%, rgba(139, 92, 246, 0.06) 0%, transparent 50%);
-    pointer-events: none;
-    z-index: 0;
-  }
+  /* Tabs */
+  .tabs{display:flex;gap:0}
+  .tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--dim);background:0;border:1px solid var(--border);border-bottom:0;border-radius:8px 8px 0 0;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}
+  .tab.on{background:var(--code);color:var(--accent);border-color:var(--border)}
+  .tc{display:none}.tc.on{display:block}
+  .tc .cb{border-top-left-radius:0;margin-top:0}
 
-  .container {
-    max-width: 900px;
-    margin: 0 auto;
-    padding: 40px 24px;
-    position: relative;
-    z-index: 1;
-  }
+  /* Code */
+  .cb{background:var(--code);border:1px solid var(--border);border-radius:10px;margin:12px 0;overflow:hidden}
+  .ch{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)}
+  .cl{font-size:12px;font-weight:500;color:var(--dim);display:flex;align-items:center;gap:6px}
+  .dt{width:8px;height:8px;border-radius:50%}.d1{background:#ef4444}.d2{background:#eab308}.d3{background:#22c55e}
+  .cp{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}
+  .cp:hover{background:var(--glow);border-color:var(--accent);color:var(--accent)}
+  pre.cd{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:13.5px;line-height:1.8;overflow-x:auto;white-space:pre;color:var(--text)}
+  .cm{color:var(--dim)}.kw{color:var(--pink)}.vr{color:var(--purple)}.st{color:var(--yellow)}.gn{color:var(--green)}.cn{color:var(--cyan)}
 
-  /* ── Header ── */
-  .header {
-    text-align: center;
-    margin-bottom: 48px;
-  }
+  /* Provider grid */
+  .pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:16px}
+  .pc{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:16px;transition:.2s}
+  .pc:hover{border-color:rgba(14,165,233,.3)}
+  .pc.df{border-color:rgba(14,165,233,.3);background:var(--glow)}
+  .pn{font-weight:600;font-size:14px;margin-bottom:4px;display:flex;align-items:center;gap:8px}
+  .pn .bd{font-size:10px;font-weight:500;padding:2px 6px;border-radius:4px;background:rgba(14,165,233,.2);color:var(--accent)}
+  .pe{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--purple);margin:4px 0}
+  .pm{font-size:12px;color:var(--dim)}
 
-  .logo {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 48px;
-    font-weight: 700;
-    letter-spacing: -2px;
-    margin-bottom: 4px;
-    background: linear-gradient(135deg, var(--accent) 0%, var(--cyan) 50%, var(--accent-light) 100%);
-    background-size: 200% 200%;
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    animation: shimmer 3s ease-in-out infinite;
-  }
+  /* Usage table */
+  .ut{width:100%;margin-top:12px;border-collapse:collapse}
+  .ut td{padding:10px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}
+  .ut td:first-child{font-family:'JetBrains Mono',monospace;color:var(--green);padding-right:16px;white-space:nowrap}
+  .ut td:last-child{color:var(--dim)}
 
-  @keyframes shimmer {
-    0%, 100% { background-position: 0% 50%; }
-    50% { background-position: 100% 50%; }
-  }
+  /* Footer */
+  .ft{text-align:center;margin-top:48px;padding-top:32px;border-top:1px solid var(--border);color:var(--dim);font-size:13px}
+  .ft a{color:var(--accent);text-decoration:none}
+  .ft a:hover{text-decoration:underline}
 
-  .logo-oa {
-    display: inline-block;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 20px;
-    font-weight: 700;
-    padding: 6px 14px;
-    border: 2px solid var(--accent);
-    border-radius: 8px;
-    color: var(--accent);
-    margin-bottom: 16px;
-    letter-spacing: 4px;
-    box-shadow: 0 0 20px var(--accent-glow), inset 0 0 20px var(--accent-glow);
-  }
-
-  .subtitle {
-    color: var(--text-muted);
-    font-size: 16px;
-    font-weight: 400;
-  }
-
-  .version-badge {
-    display: inline-block;
-    background: var(--accent-glow);
-    border: 1px solid rgba(14, 165, 233, 0.3);
-    color: var(--accent-light);
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    padding: 4px 12px;
-    border-radius: 20px;
-    margin-top: 12px;
-  }
-
-  .internal-badge {
-    display: inline-block;
-    background: rgba(234, 179, 8, 0.1);
-    border: 1px solid rgba(234, 179, 8, 0.3);
-    color: var(--yellow);
-    font-size: 12px;
-    font-weight: 500;
-    padding: 3px 10px;
-    border-radius: 20px;
-    margin-top: 8px;
-    margin-left: 8px;
-  }
-
-  /* ── Steps ── */
-  .step {
-    background: var(--bg-card);
-    border: 1px solid var(--border);
-    border-radius: 16px;
-    padding: 32px;
-    margin-bottom: 24px;
-    position: relative;
-    overflow: hidden;
-    transition: border-color 0.3s, box-shadow 0.3s;
-  }
-
-  .step:hover {
-    border-color: rgba(14, 165, 233, 0.3);
-    box-shadow: 0 0 30px rgba(14, 165, 233, 0.05);
-  }
-
-  .step-number {
-    position: absolute;
-    top: 24px;
-    right: 28px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 64px;
-    font-weight: 700;
-    color: rgba(14, 165, 233, 0.07);
-    line-height: 1;
-  }
-
-  .step h2 {
-    font-size: 20px;
-    font-weight: 600;
-    margin-bottom: 20px;
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .step h2 .icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 8px;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 14px;
-    flex-shrink: 0;
-  }
-
-  .step h2 .icon.blue { background: var(--accent-glow); color: var(--accent); }
-  .step h2 .icon.green { background: rgba(34, 197, 94, 0.15); color: var(--green); }
-  .step h2 .icon.orange { background: rgba(249, 115, 22, 0.15); color: var(--orange); }
-  .step h2 .icon.purple { background: rgba(167, 139, 250, 0.15); color: var(--purple); }
-
-  /* ── Code blocks ── */
-  .code-block {
-    background: var(--bg-code);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    margin: 12px 0;
-    overflow: hidden;
-  }
-
-  .code-header {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 10px 16px;
-    background: rgba(255, 255, 255, 0.02);
-    border-bottom: 1px solid var(--border);
-  }
-
-  .code-label {
-    font-size: 12px;
-    font-weight: 500;
-    color: var(--text-dim);
-    display: flex;
-    align-items: center;
-    gap: 6px;
-  }
-
-  .code-label .dot {
-    width: 8px;
-    height: 8px;
-    border-radius: 50%;
-  }
-
-  .code-label .dot.mac { background: #ef4444; }
-  .code-label .dot.mac + .dot { background: #eab308; }
-  .code-label .dot.mac + .dot + .dot { background: #22c55e; }
-
-  .copy-btn {
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid var(--border);
-    color: var(--text-muted);
-    font-size: 12px;
-    padding: 4px 12px;
-    border-radius: 6px;
-    cursor: pointer;
-    font-family: 'Inter', sans-serif;
-    transition: all 0.2s;
-  }
-
-  .copy-btn:hover {
-    background: var(--accent-glow);
-    border-color: var(--accent);
-    color: var(--accent);
-  }
-
-  .code-body {
-    padding: 16px 20px;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13.5px;
-    line-height: 1.7;
-    overflow-x: auto;
-    white-space: pre;
-  }
-
-  .code-body .comment { color: var(--text-dim); }
-  .code-body .cmd { color: var(--green); }
-  .code-body .flag { color: var(--cyan); }
-  .code-body .string { color: var(--yellow); }
-  .code-body .var { color: var(--purple); }
-  .code-body .keyword { color: var(--pink); }
-  .code-body .url { color: var(--accent-light); }
-
-  /* ── Tabs ── */
-  .tabs {
-    display: flex;
-    gap: 0;
-    margin-bottom: 0;
-  }
-
-  .tab {
-    padding: 10px 20px;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--text-dim);
-    background: transparent;
-    border: 1px solid var(--border);
-    border-bottom: none;
-    border-radius: 8px 8px 0 0;
-    cursor: pointer;
-    transition: all 0.2s;
-    font-family: 'Inter', sans-serif;
-  }
-
-  .tab.active {
-    background: var(--bg-code);
-    color: var(--accent);
-    border-color: var(--border);
-  }
-
-  .tab-content { display: none; }
-  .tab-content.active { display: block; }
-
-  .tab-content .code-block {
-    border-top-left-radius: 0;
-    margin-top: 0;
-  }
-
-  /* ── Provider cards ── */
-  .providers {
-    display: grid;
-    grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-    gap: 12px;
-    margin-top: 16px;
-  }
-
-  .provider-card {
-    background: rgba(255, 255, 255, 0.02);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 16px;
-    transition: all 0.2s;
-  }
-
-  .provider-card:hover {
-    border-color: rgba(14, 165, 233, 0.3);
-    background: rgba(14, 165, 233, 0.03);
-  }
-
-  .provider-card.default {
-    border-color: rgba(14, 165, 233, 0.3);
-    background: var(--accent-glow);
-  }
-
-  .provider-name {
-    font-weight: 600;
-    font-size: 14px;
-    margin-bottom: 4px;
-    display: flex;
-    align-items: center;
-    gap: 8px;
-  }
-
-  .provider-name .badge {
-    font-size: 10px;
-    font-weight: 500;
-    padding: 2px 6px;
-    border-radius: 4px;
-    background: rgba(14, 165, 233, 0.2);
-    color: var(--accent);
-  }
-
-  .provider-env {
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 11.5px;
-    color: var(--purple);
-    margin: 4px 0;
-  }
-
-  .provider-models {
-    font-size: 12px;
-    color: var(--text-dim);
-  }
-
-  /* ── Table ── */
-  .usage-table {
-    width: 100%;
-    margin-top: 12px;
-    border-collapse: collapse;
-  }
-
-  .usage-table td {
-    padding: 8px 0;
-    font-family: 'JetBrains Mono', monospace;
-    font-size: 13px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-    vertical-align: top;
-  }
-
-  .usage-table td:first-child {
-    color: var(--green);
-    padding-right: 16px;
-    white-space: nowrap;
-  }
-
-  .usage-table td:last-child {
-    color: var(--text-dim);
-    font-family: 'Inter', sans-serif;
-    font-size: 13px;
-  }
-
-  /* ── Requirements ── */
-  .req-list {
-    list-style: none;
-    margin-top: 12px;
-  }
-
-  .req-list li {
-    padding: 8px 0;
-    font-size: 14px;
-    color: var(--text-muted);
-    display: flex;
-    align-items: center;
-    gap: 10px;
-  }
-
-  .req-list li::before {
-    content: '';
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--accent);
-    flex-shrink: 0;
-  }
-
-  /* ── Footer ── */
-  .footer {
-    text-align: center;
-    margin-top: 48px;
-    padding-top: 32px;
-    border-top: 1px solid var(--border);
-    color: var(--text-dim);
-    font-size: 13px;
-  }
-
-  .footer a {
-    color: var(--accent);
-    text-decoration: none;
-  }
-
-  .footer a:hover { text-decoration: underline; }
-
-  /* ── Responsive ── */
-  @media (max-width: 640px) {
-    .container { padding: 24px 16px; }
-    .logo { font-size: 32px; }
-    .step { padding: 24px; }
-    .providers { grid-template-columns: 1fr; }
-    .step-number { font-size: 48px; }
-  }
+  @media(max-width:640px){.wrap{padding:24px 16px}.title{font-size:28px}.card{padding:24px}.pg{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
+<div class="wrap">
 
-<div class="container">
-
-  <!-- Header -->
-  <div class="header">
-    <div class="logo-oa">O A</div>
-    <div class="logo">OpenAnalyst CLI</div>
-    <div class="subtitle">AI-Powered Code Analysis Agent &middot; One CLI, Every LLM Provider</div>
-    <div>
-      <span class="version-badge">v1.0.1</span>
-      <span class="internal-badge">Internal Use</span>
-    </div>
+  <div class="hdr">
+    <div class="oa">O A</div>
+    <div class="title">OpenAnalyst CLI</div>
+    <div class="sub">One CLI, Every LLM Provider</div>
+    <div class="ver">v1.0.1</div>
   </div>
 
-  <!-- Step 1: Install -->
-  <div class="step">
-    <div class="step-number">01</div>
-    <h2><span class="icon blue">&#8595;</span> Install</h2>
-
+  <!-- 1. Install -->
+  <div class="card">
+    <div class="num">01</div>
+    <h2><span class="ic bl">&#8595;</span> Install</h2>
     <div class="tabs">
-      <button class="tab active" onclick="switchTab(event, 'install-mac')">macOS / Linux</button>
-      <button class="tab" onclick="switchTab(event, 'install-win')">Windows PowerShell</button>
-      <button class="tab" onclick="switchTab(event, 'install-source')">From Source</button>
+      <button class="tab on" onclick="sw(event,'i1')">macOS / Linux</button>
+      <button class="tab" onclick="sw(event,'i2')">Windows</button>
     </div>
-
-    <div id="install-mac" class="tab-content active">
-      <div class="code-block">
-        <div class="code-header">
-          <span class="code-label"><span class="dot mac"></span><span class="dot mac"></span><span class="dot mac"></span>&nbsp; Terminal</span>
-          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-        </div>
-        <div class="code-body">
-<span class="comment"># Replace &lt;GITHUB_PAT&gt; with your GitHub personal access token</span>
-<span class="cmd">curl</span> <span class="flag">-fsSL</span> <span class="flag">-H</span> <span class="string">"Authorization: token &lt;GITHUB_PAT&gt;"</span> \
-  <span class="url">https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh</span> \
-  | <span class="cmd">bash</span>
-        </div>
+    <div id="i1" class="tc on">
+      <div class="cb">
+        <div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span><button class="cp" onclick="cc(this)">Copy</button></div>
+<pre class="cd"><span class="gn">curl</span> <span class="cn">-fsSL</span> https://install.openanalyst.com | <span class="gn">bash</span></pre>
       </div>
     </div>
-
-    <div id="install-win" class="tab-content">
-      <div class="code-block">
-        <div class="code-header">
-          <span class="code-label">PowerShell</span>
-          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-        </div>
-        <div class="code-body">
-<span class="comment"># Replace &lt;GITHUB_PAT&gt; with your GitHub personal access token</span>
-<span class="var">$h</span> = @{<span class="keyword">Authorization</span>=<span class="string">"token &lt;GITHUB_PAT&gt;"</span>}
-<span class="cmd">iex</span> (<span class="cmd">irm</span> <span class="url">https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1</span> <span class="flag">-Headers</span> <span class="var">$h</span>)
-        </div>
-      </div>
-    </div>
-
-    <div id="install-source" class="tab-content">
-      <div class="code-block">
-        <div class="code-header">
-          <span class="code-label">Terminal (requires Rust)</span>
-          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-        </div>
-        <div class="code-body">
-<span class="cmd">git</span> clone https://github.com/AnitChaudhry/openanalyst-cli.git
-<span class="cmd">cd</span> openanalyst-cli/rust
-<span class="cmd">cargo</span> build <span class="flag">--release</span>
-<span class="comment"># Binary at: rust/target/release/openanalyst</span>
-        </div>
+    <div id="i2" class="tc">
+      <div class="cb">
+        <div class="ch"><span class="cl">PowerShell</span><button class="cp" onclick="cc(this)">Copy</button></div>
+<pre class="cd"><span class="gn">irm</span> https://install.openanalyst.com/win | <span class="gn">iex</span></pre>
       </div>
     </div>
   </div>
 
-  <!-- Step 2: Configure -->
-  <div class="step">
-    <div class="step-number">02</div>
-    <h2><span class="icon green">&#9881;</span> Configure API Credentials</h2>
-    <p style="color: var(--text-muted); font-size: 14px; margin-bottom: 16px;">
-      Set credentials for any provider. OpenAnalyst is the default &mdash; others activate automatically when their API key is set.
-    </p>
-
+  <!-- 2. Configure -->
+  <div class="card">
+    <div class="num">02</div>
+    <h2><span class="ic gn">&#9881;</span> Configure</h2>
+    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Set your API key for any provider you have access to.</p>
     <div class="tabs">
-      <button class="tab active" onclick="switchTab(event, 'conf-mac')">macOS / Linux</button>
-      <button class="tab" onclick="switchTab(event, 'conf-win')">Windows PowerShell</button>
+      <button class="tab on" onclick="sw(event,'c1')">macOS / Linux</button>
+      <button class="tab" onclick="sw(event,'c2')">Windows</button>
     </div>
+    <div id="c1" class="tc on">
+      <div class="cb">
+        <div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; ~/.zshrc</span><button class="cp" onclick="cc(this)">Copy</button></div>
+<pre class="cd"><span class="cm"># Pick your provider (set one or more)</span>
 
-    <div id="conf-mac" class="tab-content active">
-      <div class="code-block">
-        <div class="code-header">
-          <span class="code-label"><span class="dot mac"></span><span class="dot mac"></span><span class="dot mac"></span>&nbsp; ~/.zshrc</span>
-          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-        </div>
-        <div class="code-body">
-<span class="comment"># ── OpenAnalyst (default) ──</span>
-<span class="keyword">export</span> <span class="var">OPENANALYST_AUTH_TOKEN</span>=<span class="string">"your-openanalyst-key"</span>
-
-<span class="comment"># ── Or any other provider ──</span>
-<span class="keyword">export</span> <span class="var">ANTHROPIC_API_KEY</span>=<span class="string">"sk-ant-..."</span>        <span class="comment"># Claude</span>
-<span class="keyword">export</span> <span class="var">OPENAI_API_KEY</span>=<span class="string">"sk-..."</span>              <span class="comment"># GPT / Codex</span>
-<span class="keyword">export</span> <span class="var">OPENROUTER_API_KEY</span>=<span class="string">"sk-or-..."</span>       <span class="comment"># OpenRouter</span>
-<span class="keyword">export</span> <span class="var">XAI_API_KEY</span>=<span class="string">"xai-..."</span>               <span class="comment"># Grok</span>
-<span class="keyword">export</span> <span class="var">BEDROCK_API_KEY</span>=<span class="string">"..."</span>               <span class="comment"># Bedrock</span>
-
-<span class="comment"># ── Override default model (optional) ──</span>
-<span class="keyword">export</span> <span class="var">OPENANALYST_MODEL</span>=<span class="string">"openanalyst-beta"</span>
-        </div>
+<span class="kw">export</span> <span class="vr">OPENANALYST_AUTH_TOKEN</span>=<span class="st">"your-openanalyst-key"</span>     <span class="cm"># OpenAnalyst</span>
+<span class="kw">export</span> <span class="vr">ANTHROPIC_API_KEY</span>=<span class="st">"sk-ant-..."</span>                   <span class="cm"># Claude</span>
+<span class="kw">export</span> <span class="vr">OPENAI_API_KEY</span>=<span class="st">"sk-..."</span>                         <span class="cm"># GPT / Codex</span>
+<span class="kw">export</span> <span class="vr">OPENROUTER_API_KEY</span>=<span class="st">"sk-or-..."</span>                  <span class="cm"># OpenRouter</span>
+<span class="kw">export</span> <span class="vr">XAI_API_KEY</span>=<span class="st">"xai-..."</span>                          <span class="cm"># Grok</span>
+<span class="kw">export</span> <span class="vr">BEDROCK_API_KEY</span>=<span class="st">"..."</span>                          <span class="cm"># Bedrock</span></pre>
       </div>
     </div>
+    <div id="c2" class="tc">
+      <div class="cb">
+        <div class="ch"><span class="cl">PowerShell</span><button class="cp" onclick="cc(this)">Copy</button></div>
+<pre class="cd"><span class="cm"># Pick your provider (set one or more)</span>
 
-    <div id="conf-win" class="tab-content">
-      <div class="code-block">
-        <div class="code-header">
-          <span class="code-label">PowerShell</span>
-          <button class="copy-btn" onclick="copyCode(this)">Copy</button>
-        </div>
-        <div class="code-body">
-<span class="comment"># OpenAnalyst (default)</span>
-<span class="var">$env:OPENANALYST_AUTH_TOKEN</span> = <span class="string">"your-openanalyst-key"</span>
-
-<span class="comment"># Or any other provider</span>
-<span class="var">$env:ANTHROPIC_API_KEY</span> = <span class="string">"sk-ant-..."</span>
-<span class="var">$env:OPENAI_API_KEY</span> = <span class="string">"sk-..."</span>
-<span class="var">$env:OPENROUTER_API_KEY</span> = <span class="string">"sk-or-..."</span>
-
-<span class="comment"># Override default model (optional)</span>
-<span class="var">$env:OPENANALYST_MODEL</span> = <span class="string">"openanalyst-beta"</span>
-        </div>
+<span class="vr">$env:OPENANALYST_AUTH_TOKEN</span> = <span class="st">"your-openanalyst-key"</span>     <span class="cm"># OpenAnalyst</span>
+<span class="vr">$env:ANTHROPIC_API_KEY</span> = <span class="st">"sk-ant-..."</span>                   <span class="cm"># Claude</span>
+<span class="vr">$env:OPENAI_API_KEY</span> = <span class="st">"sk-..."</span>                         <span class="cm"># GPT / Codex</span>
+<span class="vr">$env:OPENROUTER_API_KEY</span> = <span class="st">"sk-or-..."</span>                  <span class="cm"># OpenRouter</span>
+<span class="vr">$env:XAI_API_KEY</span> = <span class="st">"xai-..."</span>                          <span class="cm"># Grok</span>
+<span class="vr">$env:BEDROCK_API_KEY</span> = <span class="st">"..."</span>                          <span class="cm"># Bedrock</span></pre>
       </div>
     </div>
   </div>
 
-  <!-- Step 3: Use -->
-  <div class="step">
-    <div class="step-number">03</div>
-    <h2><span class="icon orange">&#9654;</span> Start Using</h2>
+  <!-- 3. Use -->
+  <div class="card">
+    <div class="num">03</div>
+    <h2><span class="ic or">&#9654;</span> Use</h2>
+    <div class="cb">
+      <div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span></div>
+<pre class="cd"><span class="gn">$</span> openanalyst
 
-    <div class="code-block">
-      <div class="code-header">
-        <span class="code-label"><span class="dot mac"></span><span class="dot mac"></span><span class="dot mac"></span>&nbsp; Terminal</span>
-      </div>
-      <div class="code-body">
-<span class="cmd">$</span> <span class="cmd">openanalyst</span>
-<span class="comment"># OpenAnalyst CLI is now connected</span>
-<span class="comment"># Using model: openanalyst-beta</span>
-      </div>
+<span class="cm"># Connected to OpenAnalyst API</span>
+<span class="cm"># Model: openanalyst-beta</span></pre>
     </div>
-
-    <table class="usage-table">
-      <tr><td>openanalyst</td><td>Interactive REPL</td></tr>
-      <tr><td>openanalyst "explain this"</td><td>One-shot prompt</td></tr>
+    <table class="ut">
+      <tr><td>openanalyst</td><td>Start interactive session</td></tr>
+      <tr><td>openanalyst "explain this code"</td><td>Quick one-shot prompt</td></tr>
       <tr><td>openanalyst --model gpt-4o "hello"</td><td>Use OpenAI</td></tr>
       <tr><td>openanalyst --model sonnet "fix bug"</td><td>Use Claude</td></tr>
-      <tr><td>openanalyst --model grok "review"</td><td>Use xAI Grok</td></tr>
+      <tr><td>openanalyst --model grok "review"</td><td>Use Grok</td></tr>
       <tr><td>openanalyst init</td><td>Setup project config</td></tr>
-      <tr><td>openanalyst --help</td><td>All commands</td></tr>
+      <tr><td>/help</td><td>Show all commands (inside REPL)</td></tr>
+      <tr><td>/model gpt-4o</td><td>Switch model mid-session</td></tr>
     </table>
   </div>
 
-  <!-- Providers -->
-  <div class="step">
-    <div class="step-number">04</div>
-    <h2><span class="icon purple">&#9733;</span> Supported Providers</h2>
-
-    <div class="providers">
-      <div class="provider-card default">
-        <div class="provider-name">OpenAnalyst <span class="badge">DEFAULT</span></div>
-        <div class="provider-env">OPENANALYST_AUTH_TOKEN</div>
-        <div class="provider-models">openanalyst-beta</div>
+  <!-- 4. Providers -->
+  <div class="card">
+    <div class="num">04</div>
+    <h2><span class="ic pu">&#9733;</span> Providers</h2>
+    <div class="pg">
+      <div class="pc df">
+        <div class="pn">OpenAnalyst <span class="bd">DEFAULT</span></div>
+        <div class="pe">OPENANALYST_AUTH_TOKEN</div>
+        <div class="pm">openanalyst-beta</div>
       </div>
-      <div class="provider-card">
-        <div class="provider-name">Anthropic / Claude</div>
-        <div class="provider-env">ANTHROPIC_API_KEY</div>
-        <div class="provider-models">opus, sonnet, haiku, claude-*</div>
+      <div class="pc">
+        <div class="pn">Anthropic / Claude</div>
+        <div class="pe">ANTHROPIC_API_KEY</div>
+        <div class="pm">opus, sonnet, haiku</div>
       </div>
-      <div class="provider-card">
-        <div class="provider-name">OpenAI / GPT</div>
-        <div class="provider-env">OPENAI_API_KEY</div>
-        <div class="provider-models">gpt-4o, gpt-4.1, o3, o4-mini, codex-mini</div>
+      <div class="pc">
+        <div class="pn">OpenAI / GPT</div>
+        <div class="pe">OPENAI_API_KEY</div>
+        <div class="pm">gpt-4o, gpt-4.1, o3, codex-mini</div>
       </div>
-      <div class="provider-card">
-        <div class="provider-name">xAI / Grok</div>
-        <div class="provider-env">XAI_API_KEY</div>
-        <div class="provider-models">grok, grok-3, grok-mini</div>
+      <div class="pc">
+        <div class="pn">xAI / Grok</div>
+        <div class="pe">XAI_API_KEY</div>
+        <div class="pm">grok, grok-3, grok-mini</div>
       </div>
-      <div class="provider-card">
-        <div class="provider-name">OpenRouter</div>
-        <div class="provider-env">OPENROUTER_API_KEY</div>
-        <div class="provider-models">openrouter/* (any model)</div>
+      <div class="pc">
+        <div class="pn">OpenRouter</div>
+        <div class="pe">OPENROUTER_API_KEY</div>
+        <div class="pm">Any model via openrouter/*</div>
       </div>
-      <div class="provider-card">
-        <div class="provider-name">Amazon Bedrock</div>
-        <div class="provider-env">BEDROCK_API_KEY</div>
-        <div class="provider-models">bedrock/* (any model)</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Requirements -->
-  <div class="step">
-    <div class="step-number">05</div>
-    <h2><span class="icon blue">&#9432;</span> Requirements</h2>
-    <ul class="req-list">
-      <li>GitHub Personal Access Token with <code style="color: var(--cyan);">repo</code> scope &mdash; <a href="https://github.com/settings/tokens" style="color: var(--accent);">Generate here</a></li>
-      <li>At least one API key from any supported LLM provider</li>
-      <li>macOS (Intel or Apple Silicon), Linux (x64 or ARM64), or Windows 10+</li>
-      <li>For building from source: <a href="https://rustup.rs" style="color: var(--accent);">Rust toolchain</a></li>
-    </ul>
-  </div>
-
-  <!-- Features -->
-  <div class="step">
-    <div class="step-number">06</div>
-    <h2><span class="icon green">&#10003;</span> What You Get</h2>
-    <div class="providers">
-      <div class="provider-card">
-        <div class="provider-name">Interactive REPL</div>
-        <div class="provider-models">Full conversational coding assistant with streaming responses and syntax highlighting</div>
-      </div>
-      <div class="provider-card">
-        <div class="provider-name">Tool Execution</div>
-        <div class="provider-models">Bash, file read/write/edit, grep, glob, web search, web fetch &mdash; all built in</div>
-      </div>
-      <div class="provider-card">
-        <div class="provider-name">Session Management</div>
-        <div class="provider-models">Persist conversations, resume later, export transcripts, track costs</div>
-      </div>
-      <div class="provider-card">
-        <div class="provider-name">Auto Provider Detection</div>
-        <div class="provider-models">Set any API key &mdash; the CLI auto-routes to the correct provider</div>
-      </div>
-      <div class="provider-card">
-        <div class="provider-name">Plugin System</div>
-        <div class="provider-models">Extend with custom tools, hooks, skills, and agents</div>
-      </div>
-      <div class="provider-card">
-        <div class="provider-name">Cross-Platform</div>
-        <div class="provider-models">Native binaries for macOS (Intel + Apple Silicon), Linux (x64 + ARM), Windows</div>
+      <div class="pc">
+        <div class="pn">Amazon Bedrock</div>
+        <div class="pe">BEDROCK_API_KEY</div>
+        <div class="pm">Any model via bedrock/*</div>
       </div>
     </div>
   </div>
 
-  <!-- FAQ -->
-  <div class="step">
-    <div class="step-number">?</div>
-    <h2><span class="icon purple">&#63;</span> FAQ</h2>
-
-    <div style="margin-top: 8px;">
-      <details style="margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
-        <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text); padding: 4px 0;">How do I switch between providers?</summary>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 8px; padding-left: 16px;">
-          Set the API key for the provider you want, then either use <code style="color: var(--cyan);">--model</code> flag or set <code style="color: var(--cyan);">OPENANALYST_MODEL</code> env var. The CLI auto-detects the provider from the model name. For example, <code style="color: var(--cyan);">--model gpt-4o</code> routes to OpenAI, <code style="color: var(--cyan);">--model sonnet</code> routes to Anthropic/OpenAnalyst.
-        </p>
-      </details>
-
-      <details style="margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
-        <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text); padding: 4px 0;">Can I use multiple providers at the same time?</summary>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 8px; padding-left: 16px;">
-          Yes. Set all the API keys you have. The default model uses OpenAnalyst, but you can switch per-session using <code style="color: var(--cyan);">/model gpt-4o</code> or start with <code style="color: var(--cyan);">openanalyst --model grok</code>.
-        </p>
-      </details>
-
-      <details style="margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
-        <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text); padding: 4px 0;">Where is the GitHub PAT needed?</summary>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 8px; padding-left: 16px;">
-          Only for installation &mdash; the repo is private, so the install script needs a GitHub token to download the binary or clone the source. Generate one at <a href="https://github.com/settings/tokens" style="color: var(--accent);">github.com/settings/tokens</a> with <code style="color: var(--cyan);">repo</code> scope. The PAT is NOT sent to any LLM provider.
-        </p>
-      </details>
-
-      <details style="margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
-        <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text); padding: 4px 0;">What does <code>openanalyst init</code> do?</summary>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 8px; padding-left: 16px;">
-          Creates project configuration files: <code style="color: var(--cyan);">.openanalyst/</code> directory, <code style="color: var(--cyan);">.openanalyst.json</code> settings, and <code style="color: var(--cyan);">OPENANALYST.md</code> &mdash; a guidance file that gives the AI context about your project.
-        </p>
-      </details>
-
-      <details style="margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
-        <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text); padding: 4px 0;">What slash commands are available?</summary>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 8px; padding-left: 16px;">
-          <code style="color: var(--cyan);">/help</code> &middot;
-          <code style="color: var(--cyan);">/status</code> &middot;
-          <code style="color: var(--cyan);">/model</code> &middot;
-          <code style="color: var(--cyan);">/cost</code> &middot;
-          <code style="color: var(--cyan);">/compact</code> &middot;
-          <code style="color: var(--cyan);">/clear</code> &middot;
-          <code style="color: var(--cyan);">/config</code> &middot;
-          <code style="color: var(--cyan);">/memory</code> &middot;
-          <code style="color: var(--cyan);">/diff</code> &middot;
-          <code style="color: var(--cyan);">/export</code> &middot;
-          <code style="color: var(--cyan);">/session</code> &middot;
-          <code style="color: var(--cyan);">/version</code> &middot;
-          <code style="color: var(--cyan);">/permissions</code>
-        </p>
-      </details>
-
-      <details style="margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 16px;">
-        <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text); padding: 4px 0;">Is my data sent to OpenAnalyst?</summary>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 8px; padding-left: 16px;">
-          Only when you use the OpenAnalyst provider. If you set <code style="color: var(--cyan);">OPENAI_API_KEY</code> and use <code style="color: var(--cyan);">--model gpt-4o</code>, your data goes directly to OpenAI. Each provider connection is isolated. The CLI routes to whichever provider you select.
-        </p>
-      </details>
-
-      <details style="margin-bottom: 0;">
-        <summary style="cursor: pointer; font-weight: 600; font-size: 14px; color: var(--text); padding: 4px 0;">How do I update to a new version?</summary>
-        <p style="color: var(--text-muted); font-size: 14px; margin-top: 8px; padding-left: 16px;">
-          Re-run the install command. It will download the latest release binary and replace the existing one. Your configuration and sessions are preserved.
-        </p>
-      </details>
-    </div>
-  </div>
-
-  <!-- Footer -->
-  <div class="footer">
-    <p style="margin-bottom: 8px;">
-      <strong style="color: var(--text);">OpenAnalyst CLI v1.0.1</strong> &middot; Internal Release &middot; OpenAnalyst Inc
-    </p>
-    <p>
-      Repo: <a href="https://github.com/AnitChaudhry/openanalyst-cli">github.com/AnitChaudhry/openanalyst-cli</a> (private)
-    </p>
-    <p style="margin-top: 4px;">
-      Contact: <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a>
-    </p>
+  <div class="ft">
+    <p><strong style="color:var(--text)">OpenAnalyst CLI v1.0.1</strong> &middot; OpenAnalyst Inc</p>
+    <p style="margin-top:4px">Questions? <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a></p>
   </div>
 
 </div>
-
 <script>
-function switchTab(event, tabId) {
-  const parent = event.target.closest('.step');
-  parent.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
-  parent.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
-  event.target.classList.add('active');
-  document.getElementById(tabId).classList.add('active');
-}
-
-function copyCode(btn) {
-  const code = btn.closest('.code-block').querySelector('.code-body').innerText;
-  navigator.clipboard.writeText(code).then(() => {
-    const original = btn.textContent;
-    btn.textContent = 'Copied!';
-    btn.style.color = 'var(--green)';
-    btn.style.borderColor = 'var(--green)';
-    setTimeout(() => {
-      btn.textContent = original;
-      btn.style.color = '';
-      btn.style.borderColor = '';
-    }, 2000);
-  });
-}
+function sw(e,id){const p=e.target.closest('.card');p.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));p.querySelectorAll('.tc').forEach(c=>c.classList.remove('on'));e.target.classList.add('on');document.getElementById(id).classList.add('on')}
+function cc(b){const c=b.closest('.cb').querySelector('.cd').innerText;navigator.clipboard.writeText(c).then(()=>{b.textContent='Copied!';b.style.color='var(--green)';b.style.borderColor='var(--green)';setTimeout(()=>{b.textContent='Copy';b.style.color='';b.style.borderColor=''},2000)})}
 </script>
-
 </body>
 </html>
