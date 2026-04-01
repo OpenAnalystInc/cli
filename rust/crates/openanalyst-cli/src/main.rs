@@ -3303,7 +3303,7 @@ impl runtime::PermissionPrompter for CliPermissionPrompter {
 
 struct DefaultRuntimeClient {
     runtime: tokio::runtime::Runtime,
-    client: OpenAnalystApiClient,
+    client: api::ProviderClient,
     model: String,
     enable_tools: bool,
     emit_output: bool,
@@ -3321,10 +3321,21 @@ impl DefaultRuntimeClient {
         tool_registry: GlobalToolRegistry,
         progress_reporter: Option<InternalPromptProgressReporter>,
     ) -> Result<Self, Box<dyn std::error::Error>> {
+        // Build the correct provider client based on model name.
+        // This is what enables cross-provider /model switching:
+        // - "openanalyst-beta" or "sonnet" → OpenAnalyst/Anthropic API
+        // - "gpt-4o" → OpenAI API
+        // - "grok" → xAI API
+        // - "openrouter/*" → OpenRouter API
+        // The session and conversation persist across provider switches.
+        let default_auth = resolve_cli_auth_source().ok();
+        let client = api::ProviderClient::from_model_with_default_auth(
+            &model,
+            default_auth,
+        )?;
         Ok(Self {
             runtime: tokio::runtime::Runtime::new()?,
-            client: OpenAnalystApiClient::from_auth(resolve_cli_auth_source()?)
-                .with_base_url(api::read_base_url()),
+            client,
             model,
             enable_tools,
             emit_output,
