@@ -73,34 +73,37 @@ irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.
 cd rust && cargo build --release
 ```
 
-### 2. Configure Your Terminal
-
-**OpenAnalyst API (default):**
+### 2. Login
 
 ```bash
-# macOS / Linux
-export OPENANALYST_AUTH_TOKEN="your-api-key-here"
+openanalyst login
 ```
 
-```powershell
-# Windows PowerShell
-$env:OPENANALYST_AUTH_TOKEN = "your-api-key-here"
+Interactive provider picker — select provider with arrow keys, enter API key, connection tested automatically, credentials saved to `~/.openanalyst/credentials.json`. Run multiple times to add keys for different providers.
+
+```
+  Select your LLM provider:
+
+  > OpenAnalyst          OpenAnalyst API (default)
+    Anthropic / Claude
+    OpenAI / GPT
+    xAI / Grok
+    OpenRouter
+    Amazon Bedrock
+
+  Enter your API key: sk-oa-...
+  Testing connection... Connected
+  Login complete
 ```
 
-**Or connect to other providers:**
+**Or set env vars directly:**
 
 ```bash
-# Anthropic / Claude
-export ANTHROPIC_API_KEY="sk-ant-..."
-
-# OpenAI / GPT / Codex
-export OPENAI_API_KEY="sk-..."
-
-# OpenRouter (access any model)
-export OPENROUTER_API_KEY="sk-or-..."
-
-# xAI / Grok
-export XAI_API_KEY="xai-..."
+export OPENANALYST_AUTH_TOKEN="your-api-key-here"   # OpenAnalyst
+export ANTHROPIC_API_KEY="sk-ant-..."               # Claude
+export OPENAI_API_KEY="sk-..."                      # GPT
+export OPENROUTER_API_KEY="sk-or-..."               # OpenRouter
+export XAI_API_KEY="xai-..."                        # Grok
 
 # Amazon Bedrock
 export BEDROCK_API_KEY="..."
@@ -127,15 +130,16 @@ $ openanalyst
 
 ## Features
 
-- **Interactive REPL** — Conversational coding assistant with tool execution
-- **Multi-provider LLM routing** — OpenAnalyst (default), Anthropic, OpenAI, xAI, OpenRouter, Amazon Bedrock
-- **Automatic provider detection** — Detects provider from model name or env vars
-- **Session management** — Persist and resume conversations
-- **Plugin system** — Extend with custom tools and hooks
-- **Slash commands** — `/help`, `/status`, `/config`, `/model`, `/skills`, `/agents`
-- **Markdown rendering** — Syntax-highlighted output in the terminal
-- **Permission modes** — Read-only, workspace-write, or full access
-- **Cross-platform** — Windows, macOS, and Linux
+- **Cross-provider `/model` switching** — Switch from OpenAnalyst to GPT to Grok to Claude mid-conversation. Session ID, chat history, tool results, and context persist across provider boundaries. No other CLI does this.
+- **Live model discovery** — `/model` fetches available models from each provider's API in real-time. No hardcoded model lists.
+- **Interactive `openanalyst login`** — Arrow-key provider picker, API key input, connection test, credential persistence. Run multiple times to add keys for different providers. All keys loaded automatically on startup.
+- **6 LLM providers** — OpenAnalyst (default), Anthropic, OpenAI, xAI, OpenRouter, Amazon Bedrock
+- **Persistent sessions** — Save, resume, list, and export conversations. Sessions survive model and provider switches.
+- **12 built-in tools** — Bash, ReadFile, WriteFile, EditFile, GlobSearch, GrepSearch, WebSearch, WebFetch, Agent, TodoWrite, NotebookEdit, Skill
+- **30+ slash commands** — `/help`, `/status`, `/model`, `/cost`, `/commit`, `/pr`, `/bughunter`, `/ultraplan`, and more
+- **OPENANALYST.md** — Project-specific AI instructions, auto-detected in directory tree
+- **Permission system** — Read-only, workspace-write, or full access modes
+- **Cross-platform** — Native binaries for Windows, macOS (Intel + Apple Silicon), Linux (x64 + ARM)
 
 ## Usage
 
@@ -162,16 +166,18 @@ openanalyst --resume session.json /status
 openanalyst init
 ```
 
-## Supported Providers & Models
+## Supported Providers
 
 | Provider | Auth Variable | Models |
 |----------|--------------|--------|
-| **OpenAnalyst** (default) | `OPENANALYST_AUTH_TOKEN` | `openanalyst-beta` |
-| **Anthropic / Claude** | `ANTHROPIC_API_KEY` | `opus`, `sonnet`, `haiku`, `claude-*` |
-| **OpenAI / GPT** | `OPENAI_API_KEY` | `gpt-4o`, `gpt-4.1`, `o3`, `o4-mini`, `codex-mini` |
-| **xAI / Grok** | `XAI_API_KEY` | `grok`, `grok-3`, `grok-mini` |
-| **OpenRouter** | `OPENROUTER_API_KEY` | `openrouter/*` (any model) |
-| **Amazon Bedrock** | `BEDROCK_API_KEY` | `bedrock/*` |
+| **OpenAnalyst** (default) | `OPENANALYST_AUTH_TOKEN` | Fetched live from API |
+| **Anthropic / Claude** | `ANTHROPIC_API_KEY` | Fetched live from API |
+| **OpenAI / GPT** | `OPENAI_API_KEY` | Fetched live from API |
+| **xAI / Grok** | `XAI_API_KEY` | Fetched live from API |
+| **OpenRouter** | `OPENROUTER_API_KEY` | 350+ models, fetched live |
+| **Amazon Bedrock** | `BEDROCK_API_KEY` | Fetched live from gateway |
+
+Run `/model` inside the CLI to see all available models from your configured providers.
 
 ## Configuration
 
