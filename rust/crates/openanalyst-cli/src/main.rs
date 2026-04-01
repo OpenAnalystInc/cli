@@ -756,6 +756,82 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
+struct ProviderModelsConfig {
+    name: &'static str,
+    keys: &'static [&'static str],
+    models_url: &'static str,
+    auth_header: &'static str,
+}
+
+/// Fetch model list from a provider's /models endpoint. Returns model IDs.
+fn fetch_provider_models(url: &str, key: &str, header_type: &str) -> Vec<String> {
+    if url.is_empty() || key.is_empty() {
+        return Vec::new();
+    }
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return Vec::new(),
+    };
+    rt.block_on(async {
+        let client = match reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+        {
+            Ok(c) => c,
+            Err(_) => return Vec::new(),
+        };
+        let mut req = client.get(url);
+        match header_type {
+            "bearer" => req = req.bearer_auth(key),
+            "x-api-key" => req = req.header("x-api-key", key),
+            _ => req = req.bearer_auth(key),
+        }
+        req = req.header("anthropic-version", "2023-06-01");
+
+        let resp = match req.send().await {
+            Ok(r) if r.status().is_success() => r,
+            _ => return Vec::new(),
+        };
+        let body: serde_json::Value = match resp.json().await {
+            Ok(b) => b,
+            Err(_) => return Vec::new(),
+        };
+
+        // Parse models from response — handles multiple formats:
+        // OpenAI/xAI/OpenRouter: {"data": [{"id": "model-name"}, ...]}
+        // Anthropic: {"data": [{"id": "model-name"}, ...]} or {"models": [...]}
+        // OpenAnalyst: could be array or {"data": [...]} or {"models": [...]}
+        let models_array = body.get("data")
+            .and_then(|d| d.as_array())
+            .or_else(|| body.get("models").and_then(|m| m.as_array()))
+            .or_else(|| body.as_array());
+
+        let Some(models) = models_array else {
+            return Vec::new();
+        };
+
+        models.iter()
+            .filter_map(|m| {
+                // Each model can be {"id": "..."} or just a string
+                m.get("id").and_then(|v| v.as_str())
+                    .or_else(|| m.get("name").and_then(|v| v.as_str()))
+                    .or_else(|| m.as_str())
+                    .map(ToOwned::to_owned)
+            })
+            .filter(|id| {
+                // Filter out embedding/moderation/whisper/dall-e models for cleaner output
+                !id.contains("embed")
+                    && !id.contains("moderation")
+                    && !id.contains("whisper")
+                    && !id.contains("dall-e")
+                    && !id.contains("tts")
+                    && !id.contains("babbage")
+                    && !id.contains("davinci")
+            })
+            .collect()
+    })
+}
+
 fn test_api_key(url: &str, key: &str, header_type: &str) -> bool {
     let rt = match tokio::runtime::Runtime::new() {
         Ok(rt) => rt,
@@ -1729,32 +1805,77 @@ impl LiveCli {
                     self.runtime.usage().turns(),
                 )
             );
-            // Show available models grouped by provider with auth status
-            println!("\n  \x1b[1mAvailable models\x1b[0m (based on configured keys):\n");
-            let providers: &[(&str, &str, &[&str])] = &[
-                ("OpenAnalyst", "OPENANALYST_AUTH_TOKEN", &["openanalyst-beta"]),
-                ("Anthropic",   "ANTHROPIC_API_KEY",     &["opus", "sonnet", "haiku"]),
-                ("OpenAI",      "OPENAI_API_KEY",        &["gpt-4o", "gpt-4.1", "o3", "o4-mini", "codex-mini"]),
-                ("xAI",         "XAI_API_KEY",           &["grok", "grok-3", "grok-mini"]),
-                ("OpenRouter",  "OPENROUTER_API_KEY",    &["openrouter/auto", "openrouter/<model>"]),
-                ("Bedrock",     "BEDROCK_API_KEY",       &["bedrock/<model>"]),
+            // Show available models fetched live from each provider's API
+            println!("\n  \x1b[1mAvailable models\x1b[0m \x1b[2m(fetching from providers...)\x1b[0m\n");
+            let provider_configs: &[ProviderModelsConfig] = &[
+                ProviderModelsConfig {
+                    name: "OpenAnalyst",
+                    keys: &["OPENANALYST_AUTH_TOKEN", "OPENANALYST_API_KEY"],
+                    models_url: "https://api.openanalyst.com/api/ai/models",
+                    auth_header: "bearer",
+                },
+                ProviderModelsConfig {
+                    name: "Anthropic",
+                    keys: &["ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN"],
+                    models_url: "https://api.anthropic.com/v1/models",
+                    auth_header: "x-api-key",
+                },
+                ProviderModelsConfig {
+                    name: "OpenAI",
+                    keys: &["OPENAI_API_KEY"],
+                    models_url: "https://api.openai.com/v1/models",
+                    auth_header: "bearer",
+                },
+                ProviderModelsConfig {
+                    name: "xAI",
+                    keys: &["XAI_API_KEY"],
+                    models_url: "https://api.x.ai/v1/models",
+                    auth_header: "bearer",
+                },
+                ProviderModelsConfig {
+                    name: "OpenRouter",
+                    keys: &["OPENROUTER_API_KEY"],
+                    models_url: "https://openrouter.ai/api/v1/models",
+                    auth_header: "bearer",
+                },
+                ProviderModelsConfig {
+                    name: "Amazon Bedrock",
+                    keys: &["BEDROCK_API_KEY"],
+                    models_url: "",
+                    auth_header: "bearer",
+                },
             ];
-            for (name, env_key, models) in providers {
-                let has_key = env::var(env_key).ok().filter(|v| !v.is_empty()).is_some();
-                // Also check secondary key for OA/Anthropic
-                let has_key = has_key || (*name == "OpenAnalyst" &&
-                    env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty()).is_some());
-                let has_key = has_key || (*name == "Anthropic" &&
-                    env::var("ANTHROPIC_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some());
-
+            for config in provider_configs {
+                let api_key = config.keys.iter()
+                    .find_map(|k| env::var(k).ok().filter(|v| !v.is_empty()));
+                let has_key = api_key.is_some();
                 let icon = if has_key { "\x1b[38;5;46m●\x1b[0m" } else { "\x1b[38;5;240m○\x1b[0m" };
                 let name_style = if has_key { "\x1b[1m" } else { "\x1b[2m" };
-                let model_list = models.join(", ");
-                let status = if has_key { "" } else { " \x1b[2m(run: openanalyst login)\x1b[0m" };
-                println!("  {icon} {name_style}{name}\x1b[0m{status}");
-                if has_key {
-                    println!("    \x1b[38;5;45m{model_list}\x1b[0m");
+
+                if !has_key {
+                    println!("  {icon} {name_style}{}\x1b[0m \x1b[2m(run: openanalyst login)\x1b[0m", config.name);
+                    continue;
                 }
+
+                // Fetch models from API
+                let models = fetch_provider_models(
+                    config.models_url,
+                    api_key.as_deref().unwrap_or(""),
+                    config.auth_header,
+                );
+                let model_list = if models.is_empty() {
+                    "\x1b[2munable to fetch models\x1b[0m".to_string()
+                } else {
+                    let display: Vec<&str> = models.iter().map(String::as_str).take(8).collect();
+                    let suffix = if models.len() > 8 {
+                        format!(" \x1b[2m(+{} more)\x1b[0m", models.len() - 8)
+                    } else {
+                        String::new()
+                    };
+                    format!("\x1b[38;5;45m{}\x1b[0m{suffix}", display.join(", "))
+                };
+                println!("  {icon} {name_style}{}\x1b[0m", config.name);
+                println!("    {model_list}");
             }
             println!("\n  \x1b[2mSwitch: /model <name>\x1b[0m");
             return Ok(false);
