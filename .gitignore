@@ -1,0 +1,24 @@
+__pycache__/
+archive/
+.omx/
+.openanalyst-agents/
+.openanalyst-todos.json
+
+# OpenAnalyst CLI local artifacts
+.openanalyst/settings.local.json
+.openanalyst/sessions/
+
+# Build artifacts
+rust/target/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Claude Code artifacts (if running claude alongside)
+.claude/settings.local.json
+.claude/sessions/
