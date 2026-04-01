@@ -71,21 +71,34 @@
     <h2 style="font-size:18px;margin-bottom:12px"><span class="ic cy" style="font-size:16px">&#9889;</span> Switch Models Mid-Conversation &mdash; Session Persists</h2>
     <p style="color:var(--muted);font-size:14px;margin-bottom:16px">The game-changer: switch between <strong style="color:var(--text)">any LLM provider</strong> mid-conversation. Your session ID, chat history, tool results, and context carry over seamlessly. No other CLI does this.</p>
     <div class="cb"><div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span></div>
-<pre class="cd"><span class="gn">&gt;</span> Explain this codebase                     <span class="cm"># openanalyst-beta answers</span>
+<pre class="cd"><span class="gn">&gt;</span> /model
+  Available models (fetching from providers...)
+
+  <span class="gn">●</span> <span class="cn">OpenAnalyst</span>
+    openanalyst-beta, openanalyst-pro
+  <span class="gn">●</span> <span class="cn">OpenAI</span>
+    gpt-4o, gpt-4.1, o3, o4-mini (+12 more)
+  <span class="gn">●</span> <span class="cn">xAI</span>
+    grok-3, grok-3-mini
+  <span class="cm">○ Anthropic (run: openanalyst login)</span>
+
+<span class="gn">&gt;</span> Explain this codebase                     <span class="cm"># openanalyst-beta answers</span>
 
 <span class="gn">&gt;</span> /model gpt-4o
   Model updated
   Previous         openanalyst-beta
   Current          gpt-4o
-  Preserved msgs   3                         <span class="cm"># conversation carries over</span>
+  Provider         OpenAI
+  Session          persisted (3 messages)    <span class="cm"># conversation carries over</span>
 
 <span class="gn">&gt;</span> Now fix the bug you found                 <span class="cm"># gpt-4o sees full history</span>
 
 <span class="gn">&gt;</span> /model grok
-  Preserved msgs   5                         <span class="cm"># still the same session</span>
+  Provider         xAI
+  Session          persisted (5 messages)    <span class="cm"># same session ID</span>
 
 <span class="gn">&gt;</span> /model sonnet
-  Preserved msgs   7                         <span class="cm"># 4 providers, 1 conversation</span></pre></div>
+  Session          persisted (7 messages)    <span class="cm"># 4 providers, 1 conversation</span></pre></div>
   </div>
 
   <!-- 1. Install -->
@@ -160,12 +173,12 @@
     <div class="num">04</div>
     <h2><span class="ic pu">&#9733;</span> Supported Providers</h2>
     <div class="pg">
-      <div class="pc df"><div class="pn">OpenAnalyst <span class="bd">DEFAULT</span></div><div class="pe">OPENANALYST_AUTH_TOKEN</div><div class="pm">openanalyst-beta</div></div>
-      <div class="pc"><div class="pn">Anthropic / Claude</div><div class="pe">ANTHROPIC_API_KEY</div><div class="pm">opus, sonnet, haiku, claude-*</div></div>
-      <div class="pc"><div class="pn">OpenAI / GPT</div><div class="pe">OPENAI_API_KEY</div><div class="pm">gpt-4o, gpt-4.1, o3, o4-mini, codex-mini</div></div>
-      <div class="pc"><div class="pn">xAI / Grok</div><div class="pe">XAI_API_KEY</div><div class="pm">grok, grok-3, grok-mini</div></div>
-      <div class="pc"><div class="pn">OpenRouter</div><div class="pe">OPENROUTER_API_KEY</div><div class="pm">openrouter/* (any model)</div></div>
-      <div class="pc"><div class="pn">Amazon Bedrock</div><div class="pe">BEDROCK_API_KEY</div><div class="pm">bedrock/* (any model)</div></div>
+      <div class="pc df"><div class="pn">OpenAnalyst <span class="bd">DEFAULT</span></div><div class="pe">OPENANALYST_AUTH_TOKEN</div><div class="pm">Models fetched live from API &mdash; run <code style="color:var(--cyan)">/model</code> to see available</div></div>
+      <div class="pc"><div class="pn">Anthropic / Claude</div><div class="pe">ANTHROPIC_API_KEY</div><div class="pm">Models fetched live &mdash; opus, sonnet, haiku, and more</div></div>
+      <div class="pc"><div class="pn">OpenAI / GPT</div><div class="pe">OPENAI_API_KEY</div><div class="pm">Models fetched live &mdash; gpt-4o, o3, codex, and more</div></div>
+      <div class="pc"><div class="pn">xAI / Grok</div><div class="pe">XAI_API_KEY</div><div class="pm">Models fetched live &mdash; grok-3, grok-mini, and more</div></div>
+      <div class="pc"><div class="pn">OpenRouter</div><div class="pe">OPENROUTER_API_KEY</div><div class="pm">350+ models fetched live &mdash; any provider via one key</div></div>
+      <div class="pc"><div class="pn">Amazon Bedrock</div><div class="pe">BEDROCK_API_KEY</div><div class="pm">Models fetched live from your Bedrock gateway</div></div>
     </div>
   </div>
 
@@ -184,8 +197,8 @@
       <tr><td>openanalyst --model MODEL</td><td>Use a specific model (auto-detects provider)</td></tr>
       <tr><td>openanalyst --resume FILE</td><td>Resume a saved session</td></tr>
       <tr><td>openanalyst init</td><td>Create OPENANALYST.md and project config</td></tr>
-      <tr><td>openanalyst login</td><td>Authenticate via OAuth</td></tr>
-      <tr><td>openanalyst logout</td><td>Clear stored credentials</td></tr>
+      <tr><td>openanalyst login</td><td>Interactive provider picker &mdash; select provider, enter API key, test connection, save credentials</td></tr>
+      <tr><td>openanalyst logout</td><td>Clear all saved provider credentials</td></tr>
       <tr><td>openanalyst agents</td><td>List configured agents</td></tr>
       <tr><td>openanalyst skills</td><td>List available skills</td></tr>
       <tr><td>openanalyst --version</td><td>Print version info</td></tr>
@@ -199,7 +212,7 @@
       <tr><td>/help <span class="tag tag-r">resume</span></td><td>Show all available commands</td></tr>
       <tr><td>/status <span class="tag tag-r">resume</span></td><td>Model, permissions, tokens, cost, git branch, session info</td></tr>
       <tr><td>/cost <span class="tag tag-r">resume</span></td><td>Show cumulative token usage and cost breakdown</td></tr>
-      <tr><td>/model [name]</td><td>Show or switch model mid-session (e.g. <code style="color:var(--cyan)">/model gpt-4o</code>)</td></tr>
+      <tr><td>/model [name]</td><td>Show live models from all configured providers, or switch mid-session (e.g. <code style="color:var(--cyan)">/model gpt-4o</code>). Session persists across provider switches.</td></tr>
       <tr><td>/clear [--confirm] <span class="tag tag-r">resume</span></td><td>Start a fresh session</td></tr>
       <tr><td>/compact <span class="tag tag-r">resume</span></td><td>Compact conversation history to save context</td></tr>
       <tr><td>/session [list|switch] <span class="tag tag-r">resume</span></td><td>List or switch between saved sessions</td></tr>
@@ -261,7 +274,9 @@
     <div class="num">07</div>
     <h2><span class="ic gn">&#10003;</span> Features</h2>
     <div class="fg">
-      <div class="fc"><div class="fn">Cross-Provider /model Switch</div><div class="fd">Switch from OpenAnalyst to GPT to Grok to Claude mid-conversation. Session, history, and context persist.</div></div>
+      <div class="fc"><div class="fn">Cross-Provider /model Switch</div><div class="fd">Switch from OpenAnalyst to GPT to Grok to Claude mid-conversation. Session ID, history, and context persist across providers.</div></div>
+      <div class="fc"><div class="fn">Live Model Discovery</div><div class="fd">/model fetches available models from each provider's API in real-time. No hardcoded lists.</div></div>
+      <div class="fc"><div class="fn">Multi-Provider Login</div><div class="fd">Run openanalyst login multiple times to add keys for different providers. All keys loaded on startup.</div></div>
       <div class="fc"><div class="fn">OPENANALYST.md</div><div class="fd">Project-specific AI instructions. Detected automatically in directory tree.</div></div>
       <div class="fc"><div class="fn">Session Persistence</div><div class="fd">Save, resume, list, and export conversation sessions.</div></div>
       <div class="fc"><div class="fn">Streaming Output</div><div class="fd">Real-time streaming with syntax-highlighted Markdown rendering.</div></div>
