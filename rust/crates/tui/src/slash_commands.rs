@@ -48,11 +48,11 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             ));
         }
         SlashCommand::Config { section } => {
-            let output = run_text_command("config", section.as_deref());
+            let output = build_config_output(section.as_deref());
             app.chat.push_system(output);
         }
         SlashCommand::Memory => {
-            let output = run_text_command("memory", None);
+            let output = build_memory_output();
             app.chat.push_system(output);
         }
         SlashCommand::Diff => {
@@ -64,19 +64,25 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             });
         }
         SlashCommand::Init => {
-            app.chat.push_system("Run `openanalyst init` from the terminal to create OPENANALYST.md".to_string());
+            let output = run_init();
+            app.chat.push_system(output);
         }
         SlashCommand::Agents { args } => {
-            let output = run_text_command("agents", args.as_deref());
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let output = commands::handle_agents_slash_command(args.as_deref(), &cwd)
+                .unwrap_or_else(|e| format!("Error: {e}"));
             app.chat.push_system(output);
         }
         SlashCommand::Skills { args } => {
-            let output = run_text_command("skills", args.as_deref());
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let output = commands::handle_skills_slash_command(args.as_deref(), &cwd)
+                .unwrap_or_else(|e| format!("Error: {e}"));
             app.chat.push_system(output);
         }
         SlashCommand::Export { path } => {
             let dest = path.unwrap_or_else(|| "session-export.md".to_string());
-            app.chat.push_system(format!("Session exported to: {dest}"));
+            let output = export_session(&app.chat.messages, &dest);
+            app.chat.push_system(output);
         }
         SlashCommand::Tokens { target } => {
             let text = target.unwrap_or_default();
@@ -120,15 +126,27 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
         }
         SlashCommand::Resume { session_path } => {
             if let Some(path) = session_path {
-                app.chat.push_system(format!("Resuming session from: {path}"));
+                match load_session_into_chat(app, &path) {
+                    Ok(count) => app.chat.push_system(format!("Resumed session from {path} ({count} messages)")),
+                    Err(e) => app.chat.push_system(format!("Failed to load session: {e}")),
+                }
             } else {
                 app.chat.push_system("Usage: /resume <session-path>".to_string());
             }
         }
         SlashCommand::Session { action, target } => {
             let msg = match action.as_deref() {
-                Some("list") => "Sessions: (use /session switch <id> to switch)".to_string(),
-                Some("switch") => format!("Switched to session: {}", target.unwrap_or_default()),
+                Some("list") => list_sessions(),
+                Some("switch") => {
+                    if let Some(id) = target {
+                        match load_session_into_chat(app, &id) {
+                            Ok(count) => format!("Switched to session ({count} messages)"),
+                            Err(e) => format!("Failed to switch: {e}"),
+                        }
+                    } else {
+                        "Usage: /session switch <session-id-or-path>".to_string()
+                    }
+                }
                 _ => "Usage: /session [list|switch <id>]".to_string(),
             };
             app.chat.push_system(msg);
@@ -360,7 +378,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
 
         SlashCommand::Mcp { action, args } => {
             let msg = match action.as_deref() {
-                None | Some("list") => "MCP servers: use /mcp list in REPL for full details".to_string(),
+                None | Some("list") => list_mcp_servers(),
                 Some("add") => {
                     if let Some(a) = args {
                         format!("MCP server add requested: {a}\nRestart CLI to activate.")
@@ -560,13 +578,26 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
 
         // ── Claude Code parity ──
         SlashCommand::Doctor => {
-            app.chat.push_system("Run /doctor in the REPL for full diagnostics.".to_string());
+            let output = run_doctor();
+            app.chat.push_system(output);
         }
         SlashCommand::Login => {
-            app.chat.push_system("Run `openanalyst login` from the terminal to add provider keys.".to_string());
+            let output = show_login_status();
+            app.chat.push_system(output);
         }
         SlashCommand::Logout => {
-            app.chat.push_system("Run `openanalyst logout` from the terminal to clear credentials.".to_string());
+            // Clear credentials.json
+            let config_dir = std::env::var("OPENANALYST_CONFIG_HOME")
+                .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.openanalyst")))
+                .or_else(|_| std::env::var("USERPROFILE").map(|h| format!("{h}/.openanalyst")))
+                .unwrap_or_else(|_| ".openanalyst".to_string());
+            let creds_path = std::path::Path::new(&config_dir).join("credentials.json");
+            if creds_path.exists() {
+                let _ = std::fs::remove_file(&creds_path);
+                app.chat.push_system(format!("Credentials cleared: {}\nRun `openanalyst login` from the terminal to re-authenticate.", creds_path.display()));
+            } else {
+                app.chat.push_system("No saved credentials to clear.".to_string());
+            }
         }
         SlashCommand::Vim => {
             app.chat.push_system("Vim mode: toggle with Ctrl+V in the input editor.".to_string());
@@ -621,9 +652,374 @@ fn capture_command_output(cmd: &str, args: &[&str]) -> String {
         .unwrap_or_else(|e| format!("Failed to run {cmd}: {e}"))
 }
 
-/// Placeholder for text commands that need runtime access.
-fn run_text_command(name: &str, _args: Option<&str>) -> String {
-    format!("/{name}: command output will be available when fully wired to runtime")
+// ═══════════════════════════════════════════════════════════════════
+//  Real implementations for previously-stubbed commands
+// ═══════════════════════════════════════════════════════════════════
+
+/// /init — create OPENANALYST.md in the current directory.
+fn run_init() -> String {
+    let path = std::path::Path::new("OPENANALYST.md");
+    if path.exists() {
+        return format!("OPENANALYST.md already exists at {}", std::env::current_dir().unwrap_or_default().display());
+    }
+    let template = "\
+# Project Instructions\n\n\
+This file provides context to the AI agent about this project.\n\n\
+## Overview\n\n\
+Describe your project here.\n\n\
+## Key Files\n\n\
+- `src/` — source code\n\n\
+## Conventions\n\n\
+- Add project-specific coding conventions here.\n\
+";
+    match std::fs::write(path, template) {
+        Ok(()) => format!("Created OPENANALYST.md in {}", std::env::current_dir().unwrap_or_default().display()),
+        Err(e) => format!("Failed to create OPENANALYST.md: {e}"),
+    }
+}
+
+/// /config — display environment, model, and provider configuration.
+fn build_config_output(section: Option<&str>) -> String {
+    let mut out = String::new();
+    let show_all = section.is_none();
+    let sec = section.unwrap_or("");
+
+    if show_all || sec == "env" {
+        out.push_str("── Environment ──\n");
+        for var in &[
+            "OPENANALYST_API_KEY", "OPENANALYST_AUTH_TOKEN",
+            "ANTHROPIC_API_KEY", "OPENAI_API_KEY", "GEMINI_API_KEY",
+            "XAI_API_KEY", "OPENROUTER_API_KEY", "BEDROCK_API_KEY",
+            "STABILITY_API_KEY",
+        ] {
+            let val = std::env::var(var).ok().filter(|v| !v.is_empty());
+            let display = match &val {
+                Some(v) if v.len() > 8 => format!("{}...{}", &v[..4], &v[v.len()-4..]),
+                Some(_) => "****".to_string(),
+                None => "(not set)".to_string(),
+            };
+            out.push_str(&format!("  {var} = {display}\n"));
+        }
+        out.push('\n');
+    }
+
+    if show_all || sec == "model" {
+        out.push_str("── Model ──\n");
+        let model = std::env::var("OPENANALYST_MODEL")
+            .or_else(|_| std::env::var("OPENANALYST_DEFAULT_MODEL"))
+            .unwrap_or_else(|_| "(default)".to_string());
+        out.push_str(&format!("  Active model: {model}\n\n"));
+    }
+
+    if show_all || sec == "paths" {
+        out.push_str("── Paths ──\n");
+        let config_home = std::env::var("OPENANALYST_CONFIG_HOME")
+            .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.openanalyst")))
+            .or_else(|_| std::env::var("USERPROFILE").map(|h| format!("{h}\\.openanalyst")))
+            .unwrap_or_else(|_| "~/.openanalyst".to_string());
+        out.push_str(&format!("  Config home:   {config_home}\n"));
+        out.push_str(&format!("  .env file:     {config_home}/.env\n"));
+        out.push_str(&format!("  Credentials:   {config_home}/credentials.json\n"));
+        out.push_str(&format!("  Working dir:   {}\n", std::env::current_dir().unwrap_or_default().display()));
+        out.push('\n');
+    }
+
+    if out.is_empty() {
+        format!("Unknown config section: {sec}\nAvailable: env, model, paths")
+    } else {
+        out
+    }
+}
+
+/// /memory — find and display OPENANALYST.md files.
+fn build_memory_output() -> String {
+    let mut found = Vec::new();
+    let cwd = std::env::current_dir().unwrap_or_default();
+
+    // Search cwd and parents for OPENANALYST.md
+    let mut dir = Some(cwd.as_path());
+    while let Some(d) = dir {
+        let candidate = d.join("OPENANALYST.md");
+        if candidate.exists() {
+            if let Ok(content) = std::fs::read_to_string(&candidate) {
+                let preview: String = content.lines().take(20).collect::<Vec<_>>().join("\n");
+                let lines = content.lines().count();
+                found.push(format!(
+                    "── {} ({} lines) ──\n{}{}\n",
+                    candidate.display(),
+                    lines,
+                    preview,
+                    if lines > 20 { "\n  ..." } else { "" }
+                ));
+            }
+        }
+        // Also check .openanalyst/OPENANALYST.md
+        let alt = d.join(".openanalyst").join("OPENANALYST.md");
+        if alt.exists() {
+            if let Ok(content) = std::fs::read_to_string(&alt) {
+                let preview: String = content.lines().take(10).collect::<Vec<_>>().join("\n");
+                found.push(format!("── {} ──\n{}\n", alt.display(), preview));
+            }
+        }
+        dir = d.parent();
+        // Don't walk above 5 levels
+        if found.len() >= 5 { break; }
+    }
+
+    if found.is_empty() {
+        "No OPENANALYST.md files found.\nRun /init to create one in the current directory.".to_string()
+    } else {
+        format!("Loaded {} instruction file(s):\n\n{}", found.len(), found.join("\n"))
+    }
+}
+
+/// /session list — list session files from .openanalyst/sessions/.
+fn list_sessions() -> String {
+    let sessions_dir = std::path::Path::new(".openanalyst").join("sessions");
+    if !sessions_dir.exists() {
+        return "No saved sessions found.".to_string();
+    }
+    let mut entries: Vec<_> = std::fs::read_dir(&sessions_dir)
+        .ok()
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+        .collect();
+    if entries.is_empty() {
+        return "No saved sessions found.".to_string();
+    }
+    // Sort by modified time (newest first)
+    entries.sort_by(|a, b| {
+        b.metadata().and_then(|m| m.modified()).ok()
+            .cmp(&a.metadata().and_then(|m| m.modified()).ok())
+    });
+    let mut out = format!("Sessions ({}):\n\n", entries.len());
+    for (i, entry) in entries.iter().take(20).enumerate() {
+        let name = entry.file_name();
+        let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+        out.push_str(&format!("  {}. {} ({:.1} KB)\n", i + 1, name.to_string_lossy(), size as f64 / 1024.0));
+    }
+    if entries.len() > 20 {
+        out.push_str(&format!("  ...and {} more\n", entries.len() - 20));
+    }
+    out.push_str("\nUse /session switch <filename> or /resume <path> to load.");
+    out
+}
+
+/// /resume and /session switch — load a session JSON into the chat.
+fn load_session_into_chat(app: &mut crate::app::App, path: &str) -> Result<usize, String> {
+    // Try the path directly, then in .openanalyst/sessions/
+    let file_path = if std::path::Path::new(path).exists() {
+        std::path::PathBuf::from(path)
+    } else {
+        let sessions_path = std::path::Path::new(".openanalyst").join("sessions").join(path);
+        if sessions_path.exists() {
+            sessions_path
+        } else {
+            return Err(format!("Session file not found: {path}"));
+        }
+    };
+
+    let content = std::fs::read_to_string(&file_path).map_err(|e| e.to_string())?;
+    let session: serde_json::Value = serde_json::from_str(&content).map_err(|e| e.to_string())?;
+
+    // Clear current chat
+    app.chat.messages.clear();
+    app.chat.scroll_offset = 0;
+
+    // Load messages from session
+    let messages = session.get("messages")
+        .and_then(|m| m.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    let count = messages.len();
+    for msg in &messages {
+        let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("system");
+        let text = msg.get("content")
+            .and_then(|c| {
+                c.as_str().map(ToOwned::to_owned).or_else(|| {
+                    c.as_array().map(|blocks| {
+                        blocks.iter()
+                            .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
+                            .collect::<Vec<_>>()
+                            .join("\n")
+                    })
+                })
+            })
+            .unwrap_or_default();
+        if text.is_empty() { continue; }
+        match role {
+            "user" => app.chat.push_user(text),
+            "assistant" => {
+                app.chat.start_assistant();
+                app.chat.push_delta(&text);
+                app.chat.finish_assistant();
+            }
+            _ => app.chat.push_system(text),
+        }
+    }
+
+    Ok(count)
+}
+
+/// /export — write chat messages to a markdown file.
+fn export_session(messages: &[crate::panels::chat::ChatMessage], dest: &str) -> String {
+    use crate::panels::chat::ChatMessage;
+    let mut md = String::from("# OpenAnalyst CLI — Session Export\n\n");
+    let mut count = 0u32;
+    for msg in messages {
+        match msg {
+            ChatMessage::User { text } => {
+                md.push_str(&format!("### User\n\n{text}\n\n---\n\n"));
+                count += 1;
+            }
+            ChatMessage::Assistant { markdown, .. } => {
+                md.push_str(&format!("### Assistant\n\n{}\n\n---\n\n", markdown.raw()));
+                count += 1;
+            }
+            ChatMessage::System { text } => {
+                md.push_str(&format!("### System\n\n{text}\n\n---\n\n"));
+                count += 1;
+            }
+            ChatMessage::ToolCall { card } => {
+                md.push_str(&format!("### Tool Call: {}\n\n```\n{}\n```\n\n---\n\n", card.tool_name, card.input_preview));
+                count += 1;
+            }
+            ChatMessage::FileOutput { path, description, .. } => {
+                md.push_str(&format!("### File Output\n\n{description}\nPath: {path}\n\n---\n\n"));
+                count += 1;
+            }
+        }
+    }
+    match std::fs::write(dest, &md) {
+        Ok(()) => format!("Session exported to {dest} ({count} messages, {:.1} KB)", md.len() as f64 / 1024.0),
+        Err(e) => format!("Failed to export: {e}"),
+    }
+}
+
+/// /doctor — run provider connectivity diagnostics.
+fn run_doctor() -> String {
+    let mut out = String::from("── OpenAnalyst CLI Diagnostics ──\n\n");
+
+    // Check binary
+    out.push_str("Binary:      openanalyst v1.0.1\n");
+    out.push_str(&format!("Working dir: {}\n", std::env::current_dir().unwrap_or_default().display()));
+    out.push_str(&format!("OS:          {}\n\n", std::env::consts::OS));
+
+    // Check provider keys
+    out.push_str("── Provider Keys ──\n\n");
+    let providers: &[(&str, &str)] = &[
+        ("OPENANALYST_API_KEY", "OpenAnalyst"),
+        ("OPENANALYST_AUTH_TOKEN", "OpenAnalyst (OAuth)"),
+        ("ANTHROPIC_API_KEY", "Anthropic / Claude"),
+        ("OPENAI_API_KEY", "OpenAI / Codex"),
+        ("GEMINI_API_KEY", "Google Gemini"),
+        ("XAI_API_KEY", "xAI / Grok"),
+        ("OPENROUTER_API_KEY", "OpenRouter"),
+        ("BEDROCK_API_KEY", "Amazon Bedrock"),
+        ("STABILITY_API_KEY", "Stability AI"),
+    ];
+    let mut configured = 0u32;
+    for (var, name) in providers {
+        let set = std::env::var(var).ok().filter(|v| !v.is_empty()).is_some();
+        let icon = if set { "\u{2713}" } else { "\u{2717}" };
+        out.push_str(&format!("  {icon} {name:<22} {var}\n"));
+        if set { configured += 1; }
+    }
+    out.push_str(&format!("\n  {configured} provider(s) configured.\n\n"));
+
+    // Check config files
+    out.push_str("── Config Files ──\n\n");
+    let config_home = std::env::var("OPENANALYST_CONFIG_HOME")
+        .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.openanalyst")))
+        .or_else(|_| std::env::var("USERPROFILE").map(|h| format!("{h}\\.openanalyst")))
+        .unwrap_or_else(|_| "~/.openanalyst".to_string());
+    for file in &[".env", "credentials.json", "settings.json"] {
+        let p = std::path::Path::new(&config_home).join(file);
+        let icon = if p.exists() { "\u{2713}" } else { "\u{2717}" };
+        out.push_str(&format!("  {icon} {}\n", p.display()));
+    }
+    let oa_md = std::path::Path::new("OPENANALYST.md");
+    let icon = if oa_md.exists() { "\u{2713}" } else { "\u{2717}" };
+    out.push_str(&format!("  {icon} OPENANALYST.md (project)\n"));
+
+    // Check git
+    out.push_str("\n── Git ──\n\n");
+    let git_ok = std::process::Command::new("git").args(["rev-parse", "--git-dir"]).output()
+        .is_ok_and(|o| o.status.success());
+    out.push_str(&format!("  {} Git repository\n", if git_ok { "\u{2713}" } else { "\u{2717}" }));
+
+    out
+}
+
+/// /mcp list — display configured MCP servers from settings.
+fn list_mcp_servers() -> String {
+    // Try to read from .openanalyst/settings.json and ~/.openanalyst/settings.json
+    let mut servers = Vec::new();
+
+    for base in &[".openanalyst/settings.json", ".openanalyst/settings.local.json"] {
+        if let Ok(content) = std::fs::read_to_string(base) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(mcp) = val.get("mcpServers").and_then(|v| v.as_object()) {
+                    for (name, config) in mcp {
+                        let cmd = config.get("command").and_then(|v| v.as_str()).unwrap_or("(unknown)");
+                        servers.push(format!("  \u{25A0} {name}  →  {cmd}"));
+                    }
+                }
+            }
+        }
+    }
+
+    // Also check ~/.openanalyst/settings.json
+    let home_settings = std::env::var("OPENANALYST_CONFIG_HOME")
+        .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.openanalyst")))
+        .or_else(|_| std::env::var("USERPROFILE").map(|h| format!("{h}\\.openanalyst")))
+        .unwrap_or_default();
+    let home_path = std::path::Path::new(&home_settings).join("settings.json");
+    if let Ok(content) = std::fs::read_to_string(&home_path) {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(mcp) = val.get("mcpServers").and_then(|v| v.as_object()) {
+                for (name, config) in mcp {
+                    let cmd = config.get("command").and_then(|v| v.as_str()).unwrap_or("(unknown)");
+                    let entry = format!("  \u{25A0} {name}  →  {cmd}");
+                    if !servers.contains(&entry) {
+                        servers.push(entry);
+                    }
+                }
+            }
+        }
+    }
+
+    if servers.is_empty() {
+        "No MCP servers configured.\nAdd servers in .openanalyst/settings.json under \"mcpServers\".".to_string()
+    } else {
+        format!("MCP Servers ({}):\n\n{}", servers.len(), servers.join("\n"))
+    }
+}
+
+/// /login — show provider auth status and guide user.
+fn show_login_status() -> String {
+    let mut out = String::from("── Provider Auth Status ──\n\n");
+    let providers: &[(&str, &str)] = &[
+        ("OPENANALYST_AUTH_TOKEN", "OpenAnalyst"),
+        ("ANTHROPIC_API_KEY", "Anthropic / Claude"),
+        ("OPENAI_API_KEY", "OpenAI / Codex"),
+        ("GEMINI_API_KEY", "Google Gemini"),
+        ("XAI_API_KEY", "xAI / Grok"),
+        ("OPENROUTER_API_KEY", "OpenRouter"),
+        ("BEDROCK_API_KEY", "Amazon Bedrock"),
+    ];
+    for (var, name) in providers {
+        let set = std::env::var(var).ok().filter(|v| !v.is_empty()).is_some();
+        let icon = if set { "\u{2713}" } else { "\u{2717}" };
+        out.push_str(&format!("  {icon} {name}\n"));
+    }
+    out.push_str("\nTo add or switch providers:\n");
+    out.push_str("  • Run `openanalyst login` from the terminal\n");
+    out.push_str("  • Or edit ~/.openanalyst/.env\n");
+    out
 }
 
 /// UTF-8 safe truncation.
