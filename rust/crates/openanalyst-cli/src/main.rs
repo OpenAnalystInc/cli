@@ -114,11 +114,15 @@ fn main() {
     load_saved_provider_credentials();
 
     if let Err(error) = run() {
-        eprintln!(
-            "error: {error}
-
-Run `openanalyst --help` for usage."
-        );
+        // Check if this is a credentials error — show a friendly message, not --help
+        let msg = error.to_string();
+        if msg.contains("credentials") || msg.contains("API_KEY") {
+            eprintln!("\n  \x1b[38;5;208m{msg}\x1b[0m\n");
+        } else {
+            eprintln!(
+                "error: {error}\n\nRun `openanalyst --help` for usage."
+            );
+        }
         std::process::exit(1);
     }
 }
@@ -147,6 +151,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         CliAction::Login => run_login()?,
         CliAction::Logout => run_logout()?,
         CliAction::Init => run_init()?,
+        CliAction::Agent {
+            task,
+            model,
+            max_turns,
+            permission_mode,
+            allowed_tools,
+            verbose,
+        } => run_agent(task, model, max_turns, permission_mode, allowed_tools, verbose)?,
         CliAction::Repl {
             model,
             allowed_tools,
@@ -190,6 +202,14 @@ enum CliAction {
         model: String,
         allowed_tools: Option<AllowedToolSet>,
         permission_mode: PermissionMode,
+    },
+    Agent {
+        task: String,
+        model: String,
+        max_turns: usize,
+        permission_mode: PermissionMode,
+        allowed_tools: Option<AllowedToolSet>,
+        verbose: bool,
     },
     // prompt-mode formatting is only supported for non-interactive runs
     Help,
@@ -337,6 +357,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
             args: join_optional_args(&rest[1..]),
         }),
         "system-prompt" => parse_system_prompt_args(&rest[1..]),
+        "agent" => parse_agent_args(&rest[1..], &model, permission_mode, &allowed_tool_values),
         "login" => Ok(CliAction::Login),
         "logout" => Ok(CliAction::Logout),
         "init" => Ok(CliAction::Init),
@@ -428,6 +449,146 @@ fn permission_mode_from_label(mode: &str) -> PermissionMode {
         "danger-full-access" => PermissionMode::DangerFullAccess,
         other => panic!("unsupported permission mode label: {other}"),
     }
+}
+
+fn parse_agent_args(
+    args: &[String],
+    model: &str,
+    permission_mode: PermissionMode,
+    allowed_tool_values: &[String],
+) -> Result<CliAction, String> {
+    let mut index = 0;
+    let mut max_turns: usize = 30;
+    let mut verbose = false;
+    let mut task_parts = Vec::new();
+    let mut sub_model = model.to_string();
+
+    // First arg should be "run" (only subcommand for now)
+    if args.first().map(String::as_str) != Some("run") {
+        if args.is_empty() {
+            return Err("usage: openanalyst agent run <task>\n  Subcommands: run".to_string());
+        }
+        return Err(format!(
+            "unknown agent subcommand '{}'. Use: openanalyst agent run <task>",
+            args[0]
+        ));
+    }
+    index += 1; // skip "run"
+
+    while index < args.len() {
+        match args[index].as_str() {
+            "--max-turns" => {
+                let val = args
+                    .get(index + 1)
+                    .ok_or_else(|| "missing value for --max-turns".to_string())?;
+                max_turns = val
+                    .parse()
+                    .map_err(|_| format!("invalid --max-turns value: {val}"))?;
+                index += 2;
+            }
+            flag if flag.starts_with("--max-turns=") => {
+                let val = &flag[12..];
+                max_turns = val
+                    .parse()
+                    .map_err(|_| format!("invalid --max-turns value: {val}"))?;
+                index += 1;
+            }
+            "--model" => {
+                let val = args
+                    .get(index + 1)
+                    .ok_or_else(|| "missing value for --model".to_string())?;
+                sub_model = resolve_model_alias(val).to_string();
+                index += 2;
+            }
+            flag if flag.starts_with("--model=") => {
+                sub_model = resolve_model_alias(&flag[8..]).to_string();
+                index += 1;
+            }
+            "--verbose" | "-v" => {
+                verbose = true;
+                index += 1;
+            }
+            other => {
+                task_parts.push(other.to_string());
+                index += 1;
+            }
+        }
+    }
+
+    let task = task_parts.join(" ");
+    if task.trim().is_empty() {
+        return Err("usage: openanalyst agent run <task>".to_string());
+    }
+
+    let allowed_tools = normalize_allowed_tools(allowed_tool_values)?;
+
+    Ok(CliAction::Agent {
+        task,
+        model: sub_model,
+        max_turns,
+        permission_mode,
+        allowed_tools,
+        verbose,
+    })
+}
+
+fn run_agent(
+    task: String,
+    model: String,
+    max_turns: usize,
+    permission_mode: PermissionMode,
+    allowed_tools: Option<AllowedToolSet>,
+    verbose: bool,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use openanalyst_agent::{AgentConfig, AgentRunner};
+
+    let config = AgentConfig {
+        model: model.clone(),
+        max_turns,
+        permission_mode,
+        allowed_tools,
+        cwd: env::current_dir()?,
+        verbose,
+        system_context: None,
+    };
+
+    eprintln!();
+    eprintln!(
+        "  \x1b[38;5;45m\x1b[1mOpenAnalyst Agent\x1b[0m \x1b[2m-- autonomous mode\x1b[0m"
+    );
+    eprintln!("  \x1b[2mModel\x1b[0m       {model}");
+    eprintln!("  \x1b[2mMax turns\x1b[0m   {max_turns}");
+    eprintln!();
+
+    let runner = AgentRunner::new(config);
+    let result = runner.run(&task)?;
+
+    // Print final summary
+    eprintln!();
+    eprintln!("  \x1b[38;5;45m\x1b[1mAgent complete\x1b[0m");
+    eprintln!(
+        "  \x1b[2mTurns\x1b[0m       {}",
+        result.turns
+    );
+    eprintln!(
+        "  \x1b[2mTokens\x1b[0m      {} in / {} out",
+        result.input_tokens, result.output_tokens
+    );
+    eprintln!(
+        "  \x1b[2mDuration\x1b[0m    {:.1}s",
+        result.duration_secs
+    );
+    eprintln!(
+        "  \x1b[2mTool calls\x1b[0m  {}",
+        result.tool_calls.len()
+    );
+    eprintln!();
+
+    if !result.final_text.is_empty() {
+        println!("{}", result.final_text);
+    }
+
+    Ok(())
 }
 
 fn default_permission_mode() -> PermissionMode {
@@ -594,6 +755,14 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
         test_url: "",
         test_header: "bearer",
         placeholder: "...",
+    },
+    ProviderOption {
+        name: "Google Gemini",
+        description: "Gemini 2.5 Pro, Flash & more",
+        env_var: "GEMINI_API_KEY",
+        test_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
+        test_header: "bearer",
+        placeholder: "AIza...",
     },
 ];
 
@@ -1842,6 +2011,12 @@ impl LiveCli {
                     name: "Amazon Bedrock",
                     keys: &["BEDROCK_API_KEY"],
                     models_url: "",
+                    auth_header: "bearer",
+                },
+                ProviderModelsConfig {
+                    name: "Google Gemini",
+                    keys: &["GEMINI_API_KEY"],
+                    models_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
                     auth_header: "bearer",
                 },
             ];
@@ -3587,6 +3762,12 @@ fn fetch_startup_account_info(model: &str) -> StartupAccountInfo {
             env::var("BEDROCK_BASE_URL")
                 .unwrap_or_else(|_| "https://bedrock-runtime.us-east-1.amazonaws.com/v1".to_string()),
         ),
+        ProviderKind::Gemini => (
+            None,
+            env::var("GEMINI_API_KEY").ok().filter(|v| !v.is_empty()),
+            env::var("GEMINI_BASE_URL")
+                .unwrap_or_else(|_| "https://generativelanguage.googleapis.com/v1beta/openai".to_string()),
+        ),
     };
 
     // Try to fetch account info from API
@@ -4544,6 +4725,11 @@ fn print_help_to(out: &mut impl Write) -> io::Result<()> {
     writeln!(out, "  openanalyst agents")?;
     writeln!(out, "  openanalyst skills")?;
     writeln!(out, "  openanalyst system-prompt [--cwd PATH] [--date YYYY-MM-DD]")?;
+    writeln!(out, "  openanalyst agent run [--max-turns N] [--verbose] TASK")?;
+    writeln!(
+        out,
+        "      Run an autonomous agent that completes the task without interaction"
+    )?;
     writeln!(out, "  openanalyst login")?;
     writeln!(out, "  openanalyst logout")?;
     writeln!(out, "  openanalyst init")?;
@@ -4599,6 +4785,7 @@ fn print_help_to(out: &mut impl Write) -> io::Result<()> {
     )?;
     writeln!(out, "  openanalyst agents")?;
     writeln!(out, "  openanalyst /skills")?;
+    writeln!(out, "  openanalyst agent run --model gemini-2.5-pro \"fix the failing tests\"")?;
     writeln!(out, "  openanalyst login")?;
     writeln!(out, "  openanalyst init")?;
     Ok(())
@@ -4834,6 +5021,71 @@ mod tests {
                 args: Some("--help".to_string())
             }
         );
+    }
+
+    #[test]
+    fn parses_agent_run_subcommand() {
+        let result = parse_args(&[
+            "agent".to_string(),
+            "run".to_string(),
+            "fix".to_string(),
+            "the".to_string(),
+            "bug".to_string(),
+        ])
+        .expect("agent run should parse");
+        match result {
+            CliAction::Agent {
+                task,
+                max_turns,
+                verbose,
+                ..
+            } => {
+                assert_eq!(task, "fix the bug");
+                assert_eq!(max_turns, 30);
+                assert!(!verbose);
+            }
+            other => panic!("expected Agent, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn parses_agent_run_with_flags() {
+        let result = parse_args(&[
+            "agent".to_string(),
+            "run".to_string(),
+            "--max-turns".to_string(),
+            "10".to_string(),
+            "--verbose".to_string(),
+            "--model".to_string(),
+            "gemini-2.5-pro".to_string(),
+            "deploy".to_string(),
+        ])
+        .expect("agent run with flags should parse");
+        match result {
+            CliAction::Agent {
+                task,
+                model,
+                max_turns,
+                verbose,
+                ..
+            } => {
+                assert_eq!(task, "deploy");
+                assert_eq!(model, "gemini-2.5-pro");
+                assert_eq!(max_turns, 10);
+                assert!(verbose);
+            }
+            other => panic!("expected Agent, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn agent_without_run_shows_error() {
+        assert!(parse_args(&["agent".to_string()]).is_err());
+    }
+
+    #[test]
+    fn agent_run_without_task_shows_error() {
+        assert!(parse_args(&["agent".to_string(), "run".to_string()]).is_err());
     }
 
     #[test]

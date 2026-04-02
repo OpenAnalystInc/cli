@@ -18,6 +18,7 @@ pub const DEFAULT_XAI_BASE_URL: &str = "https://api.x.ai/v1";
 pub const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 pub const DEFAULT_OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
 pub const DEFAULT_BEDROCK_BASE_URL: &str = "https://bedrock-runtime.us-east-1.amazonaws.com/v1";
+pub const DEFAULT_GEMINI_BASE_URL: &str = "https://generativelanguage.googleapis.com/v1beta/openai";
 const REQUEST_ID_HEADER: &str = "request-id";
 const ALT_REQUEST_ID_HEADER: &str = "x-request-id";
 const DEFAULT_INITIAL_BACKOFF: Duration = Duration::from_millis(200);
@@ -36,6 +37,7 @@ const XAI_ENV_VARS: &[&str] = &["XAI_API_KEY"];
 const OPENAI_ENV_VARS: &[&str] = &["OPENAI_API_KEY"];
 const OPENROUTER_ENV_VARS: &[&str] = &["OPENROUTER_API_KEY"];
 const BEDROCK_ENV_VARS: &[&str] = &["BEDROCK_API_KEY"];
+const GEMINI_ENV_VARS: &[&str] = &["GEMINI_API_KEY"];
 
 impl OpenAiCompatConfig {
     #[must_use]
@@ -79,12 +81,23 @@ impl OpenAiCompatConfig {
     }
 
     #[must_use]
+    pub const fn gemini() -> Self {
+        Self {
+            provider_name: "Google Gemini",
+            api_key_env: "GEMINI_API_KEY",
+            base_url_env: "GEMINI_BASE_URL",
+            default_base_url: DEFAULT_GEMINI_BASE_URL,
+        }
+    }
+
+    #[must_use]
     pub fn credential_env_vars(self) -> &'static [&'static str] {
         match self.provider_name {
             "xAI" => XAI_ENV_VARS,
             "OpenAI" => OPENAI_ENV_VARS,
             "OpenRouter" => OPENROUTER_ENV_VARS,
             "Amazon Bedrock" => BEDROCK_ENV_VARS,
+            "Google Gemini" => GEMINI_ENV_VARS,
             _ => &[],
         }
     }

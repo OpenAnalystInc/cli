@@ -50,7 +50,7 @@ impl InitReport {
         ];
         for artifact in &self.artifacts {
             lines.push(format!(
-                "  {:<16} {}",
+                "  {:<18} {}",
                 artifact.name,
                 artifact.status.label()
             ));
@@ -354,10 +354,10 @@ mod tests {
 
         let report = initialize_repo(&root).expect("init should succeed");
         let rendered = report.render();
-        assert!(rendered.contains(".openanalyst/           created"));
-        assert!(rendered.contains(".openanalyst.json       created"));
-        assert!(rendered.contains(".gitignore       created"));
-        assert!(rendered.contains("OPENANALYST.md          created"));
+        assert!(rendered.contains(".openanalyst/      created"));
+        assert!(rendered.contains(".openanalyst.json  created"));
+        assert!(rendered.contains(".gitignore         created"));
+        assert!(rendered.contains("OPENANALYST.md     created"));
         assert!(root.join(".openanalyst").is_dir());
         assert!(root.join(".openanalyst.json").is_file());
         assert!(root.join("OPENANALYST.md").is_file());
@@ -391,13 +391,13 @@ mod tests {
         let first = initialize_repo(&root).expect("first init should succeed");
         assert!(first
             .render()
-            .contains("OPENANALYST.md          skipped (already exists)"));
+            .contains("OPENANALYST.md     skipped (already exists)"));
         let second = initialize_repo(&root).expect("second init should succeed");
         let second_rendered = second.render();
-        assert!(second_rendered.contains(".openanalyst/           skipped (already exists)"));
-        assert!(second_rendered.contains(".openanalyst.json       skipped (already exists)"));
-        assert!(second_rendered.contains(".gitignore       skipped (already exists)"));
-        assert!(second_rendered.contains("OPENANALYST.md          skipped (already exists)"));
+        assert!(second_rendered.contains(".openanalyst/      skipped (already exists)"));
+        assert!(second_rendered.contains(".openanalyst.json  skipped (already exists)"));
+        assert!(second_rendered.contains(".gitignore         skipped (already exists)"));
+        assert!(second_rendered.contains("OPENANALYST.md     skipped (already exists)"));
         assert_eq!(
             fs::read_to_string(root.join("OPENANALYST.md")).expect("read existing openanalyst md"),
             "custom guidance\n"

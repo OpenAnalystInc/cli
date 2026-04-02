@@ -22,8 +22,8 @@ async fn stream_via_provider<P: Provider>(
 pub enum ProviderClient {
     /// OpenAnalyst or Anthropic (Anthropic message format)
     OpenAnalystApi(OpenAnalystApiClient),
-    /// OpenAI, xAI, OpenRouter, Bedrock (OpenAI chat completions format)
-    OpenAiCompat(OpenAiCompatClient),
+    /// OpenAI, xAI, OpenRouter, Bedrock, Gemini (OpenAI chat completions format)
+    OpenAiCompat(OpenAiCompatClient, ProviderKind),
 }
 
 impl ProviderClient {
@@ -45,17 +45,25 @@ impl ProviderClient {
                 }))
             }
             // OpenAI-format providers
-            ProviderKind::OpenAi => Ok(Self::OpenAiCompat(
+            kind @ ProviderKind::OpenAi => Ok(Self::OpenAiCompat(
                 OpenAiCompatClient::from_env(OpenAiCompatConfig::openai())?,
+                kind,
             )),
-            ProviderKind::Xai => Ok(Self::OpenAiCompat(
+            kind @ ProviderKind::Xai => Ok(Self::OpenAiCompat(
                 OpenAiCompatClient::from_env(OpenAiCompatConfig::xai())?,
+                kind,
             )),
-            ProviderKind::OpenRouter => Ok(Self::OpenAiCompat(
+            kind @ ProviderKind::OpenRouter => Ok(Self::OpenAiCompat(
                 OpenAiCompatClient::from_env(OpenAiCompatConfig::openrouter())?,
+                kind,
             )),
-            ProviderKind::Bedrock => Ok(Self::OpenAiCompat(
+            kind @ ProviderKind::Bedrock => Ok(Self::OpenAiCompat(
                 OpenAiCompatClient::from_env(OpenAiCompatConfig::bedrock())?,
+                kind,
+            )),
+            kind @ ProviderKind::Gemini => Ok(Self::OpenAiCompat(
+                OpenAiCompatClient::from_env(OpenAiCompatConfig::gemini())?,
+                kind,
             )),
         }
     }
@@ -64,7 +72,7 @@ impl ProviderClient {
     pub fn provider_kind(&self) -> ProviderKind {
         match self {
             Self::OpenAnalystApi(_) => ProviderKind::OpenAnalystApi,
-            Self::OpenAiCompat(_) => ProviderKind::OpenAi, // generic OpenAI-compat
+            Self::OpenAiCompat(_, kind) => *kind,
         }
     }
 
@@ -74,7 +82,7 @@ impl ProviderClient {
     ) -> Result<MessageResponse, ApiError> {
         match self {
             Self::OpenAnalystApi(client) => send_via_provider(client, request).await,
-            Self::OpenAiCompat(client) => send_via_provider(client, request).await,
+            Self::OpenAiCompat(client, _) => send_via_provider(client, request).await,
         }
     }
 
@@ -86,7 +94,7 @@ impl ProviderClient {
             Self::OpenAnalystApi(client) => stream_via_provider(client, request)
                 .await
                 .map(MessageStream::OpenAnalystApi),
-            Self::OpenAiCompat(client) => stream_via_provider(client, request)
+            Self::OpenAiCompat(client, _) => stream_via_provider(client, request)
                 .await
                 .map(MessageStream::OpenAiCompat),
         }
@@ -146,6 +154,7 @@ mod tests {
         assert_eq!(detect_provider_kind("gpt-4o"), ProviderKind::OpenAi);
         assert_eq!(detect_provider_kind("openrouter/auto"), ProviderKind::OpenRouter);
         assert_eq!(detect_provider_kind("bedrock/claude"), ProviderKind::Bedrock);
+        assert_eq!(detect_provider_kind("gemini-2.5-pro"), ProviderKind::Gemini);
         assert_eq!(
             detect_provider_kind("claude-sonnet-4-6"),
             ProviderKind::OpenAnalystApi

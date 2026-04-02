@@ -5,7 +5,7 @@ const CCR_PROXY_PATH_MARKERS: [&str; 2] = ["/v2/session_ingress/shttp/mcp/", "/v
 
 #[must_use]
 pub fn normalize_name_for_mcp(name: &str) -> String {
-    let mut normalized = name
+    let normalized = name
         .chars()
         .map(|ch| match ch {
             'a'..='z' | 'A'..='Z' | '0'..='9' | '_' | '-' => ch,
@@ -13,13 +13,13 @@ pub fn normalize_name_for_mcp(name: &str) -> String {
         })
         .collect::<String>();
 
-    if name.starts_with(MANAGED_SERVER_PREFIX) {
-        normalized = collapse_underscores(&normalized)
-            .trim_matches('_')
-            .to_string();
-    }
+    let collapsed = collapse_underscores(&normalized);
 
-    normalized
+    if name.starts_with(MANAGED_SERVER_PREFIX) {
+        collapsed.trim_matches('_').to_string()
+    } else {
+        collapsed.trim_end_matches('_').to_string()
+    }
 }
 
 #[must_use]
@@ -218,7 +218,7 @@ mod tests {
     #[test]
     fn normalizes_server_names_for_mcp_tooling() {
         assert_eq!(normalize_name_for_mcp("github.com"), "github_com");
-        assert_eq!(normalize_name_for_mcp("tool name!"), "tool_name_");
+        assert_eq!(normalize_name_for_mcp("tool name!"), "tool_name");
         assert_eq!(
             normalize_name_for_mcp("claude.ai Example   Server!!"),
             "claude_ai_Example_Server"

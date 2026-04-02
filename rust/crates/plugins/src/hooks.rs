@@ -229,22 +229,17 @@ fn format_hook_warning(command: &str, code: i32, stdout: Option<&str>, stderr: &
 }
 
 fn shell_command(command: &str) -> CommandWithStdin {
-    #[cfg(windows)]
-    let command_builder = {
-        let mut command_builder = Command::new("cmd");
-        command_builder.arg("/C").arg(command);
-        CommandWithStdin::new(command_builder)
-    };
-
-    #[cfg(not(windows))]
+    // Use sh on all platforms (Windows uses Git Bash's sh).
+    // If the command is a file path, run it directly via sh;
+    // otherwise, treat it as a shell expression.
     let command_builder = if Path::new(command).exists() {
-        let mut command_builder = Command::new("sh");
-        command_builder.arg(command);
-        CommandWithStdin::new(command_builder)
+        let mut cmd = Command::new("sh");
+        cmd.arg(command);
+        CommandWithStdin::new(cmd)
     } else {
-        let mut command_builder = Command::new("sh");
-        command_builder.arg("-lc").arg(command);
-        CommandWithStdin::new(command_builder)
+        let mut cmd = Command::new("sh");
+        cmd.arg("-lc").arg(command);
+        CommandWithStdin::new(cmd)
     };
 
     command_builder

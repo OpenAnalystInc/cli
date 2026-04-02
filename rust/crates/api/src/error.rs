@@ -64,7 +64,13 @@ impl Display for ApiError {
         match self {
             Self::MissingCredentials { provider, env_vars } => write!(
                 f,
-                "missing {provider} credentials; export {} before calling the {provider} API",
+                "No {provider} credentials configured.\n\
+                 \n\
+                 To fix this, run:\n\
+                 \n\
+                 \x1b[1m  openanalyst login\x1b[0m\n\
+                 \n\
+                 and select {provider}, or export {} in your shell.",
                 env_vars.join(" or ")
             ),
             Self::ExpiredOAuthToken => {

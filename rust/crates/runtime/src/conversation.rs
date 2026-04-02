@@ -577,6 +577,7 @@ mod tests {
 
     #[test]
     fn denies_tool_use_when_pre_tool_hook_blocks() {
+        let _guard = crate::test_env_lock();
         struct SingleCallApiClient;
         impl ApiClient for SingleCallApiClient {
             fn stream(&mut self, request: ApiRequest) -> Result<Vec<AssistantEvent>, RuntimeError> {
@@ -638,6 +639,7 @@ mod tests {
 
     #[test]
     fn appends_post_tool_hook_feedback_to_tool_result() {
+        let _guard = crate::test_env_lock();
         struct TwoCallApiClient {
             calls: usize,
         }
@@ -789,12 +791,6 @@ mod tests {
         );
     }
 
-    #[cfg(windows)]
-    fn shell_snippet(script: &str) -> String {
-        script.replace('\'', "\"")
-    }
-
-    #[cfg(not(windows))]
     fn shell_snippet(script: &str) -> String {
         script.to_string()
     }
