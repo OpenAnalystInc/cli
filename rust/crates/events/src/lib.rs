@@ -160,6 +160,13 @@ pub enum Action {
     UpdateModel(String),
     /// User changed the permission mode.
     UpdatePermissions(String),
+    /// MOE dispatch — multiple chained commands to run as parallel agents.
+    MoeDispatch {
+        /// Raw command strings (e.g., ["/bughunter src/", "/commit", "/pr"])
+        commands: Vec<String>,
+    },
+    /// Mid-task skill injection — run a slash command while agents are working.
+    InjectSkill(String),
     /// User requested to quit.
     Quit,
 }
