@@ -1,0 +1,162 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Authentication - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link active">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Getting Started</span>
+        <h1>Authentication</h1>
+        <p class="subtitle">Connect to any LLM provider using OAuth, API keys, or environment variables.</p>
+      </div>
+
+      <h2 id="methods">Authentication Methods</h2>
+
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-icon">&#128273;</div>
+          <h3>OAuth (Recommended)</h3>
+          <p>Browser-based login with PKCE security. Tokens refresh automatically.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#128272;</div>
+          <h3>API Key</h3>
+          <p>Set environment variables or edit <code>.env</code> file directly.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#128196;</div>
+          <h3>Credentials File</h3>
+          <p>Saved automatically by <code>openanalyst login</code> to <code>~/.openanalyst/credentials.json</code>.</p>
+        </div>
+      </div>
+
+      <h2 id="oauth">OAuth Login</h2>
+      <p>The recommended way to authenticate. Supports all providers with automatic token refresh.</p>
+
+      <pre><code><span class="token-comment"># Interactive provider picker</span>
+openanalyst login
+
+<span class="token-comment"># Login to a specific provider</span>
+openanalyst login --provider anthropic
+
+<span class="token-comment"># Check logged-in providers</span>
+openanalyst whoami</code></pre>
+
+      <h3>How OAuth Works</h3>
+      <ol>
+        <li>You run <code>openanalyst login</code> and pick a provider</li>
+        <li>A browser window opens for the provider's consent page</li>
+        <li>After authorization, the CLI receives a callback on <code>localhost:8080</code></li>
+        <li>Tokens are stored encrypted in <code>~/.openanalyst/credentials.json</code></li>
+        <li>Tokens auto-refresh when expired &mdash; no re-login needed</li>
+      </ol>
+
+      <div class="callout callout-info">
+        <div class="callout-title">Security</div>
+        OAuth uses <strong>PKCE</strong> (Proof Key for Code Exchange) with SHA-256 challenge. No client secret is stored on disk.
+      </div>
+
+      <h2 id="api-keys">API Key Authentication</h2>
+      <p>Set API keys via environment variables or the <code>.env</code> file:</p>
+
+      <div class="code-title">~/.openanalyst/.env</div>
+      <pre><code><span class="token-comment"># OpenAnalyst (default provider)</span>
+OPENANALYST_AUTH_TOKEN=your-openanalyst-key
+OPENANALYST_BASE_URL=https://api.openanalyst.com/api
+
+<span class="token-comment"># Anthropic / Claude</span>
+ANTHROPIC_API_KEY=sk-ant-api03-...
+
+<span class="token-comment"># OpenAI / GPT / Codex</span>
+OPENAI_API_KEY=sk-...
+
+<span class="token-comment"># Google Gemini</span>
+GEMINI_API_KEY=AIzaSy...
+
+<span class="token-comment"># xAI / Grok</span>
+XAI_API_KEY=xai-...
+
+<span class="token-comment"># OpenRouter (350+ models)</span>
+OPENROUTER_API_KEY=sk-or-v1-...
+
+<span class="token-comment"># Amazon Bedrock</span>
+BEDROCK_API_KEY=your-bedrock-key</code></pre>
+
+      <h2 id="resolution">Provider Resolution Order</h2>
+      <p>When you specify a model, OpenAnalyst resolves the provider and auth in this order:</p>
+
+      <table>
+        <thead><tr><th>Model</th><th>Provider</th><th>Auth Variable</th><th>Fallback</th></tr></thead>
+        <tbody>
+          <tr><td><code>openanalyst-beta</code></td><td>OpenAnalyst</td><td><code>OPENANALYST_AUTH_TOKEN</code></td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+          <tr><td><code>opus</code>, <code>sonnet</code>, <code>haiku</code></td><td>Anthropic</td><td><code>ANTHROPIC_API_KEY</code></td><td>&mdash;</td></tr>
+          <tr><td><code>gpt-4o</code>, <code>o3</code>, <code>codex-mini</code></td><td>OpenAI</td><td><code>OPENAI_API_KEY</code></td><td>&mdash;</td></tr>
+          <tr><td><code>gemini-2.5-pro</code></td><td>Google</td><td><code>GEMINI_API_KEY</code></td><td>&mdash;</td></tr>
+          <tr><td><code>grok-3</code></td><td>xAI</td><td><code>XAI_API_KEY</code></td><td>&mdash;</td></tr>
+          <tr><td><code>openrouter/*</code></td><td>OpenRouter</td><td><code>OPENROUTER_API_KEY</code></td><td>&mdash;</td></tr>
+          <tr><td><code>bedrock/*</code></td><td>Bedrock</td><td><code>BEDROCK_API_KEY</code></td><td>&mdash;</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="credentials-file">Credentials File</h2>
+      <p>After <code>openanalyst login</code>, tokens are saved to:</p>
+      <pre><code>~/.openanalyst/credentials.json</code></pre>
+      <p>This file contains OAuth access tokens, refresh tokens, and expiry timestamps. It is automatically managed &mdash; you should not edit it manually.</p>
+
+      <div class="callout callout-warning">
+        <div class="callout-title">Warning</div>
+        Never commit <code>credentials.json</code> or <code>.env</code> to version control. The <code>~/.openanalyst/</code> directory should remain private.
+      </div>
+
+      <h2 id="logout">Logging Out</h2>
+      <pre><code><span class="token-comment"># Logout from all providers</span>
+openanalyst logout
+
+<span class="token-comment"># Or from within the TUI</span>
+/logout</code></pre>
+
+      <div class="page-footer">
+        <a href="quickstart.html">&larr; Quick Start</a>
+        <a href="providers.html">LLM Providers &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>

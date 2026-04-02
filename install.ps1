@@ -27,7 +27,7 @@ Write-Host "    ██    ██  ██    ██ " -ForegroundColor Blue
 Write-Host "    ████████  ██    ██ " -ForegroundColor Blue
 Write-Host ""
 Write-Host "   OpenAnalyst CLI  " -ForegroundColor White -NoNewline
-Write-Host "v1.0.2" -ForegroundColor DarkGray
+Write-Host "v1.0.89" -ForegroundColor DarkGray
 Write-Host "   The Universal AI Agent for Your Terminal" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "   ────────────────────────────────────────────" -ForegroundColor DarkGray

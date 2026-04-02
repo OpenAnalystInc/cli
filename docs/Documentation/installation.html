@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Installation - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link active">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Getting Started</span>
+        <h1>Installation</h1>
+        <p class="subtitle">Install OpenAnalyst CLI on macOS, Linux, or Windows in under a minute.</p>
+      </div>
+
+      <h2 id="requirements">System Requirements</h2>
+      <table>
+        <thead><tr><th>Requirement</th><th>Details</th></tr></thead>
+        <tbody>
+          <tr><td><strong>OS</strong></td><td>macOS 12+, Linux (glibc 2.31+), Windows 10/11</td></tr>
+          <tr><td><strong>Terminal</strong></td><td>Any terminal with UTF-8 and 256-color support</td></tr>
+          <tr><td><strong>Disk</strong></td><td>~25 MB (single binary)</td></tr>
+          <tr><td><strong>Runtime</strong></td><td>None &mdash; native binary, no Node/Python required</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="install">Install</h2>
+
+      <div class="tabs">
+        <div class="tab-buttons">
+          <button class="tab-btn active" data-tab="tab-mac">macOS / Linux</button>
+          <button class="tab-btn" data-tab="tab-win">Windows</button>
+          <button class="tab-btn" data-tab="tab-source">From Source</button>
+        </div>
+
+        <div id="tab-mac" class="tab-content active">
+          <p>Run the install script:</p>
+          <pre><code>curl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash</code></pre>
+          <p>This downloads the latest release binary and places it in <code>/usr/local/bin/openanalyst</code>.</p>
+
+          <div class="callout callout-tip">
+            <div class="callout-title">Tip</div>
+            After installation, run <code>openanalyst --version</code> to verify.
+          </div>
+        </div>
+
+        <div id="tab-win" class="tab-content">
+          <p>Open PowerShell as Administrator:</p>
+          <pre><code>irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex</code></pre>
+          <p>The binary is placed in your user PATH automatically.</p>
+        </div>
+
+        <div id="tab-source" class="tab-content">
+          <p>Build from source (requires Rust 1.75+):</p>
+          <pre><code>git clone https://github.com/AnitChaudhry/openanalyst-cli.git
+cd openanalyst-cli/rust
+cargo build --release</code></pre>
+          <p>The compiled binary is at <code>target/release/openanalyst</code> (or <code>.exe</code> on Windows).</p>
+
+          <div class="callout callout-info">
+            <div class="callout-title">Info</div>
+            The workspace has 14 crates. A full release build takes 2&ndash;4 minutes depending on your hardware.
+          </div>
+        </div>
+      </div>
+
+      <h2 id="verify">Verify Installation</h2>
+      <pre><code><span class="token-comment"># Check the version</span>
+openanalyst --version
+<span class="token-comment"># Output: openanalyst-cli 1.0.89</span>
+
+<span class="token-comment"># Check logged-in providers</span>
+openanalyst whoami</code></pre>
+
+      <h2 id="update">Updating</h2>
+      <p>Re-run the same install script to update to the latest version. Your configuration and sessions are preserved.</p>
+
+      <pre><code><span class="token-comment"># macOS / Linux</span>
+curl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash
+
+<span class="token-comment"># Windows</span>
+irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex</code></pre>
+
+      <h2 id="uninstall">Uninstalling</h2>
+      <p>Remove the binary and optionally clean up config:</p>
+      <pre><code><span class="token-comment"># Remove binary</span>
+rm /usr/local/bin/openanalyst
+
+<span class="token-comment"># Remove config (optional)</span>
+rm -rf ~/.openanalyst</code></pre>
+
+      <div class="page-footer">
+        <a href="index.html">&larr; Introduction</a>
+        <a href="quickstart.html">Quick Start &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('tab-btn')) {
+        const group = e.target.closest('.tabs');
+        group.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        group.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        e.target.classList.add('active');
+        group.querySelector('#' + e.target.dataset.tab).classList.add('active');
+      }
+    });
+  </script>
+</body>
+</html>

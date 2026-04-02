@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OpenAnalyst CLI - Documentation</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <!-- Sidebar -->
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link active">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Getting Started</span>
+        <h1>OpenAnalyst CLI</h1>
+        <p class="subtitle">
+          The Universal AI Agent for Your Terminal. One CLI, every LLM provider, persistent conversations across models.
+        </p>
+      </div>
+
+      <!-- Hero Cards -->
+      <div class="card-grid">
+        <a href="installation.html" class="card" style="text-decoration:none">
+          <div class="card-icon">&#9889;</div>
+          <h3>Quick Install</h3>
+          <p>Single command install on macOS, Linux, and Windows. No runtime dependencies.</p>
+        </a>
+        <a href="providers.html" class="card" style="text-decoration:none">
+          <div class="card-icon">&#127760;</div>
+          <h3>7 Providers</h3>
+          <p>Claude, GPT, Gemini, Grok, OpenRouter, Bedrock &mdash; switch mid-conversation.</p>
+        </a>
+        <a href="tui.html" class="card" style="text-decoration:none">
+          <div class="card-icon">&#128421;</div>
+          <h3>Full Terminal UI</h3>
+          <p>Ratatui-based TUI with scrollable chat, sidebar, vim-mode, and modal dialogs.</p>
+        </a>
+        <a href="agents.html" class="card" style="text-decoration:none">
+          <div class="card-icon">&#129302;</div>
+          <h3>Multi-Agent</h3>
+          <p>Orchestrate parallel agents, autonomous loops, and swarm task decomposition.</p>
+        </a>
+      </div>
+
+      <h2 id="overview">Overview</h2>
+      <p>
+        OpenAnalyst CLI is an <strong>independent, open-source AI coding agent</strong> that connects to every major LLM provider through a single, unified terminal interface. Built from the ground up in Rust, it features a full Ratatui-based terminal UI, multi-provider streaming, multi-agent orchestration, 51+ slash commands, 19 built-in tools, and MCP protocol support.
+      </p>
+
+      <h2 id="why">Why OpenAnalyst?</h2>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Capability</th>
+            <th>OpenAnalyst CLI</th>
+            <th>Other CLI Tools</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Providers</strong></td>
+            <td>7 first-class (OpenAnalyst, Anthropic, OpenAI, xAI, Gemini, OpenRouter, Bedrock)</td>
+            <td>Typically 1&ndash;2</td>
+          </tr>
+          <tr>
+            <td><strong>Mid-conversation switching</strong></td>
+            <td>Session persists across providers</td>
+            <td>Not supported</td>
+          </tr>
+          <tr>
+            <td><strong>Terminal UI</strong></td>
+            <td>Full Ratatui-based TUI (default)</td>
+            <td>Basic REPL</td>
+          </tr>
+          <tr>
+            <td><strong>Multi-agent</strong></td>
+            <td>Built-in parallel orchestration</td>
+            <td>Limited or none</td>
+          </tr>
+          <tr>
+            <td><strong>Multimedia</strong></td>
+            <td>/image, /voice, /speak, /vision, /diagram</td>
+            <td>Rarely supported</td>
+          </tr>
+          <tr>
+            <td><strong>Slash commands</strong></td>
+            <td>51+</td>
+            <td>5&ndash;15 typical</td>
+          </tr>
+          <tr>
+            <td><strong>Binary</strong></td>
+            <td>Native Rust, zero runtime deps</td>
+            <td>Often needs Node/Python</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="features">Key Features</h2>
+
+      <div class="feature-card">
+        <div class="icon">&#127760;</div>
+        <div class="content">
+          <h4>Universal Provider Support</h4>
+          <p>Connect to OpenAnalyst, Anthropic Claude, OpenAI GPT, Google Gemini, xAI Grok, OpenRouter (350+ models), and Amazon Bedrock &mdash; all with live model discovery and streaming.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="icon">&#128421;</div>
+        <div class="content">
+          <h4>Full Terminal UI</h4>
+          <p>Scrollable chat with inline tool cards, startup banner, status line with spinner and token counts, vim-mode input, permission dialogs, and mouse navigation.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="icon">&#129302;</div>
+        <div class="content">
+          <h4>Multi-Agent Orchestration</h4>
+          <p>Spawn sub-agents for parallel tasks, run autonomous agent loops with think&rarr;act&rarr;observe&rarr;verify cycles, and dispatch Mixture of Experts for complex problems.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="icon">&#128295;</div>
+        <div class="content">
+          <h4>51+ Slash Commands &amp; 19 Tools</h4>
+          <p>Git operations, multimedia generation, web scraping, planning, analysis, Playwright browser control, and more &mdash; all from your terminal.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="icon">&#128274;</div>
+        <div class="content">
+          <h4>Permission System &amp; Sandboxing</h4>
+          <p>Three permission modes (read-only, workspace-write, full-access) with modal approval dialogs and filesystem sandboxing.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="icon">&#128640;</div>
+        <div class="content">
+          <h4>Single Native Binary</h4>
+          <p>Built in Rust with zero runtime dependencies. Fast startup, low memory, and works on macOS, Linux, and Windows.</p>
+        </div>
+      </div>
+
+      <h2 id="next">Next Steps</h2>
+      <div class="card-grid">
+        <a href="installation.html" class="card" style="text-decoration:none">
+          <h3>Installation &rarr;</h3>
+          <p>Install via curl, PowerShell, or build from source.</p>
+        </a>
+        <a href="quickstart.html" class="card" style="text-decoration:none">
+          <h3>Quick Start &rarr;</h3>
+          <p>Login, launch the TUI, and run your first prompt.</p>
+        </a>
+      </div>
+
+      <!-- Footer nav -->
+      <div class="page-footer">
+        <span></span>
+        <a href="installation.html">Installation &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    // Simple tab handler (used across pages)
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('tab-btn')) {
+        const group = e.target.closest('.tabs');
+        group.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        group.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        e.target.classList.add('active');
+        group.querySelector('#' + e.target.dataset.tab).classList.add('active');
+      }
+    });
+  </script>
+</body>
+</html>

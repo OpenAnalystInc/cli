@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Quick Start - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link active">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Getting Started</span>
+        <h1>Quick Start</h1>
+        <p class="subtitle">Go from zero to your first AI-assisted coding session in under 2 minutes.</p>
+      </div>
+
+      <div class="steps">
+
+        <div class="step">
+          <h3>Login to a Provider</h3>
+          <p>Run the interactive login command to authenticate with your preferred LLM provider:</p>
+          <pre><code>openanalyst login</code></pre>
+          <p>This opens a provider picker. Select your provider, complete the OAuth flow in your browser, and credentials are saved automatically to <code>~/.openanalyst/credentials.json</code>.</p>
+          <p>Alternatively, set API keys directly:</p>
+          <pre><code><span class="token-comment"># Edit ~/.openanalyst/.env</span>
+ANTHROPIC_API_KEY=sk-ant-...
+OPENAI_API_KEY=sk-...
+GEMINI_API_KEY=AIza...</code></pre>
+        </div>
+
+        <div class="step">
+          <h3>Launch the TUI</h3>
+          <p>Start OpenAnalyst in its default full-screen terminal UI:</p>
+          <pre><code>openanalyst</code></pre>
+          <p>You'll see the startup banner, account status, and an empty chat ready for input.</p>
+          <div class="callout callout-tip">
+            <div class="callout-title">Tip</div>
+            Use <code>--no-tui</code> for a classic REPL experience: <code>openanalyst --no-tui</code>
+          </div>
+        </div>
+
+        <div class="step">
+          <h3>Ask a Question</h3>
+          <p>Type a natural language prompt and press <kbd>Enter</kbd>:</p>
+          <pre><code>explain the architecture of this codebase</code></pre>
+          <p>The agent reads your project files, understands the structure, and streams a response with syntax-highlighted code blocks.</p>
+        </div>
+
+        <div class="step">
+          <h3>Use Slash Commands</h3>
+          <p>Type <code>/</code> to see autocomplete suggestions. Try these:</p>
+          <pre><code><span class="token-comment"># See session status and token usage</span>
+/status
+
+<span class="token-comment"># Switch to a different model mid-conversation</span>
+/model gpt-4o
+
+<span class="token-comment"># Generate a git commit message from staged changes</span>
+/commit
+
+<span class="token-comment"># Run a deep bug analysis</span>
+/bughunter</code></pre>
+        </div>
+
+        <div class="step">
+          <h3>Try One-Shot Mode</h3>
+          <p>For quick tasks, pass the prompt directly:</p>
+          <pre><code><span class="token-comment"># One-shot prompt (no interactive session)</span>
+openanalyst "summarize the README"
+
+<span class="token-comment"># Use a specific model</span>
+openanalyst --model gemini-2.5-pro "review this code for bugs"
+
+<span class="token-comment"># Pipe input</span>
+cat error.log | openanalyst "explain these errors"</code></pre>
+        </div>
+
+      </div>
+
+      <h2 id="modes">Usage Modes</h2>
+      <table>
+        <thead><tr><th>Mode</th><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>TUI (default)</strong></td>
+            <td><code>openanalyst</code></td>
+            <td>Full-screen terminal UI with sidebar, chat panel, status bar</td>
+          </tr>
+          <tr>
+            <td><strong>REPL</strong></td>
+            <td><code>openanalyst --no-tui</code></td>
+            <td>Classic line-by-line REPL with streaming output</td>
+          </tr>
+          <tr>
+            <td><strong>One-shot</strong></td>
+            <td><code>openanalyst "prompt"</code></td>
+            <td>Single prompt &rarr; response &rarr; exit</td>
+          </tr>
+          <tr>
+            <td><strong>Headless agent</strong></td>
+            <td><code>openanalyst-agent</code></td>
+            <td>Autonomous agent runner for CI/scripts</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <h2 id="useful-flags">Common Flags</h2>
+      <table>
+        <thead><tr><th>Flag</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>--model &lt;name&gt;</code></td><td>Use a specific model (e.g., <code>opus</code>, <code>gpt-4o</code>, <code>gemini-2.5-pro</code>)</td></tr>
+          <tr><td><code>--no-tui</code></td><td>Disable TUI, use REPL mode</td></tr>
+          <tr><td><code>--permission-mode &lt;mode&gt;</code></td><td>Set permission level: <code>read-only</code>, <code>workspace-write</code>, <code>danger-full-access</code></td></tr>
+          <tr><td><code>--resume</code></td><td>Resume the last conversation session</td></tr>
+          <tr><td><code>--version</code></td><td>Print version and exit</td></tr>
+        </tbody>
+      </table>
+
+      <div class="page-footer">
+        <a href="installation.html">&larr; Installation</a>
+        <a href="authentication.html">Authentication &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+
+  <script>
+    document.addEventListener('click', function(e) {
+      if (e.target.classList.contains('tab-btn')) {
+        const group = e.target.closest('.tabs');
+        group.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        group.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+        e.target.classList.add('active');
+        group.querySelector('#' + e.target.dataset.tab).classList.add('active');
+      }
+    });
+  </script>
+</body>
+</html>
