@@ -939,6 +939,28 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             }
         }
 
+        SlashCommand::Ask { question } => {
+            if let Some(q) = question {
+                // Quick question — instruct the model to answer directly, no tools
+                let prompt = format!(
+                    "Answer this question directly and concisely. Do NOT use any tools. \
+                     Do NOT read files, run commands, or search. Just answer from your knowledge:\n\n{q}"
+                );
+                app.submit_prompt_internal(prompt);
+            } else {
+                app.chat.push_system("Usage: /ask <question>\nQuick question — no tools, fast response.".to_string());
+            }
+        }
+
+        SlashCommand::UserPrompt { prompt } => {
+            if let Some(p) = prompt {
+                // Full user message with tools enabled — just send it directly
+                app.submit_prompt_internal(p);
+            } else {
+                app.chat.push_system("Usage: /user-prompt <message>\nInject a user message with full tool access.".to_string());
+            }
+        }
+
         SlashCommand::Unknown(name) => {
             app.chat.push_system(format!("Unknown command: /{name}. Type /help for available commands."));
         }

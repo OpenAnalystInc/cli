@@ -446,6 +446,20 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: Some("<task> [--goal X] [--criteria <cmd>] [--max-turns N]"),
         resume_supported: false,
     },
+    SlashCommandSpec {
+        name: "ask",
+        aliases: &["btw"],
+        summary: "Quick question — no tools, no context, fast response",
+        argument_hint: Some("<question>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "user-prompt",
+        aliases: &["up"],
+        summary: "Inject a user message with full tool access",
+        argument_hint: Some("<prompt>"),
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -608,6 +622,14 @@ pub enum SlashCommand {
         criteria: Option<String>,
         schedule: Option<String>,
         max_turns: Option<u32>,
+    },
+    /// Quick question — no tools, no context injection, fast response.
+    Ask {
+        question: Option<String>,
+    },
+    /// Inject a user message into the conversation with full tool access.
+    UserPrompt {
+        prompt: Option<String>,
     },
     Unknown(String),
 }
@@ -803,6 +825,12 @@ impl SlashCommand {
                 let (task, goal, criteria, schedule, max_turns) = parse_open_analyst_args(&remainder);
                 Self::OpenAnalyst { task, goal, criteria, schedule, max_turns }
             }
+            "ask" | "btw" => Self::Ask {
+                question: remainder_after_command(trimmed, command),
+            },
+            "user-prompt" | "up" => Self::UserPrompt {
+                prompt: remainder_after_command(trimmed, command),
+            },
             other => Self::Unknown(other.to_string()),
         })
     }
@@ -2112,6 +2140,8 @@ pub fn handle_slash_command(
         | SlashCommand::Sidebar
         | SlashCommand::Swarm { .. }
         | SlashCommand::OpenAnalyst { .. }
+        | SlashCommand::Ask { .. }
+        | SlashCommand::UserPrompt { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2468,7 +2498,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 56);
+        assert_eq!(slash_command_specs().len(), 58);
         assert_eq!(resume_supported_slash_commands().len(), 14);
     }
 

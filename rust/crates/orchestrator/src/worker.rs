@@ -68,10 +68,29 @@ fn run_turn_blocking(
     let mut plugin_config = PluginManagerConfig::new(loader.config_home().to_path_buf());
     plugin_config.enabled_plugins = plugin_settings.enabled_plugins().clone();
     let plugin_manager = PluginManager::new(plugin_config);
-    let tool_registry = GlobalToolRegistry::with_plugin_tools(
+    let mut tool_registry = GlobalToolRegistry::with_plugin_tools(
         plugin_manager.aggregated_tools().map_err(|e| e.to_string())?,
     )
     .map_err(|e| e.to_string())?;
+
+    // Bootstrap MCP servers and register their tools
+    let mcp_config = runtime_config.mcp();
+    let mcp_connections = runtime::mcp_bridge::bootstrap_mcp_servers(mcp_config.servers());
+    let mut mcp_registered = Vec::new();
+    for conn in &mcp_connections {
+        for tool in &conn.tools {
+            mcp_registered.push(tools::McpRegisteredTool {
+                name: tool.full_name.clone(),
+                description: tool.description.clone(),
+                input_schema: tool.input_schema.clone(),
+                server_name: conn.server_name.clone(),
+                original_name: tool.original_name.clone(),
+            });
+        }
+    }
+    if !mcp_registered.is_empty() {
+        tool_registry.register_mcp_tools(mcp_registered);
+    }
 
     // Create a dedicated tokio runtime for async API calls.
     // This is safe because we're inside spawn_blocking (a non-tokio thread).

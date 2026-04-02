@@ -2331,6 +2331,8 @@ fn run_resume_command(
         | SlashCommand::Sidebar
         | SlashCommand::Swarm { .. }
         | SlashCommand::OpenAnalyst { .. }
+        | SlashCommand::Ask { .. }
+        | SlashCommand::UserPrompt { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -2989,6 +2991,25 @@ impl LiveCli {
             }
             SlashCommand::OpenAnalyst { .. } => {
                 eprintln!("Autonomous mode requires the TUI (remove --no-tui)");
+                false
+            }
+            SlashCommand::Ask { question } => {
+                if let Some(q) = question {
+                    let prompt = format!(
+                        "Answer this question directly and concisely. Do NOT use any tools:\n\n{q}"
+                    );
+                    self.run_turn(&prompt)?;
+                } else {
+                    eprintln!("Usage: /ask <question>");
+                }
+                false
+            }
+            SlashCommand::UserPrompt { prompt } => {
+                if let Some(p) = prompt {
+                    self.run_turn(&p)?;
+                } else {
+                    eprintln!("Usage: /user-prompt <message>");
+                }
                 false
             }
             SlashCommand::Unknown(name) => {

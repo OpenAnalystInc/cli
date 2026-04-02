@@ -16,6 +16,7 @@ mod prompt;
 mod remote;
 pub mod sandbox;
 mod session;
+pub mod tokenizer;
 mod usage;
 
 pub use lsp::{
