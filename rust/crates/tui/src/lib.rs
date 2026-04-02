@@ -7,6 +7,7 @@ pub mod app;
 pub mod autocomplete;
 pub mod banner;
 pub mod event_loop;
+pub mod keybinding_config;
 pub mod keybindings;
 pub mod layout;
 pub mod panels;

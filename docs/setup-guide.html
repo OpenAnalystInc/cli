@@ -311,7 +311,8 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/cost</td><td>Cumulative token usage and cost breakdown</td></tr>
       <tr><td>/model [name]</td><td>Show live models or switch mid-session</td></tr>
       <tr><td>/clear</td><td>Start a fresh session</td></tr>
-      <tr><td>/compact</td><td>Compact conversation &mdash; collapse tool calls, merge system msgs, trim to 100</td></tr>
+      <tr><td>/compact</td><td>Smart compact &mdash; collapses tool calls, shows token budget %, suggests /clear when needed</td></tr>
+      <tr><td>/memory <span class="tag tag-n">NEW</span></td><td>Show all memory files &mdash; instruction files, project memory, user memory with types</td></tr>
       <tr><td>/effort [category] [level] <span class="tag tag-n">NEW</span></td><td>Set thinking effort globally or per-category (explore/research/code/write)</td></tr>
       <tr><td>/route [category] [tier] <span class="tag tag-n">NEW</span></td><td>View or edit the per-action model routing table</td></tr>
       <tr><td>/session [list|switch]</td><td>List or switch saved sessions</td></tr>
