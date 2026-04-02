@@ -320,6 +320,6 @@ mod tests {
         let config = KeybindingConfig::default();
         let help = config.render_help();
         assert!(help.contains("Cancel"));
-        assert!(help.contains("Ctrl+c"));
+        assert!(help.contains("Ctrl+C"));
     }
 }

@@ -3689,6 +3689,7 @@ dependencies = [
  "ratatui 0.30.0",
  "reqwest",
  "runtime",
+ "serde",
  "serde_json",
  "tokio",
  "tools",
