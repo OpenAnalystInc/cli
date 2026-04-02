@@ -185,7 +185,8 @@ fn send_jsonrpc(stdin: &mut impl Write, request: &serde_json::Value) -> std::io:
 }
 
 fn read_jsonrpc_response(reader: &mut impl BufRead) -> Option<serde_json::Value> {
-    // Read Content-Length header
+    // Read headers to find Content-Length
+    let mut content_length: Option<usize> = None;
     let mut header = String::new();
     loop {
         header.clear();
@@ -194,17 +195,18 @@ fn read_jsonrpc_response(reader: &mut impl BufRead) -> Option<serde_json::Value>
         }
         let trimmed = header.trim();
         if trimmed.is_empty() {
-            break; // End of headers
+            break; // End of headers (\r\n\r\n)
         }
-        if trimmed.starts_with("Content-Length:") {
-            // Parse length but we'll just read until we get valid JSON
+        if let Some(value) = trimmed.strip_prefix("Content-Length:") {
+            content_length = value.trim().parse().ok();
         }
     }
 
-    // Read body line
-    let mut body = String::new();
-    reader.read_line(&mut body).ok()?;
-    serde_json::from_str(body.trim()).ok()
+    // Read exactly Content-Length bytes (handles multi-line JSON correctly)
+    let length = content_length?;
+    let mut body = vec![0u8; length];
+    reader.read_exact(&mut body).ok()?;
+    serde_json::from_slice(&body).ok()
 }
 
 fn parse_tools_list(server_name: &str, response: &serde_json::Value) -> Vec<McpToolDef> {
@@ -244,5 +246,115 @@ impl Drop for McpConnection {
         if let Some(mut child) = self.child.take() {
             let _ = child.kill();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn read_single_line_json() {
+        let body = r#"{"jsonrpc":"2.0","id":1,"result":{"ok":true}}"#;
+        let frame = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        let result = read_jsonrpc_response(&mut reader).expect("should parse");
+        assert_eq!(result["id"], 1);
+        assert_eq!(result["result"]["ok"], true);
+    }
+
+    #[test]
+    fn read_multi_line_json() {
+        let body = "{\n  \"jsonrpc\": \"2.0\",\n  \"id\": 2,\n  \"result\": {\n    \"tools\": []\n  }\n}";
+        let frame = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        let result = read_jsonrpc_response(&mut reader).expect("should parse multi-line");
+        assert_eq!(result["id"], 2);
+        assert!(result["result"]["tools"].is_array());
+    }
+
+    #[test]
+    fn read_missing_content_length_returns_none() {
+        let frame = "X-Custom: something\r\n\r\n{}";
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        assert!(read_jsonrpc_response(&mut reader).is_none());
+    }
+
+    #[test]
+    fn read_empty_stream_returns_none() {
+        let mut reader = BufReader::new(Cursor::new(Vec::<u8>::new()));
+        assert!(read_jsonrpc_response(&mut reader).is_none());
+    }
+
+    #[test]
+    fn send_jsonrpc_formats_correctly() {
+        let mut buf = Vec::new();
+        let request = serde_json::json!({"jsonrpc":"2.0","id":1,"method":"test"});
+        send_jsonrpc(&mut buf, &request).expect("should write");
+        let output = String::from_utf8(buf).unwrap();
+        assert!(output.starts_with("Content-Length: "));
+        assert!(output.contains("\r\n\r\n"));
+        // Verify the body after headers is valid JSON
+        let body_start = output.find("\r\n\r\n").unwrap() + 4;
+        let body = &output[body_start..];
+        let parsed: serde_json::Value = serde_json::from_str(body).unwrap();
+        assert_eq!(parsed["method"], "test");
+    }
+
+    #[test]
+    fn parse_tools_list_extracts_tools() {
+        let response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 2,
+            "result": {
+                "tools": [
+                    {
+                        "name": "read_file",
+                        "description": "Read a file",
+                        "inputSchema": { "type": "object" }
+                    },
+                    {
+                        "name": "write_file",
+                        "description": "Write a file",
+                        "inputSchema": { "type": "object" }
+                    }
+                ]
+            }
+        });
+        let tools = parse_tools_list("myserver", &response);
+        assert_eq!(tools.len(), 2);
+        assert!(tools[0].full_name.contains("myserver"));
+        assert_eq!(tools[0].original_name, "read_file");
+        assert_eq!(tools[1].original_name, "write_file");
+    }
+
+    #[test]
+    fn parse_tools_list_handles_empty_result() {
+        let response = serde_json::json!({"jsonrpc":"2.0","id":2,"result":{"tools":[]}});
+        let tools = parse_tools_list("srv", &response);
+        assert!(tools.is_empty());
+    }
+
+    #[test]
+    fn parse_tools_list_handles_missing_result() {
+        let response = serde_json::json!({"jsonrpc":"2.0","id":2,"error":{"code":-1,"message":"fail"}});
+        let tools = parse_tools_list("srv", &response);
+        assert!(tools.is_empty());
+    }
+
+    #[test]
+    fn sequential_reads_from_same_stream() {
+        let body1 = r#"{"jsonrpc":"2.0","id":1,"result":"init"}"#;
+        let body2 = r#"{"jsonrpc":"2.0","id":2,"result":{"tools":[]}}"#;
+        let frame = format!(
+            "Content-Length: {}\r\n\r\n{}Content-Length: {}\r\n\r\n{}",
+            body1.len(), body1, body2.len(), body2
+        );
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        let r1 = read_jsonrpc_response(&mut reader).expect("first read");
+        let r2 = read_jsonrpc_response(&mut reader).expect("second read");
+        assert_eq!(r1["id"], 1);
+        assert_eq!(r2["id"], 2);
     }
 }
