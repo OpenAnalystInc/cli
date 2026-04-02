@@ -12,7 +12,7 @@ html{scroll-behavior:smooth;scroll-padding-top:72px}
 body{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased}
 
 /* ── Navbar ── */
-.nav{position:sticky;top:0;z-index:100;background:rgba(10,14,23,0.85);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto}
+.nav{position:relative;z-index:100;background:transparent;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto}
 .nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none}
 .nav-logo img{width:28px;height:28px;filter:drop-shadow(0 0 8px rgba(255,107,0,0.3))}
 .nav-logo span{font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:15px;color:var(--accent);letter-spacing:1px}
@@ -111,6 +111,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <div class="nav">
   <a href="#" class="nav-logo"><img src="https://openanalyst.com/images/new-logo.png" alt="OA"><span>OpenAnalyst</span></a>
   <ul class="nav-links">
+    <li><a href="Documentation/index.html" target="_blank" style="color:var(--accent);font-weight:600">Documentation</a></li>
     <li><a href="#install">Install</a></li>
     <li><a href="#providers">Providers</a></li>
     <li><a href="#features">Features</a></li>
@@ -188,6 +189,13 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   <span class="c-g">&#10003; Login complete</span></pre></div>
   </div>
+
+  <div style="margin-top:16px;padding:16px 20px;background:rgba(255,107,0,0.06);border:1px solid rgba(255,107,0,0.15);border-radius:12px">
+    <p style="margin:0;font-size:14px;color:var(--text);line-height:1.7">
+      <strong style="color:var(--accent)">Direct Provider Login</strong> &mdash;
+      For <strong>Claude</strong>, <strong>Codex</strong>, and <strong>Gemini</strong> you can login directly through your provider account via browser OAuth. No API key needed &mdash; just sign in with your existing Anthropic, OpenAI, or Google account. Credentials are stored securely with PKCE and auto-refresh.
+    </p>
+  </div>
 </div>
 </section>
 
@@ -200,12 +208,12 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   <div class="pgrid">
     <div class="pcard df"><div class="pcard-name">OpenAnalyst <span class="pcard-badge">DEFAULT</span></div><div class="pcard-env">OPENANALYST_AUTH_TOKEN</div><div class="pcard-desc">Models fetched live from API</div></div>
-    <div class="pcard"><div class="pcard-name">Anthropic / Claude</div><div class="pcard-env">ANTHROPIC_API_KEY</div><div class="pcard-desc">opus, sonnet, haiku &mdash; direct API</div></div>
-    <div class="pcard"><div class="pcard-name">OpenAI / Codex</div><div class="pcard-env">OPENAI_API_KEY</div><div class="pcard-desc">gpt-4o, o3, codex-mini &mdash; direct API</div></div>
-    <div class="pcard"><div class="pcard-name">Google Gemini</div><div class="pcard-env">GEMINI_API_KEY</div><div class="pcard-desc">gemini-2.5-pro, flash &mdash; fetched live</div></div>
-    <div class="pcard"><div class="pcard-name">xAI / Grok</div><div class="pcard-env">XAI_API_KEY</div><div class="pcard-desc">grok-3, grok-mini &mdash; fetched live</div></div>
-    <div class="pcard"><div class="pcard-name">OpenRouter</div><div class="pcard-env">OPENROUTER_API_KEY</div><div class="pcard-desc">350+ models via one key</div></div>
-    <div class="pcard"><div class="pcard-name">Amazon Bedrock</div><div class="pcard-env">BEDROCK_API_KEY</div><div class="pcard-desc">Fetched live from gateway</div></div>
+    <div class="pcard"><div class="pcard-name">Anthropic / Claude <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,0.15);color:var(--green);margin-left:4px">OAuth</span></div><div class="pcard-desc" style="margin:6px 0 8px">opus, sonnet, haiku</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">ANTHROPIC_API_KEY</span></div></div>
+    <div class="pcard"><div class="pcard-name">OpenAI / Codex <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,0.15);color:var(--green);margin-left:4px">OAuth</span></div><div class="pcard-desc" style="margin:6px 0 8px">gpt-4o, o3, codex-mini</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">OPENAI_API_KEY</span></div></div>
+    <div class="pcard"><div class="pcard-name">Google Gemini <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,0.15);color:var(--green);margin-left:4px">OAuth</span></div><div class="pcard-desc" style="margin:6px 0 8px">gemini-2.5-pro, flash</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">GEMINI_API_KEY</span></div></div>
+    <div class="pcard"><div class="pcard-name">xAI / Grok</div><div class="pcard-desc" style="margin:6px 0 8px">grok-3, grok-mini</div><div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">XAI_API_KEY</span></div></div>
+    <div class="pcard"><div class="pcard-name">OpenRouter</div><div class="pcard-desc" style="margin:6px 0 8px">350+ models from any provider</div><div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">OPENROUTER_API_KEY</span></div></div>
+    <div class="pcard"><div class="pcard-name">Amazon Bedrock</div><div class="pcard-desc" style="margin:6px 0 8px">Live discovery from gateway</div><div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">BEDROCK_API_KEY</span></div></div>
   </div>
 
   <div style="margin-top:24px">

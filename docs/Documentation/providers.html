@@ -5,18 +5,22 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>LLM Providers - OpenAnalyst CLI Docs</title>
   <link rel="stylesheet" href="styles.css">
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
 <body>
   <div class="docs-layout">
 
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <h2>OpenAnalyst CLI</h2>
+        <a href="../Index.html">
+          <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
+          <h2>OpenAnalyst CLI</h2>
+        </a>
         <span>Documentation v1.0.89</span>
       </div>
       <div class="sidebar-section">
-        <div class="sidebar-section-title">Getting Started</div>
+        <div class="sidebar-section-title">Documentation</div>
+        
         <a href="index.html" class="sidebar-link">Introduction</a>
         <a href="installation.html" class="sidebar-link">Installation</a>
         <a href="quickstart.html" class="sidebar-link">Quick Start</a>
@@ -55,34 +59,34 @@
           <p><code>OPENANALYST_AUTH_TOKEN</code></p>
         </div>
         <div class="card">
-          <h3>Anthropic / Claude</h3>
+          <h3>Anthropic / Claude <span class="badge-sm badge-green">OAuth</span></h3>
           <p>Claude Opus, Sonnet, Haiku with extended thinking support.</p>
-          <p><code>ANTHROPIC_API_KEY</code></p>
+          <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>ANTHROPIC_API_KEY</code></p>
         </div>
         <div class="card">
-          <h3>OpenAI / Codex</h3>
+          <h3>OpenAI / Codex <span class="badge-sm badge-green">OAuth</span></h3>
           <p>GPT-4o, o3, Codex Mini via direct OpenAI API.</p>
-          <p><code>OPENAI_API_KEY</code></p>
+          <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>OPENAI_API_KEY</code></p>
         </div>
         <div class="card">
-          <h3>Google Gemini</h3>
+          <h3>Google Gemini <span class="badge-sm badge-green">OAuth</span></h3>
           <p>Gemini 2.5 Pro, Gemini 2.5 Flash with live model discovery.</p>
-          <p><code>GEMINI_API_KEY</code></p>
+          <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>GEMINI_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>xAI / Grok</h3>
           <p>Grok-3, Grok Mini with streaming tool support.</p>
-          <p><code>XAI_API_KEY</code></p>
+          <p style="margin-top:8px"><code>XAI_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>OpenRouter</h3>
           <p>350+ models from any provider through a single gateway.</p>
-          <p><code>OPENROUTER_API_KEY</code></p>
+          <p style="margin-top:8px"><code>OPENROUTER_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>Amazon Bedrock</h3>
           <p>AWS-hosted models with live discovery from your Bedrock account.</p>
-          <p><code>BEDROCK_API_KEY</code></p>
+          <p style="margin-top:8px"><code>BEDROCK_API_KEY</code></p>
         </div>
       </div>
 
