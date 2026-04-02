@@ -1,6 +1,6 @@
 //! Main TUI application for OpenAnalyst CLI.
 //!
-//! Full-screen scrollable chat interface with Claude Code-style layout,
+//! Full-screen scrollable chat interface with scrollable layout,
 //! startup banner, inline tool cards, status line, and multi-agent support.
 
 pub mod app;

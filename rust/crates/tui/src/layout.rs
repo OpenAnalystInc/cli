@@ -14,7 +14,7 @@ pub struct AppLayout {
 
 /// Compute the layout for the TUI.
 ///
-/// Full-screen scrollable layout (Claude Code-style):
+/// Full-screen scrollable layout (OpenAnalyst TUI):
 /// ```text
 /// ┌──────────────────────────┐
 /// │  Chat area (scrollable)  │  Min height

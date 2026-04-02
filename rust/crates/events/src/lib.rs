@@ -1,4 +1,4 @@
-//! Shared event types for communication between the TUI frontend and backend orchestrator.
+//! Shared event types for the OpenAnalyst TUI frontend and backend orchestrator.
 //!
 //! This crate defines the message protocol that flows through `tokio::sync::mpsc` channels,
 //! connecting the async Ratatui event loop with the blocking `ConversationRuntime` workers.

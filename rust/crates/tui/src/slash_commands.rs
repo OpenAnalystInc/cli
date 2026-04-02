@@ -1,8 +1,8 @@
 //! Slash command routing for the TUI.
 //!
-//! Parses `/` input via `commands::SlashCommand::parse()` and routes each command
-//! to the appropriate handler: text output → chat, AI tasks → orchestrator,
-//! multimedia → file output, state changes → app state updates.
+//! Parses `/` input via `commands::SlashCommand::parse()` and routes each
+//! command to the appropriate handler: text output to chat, AI tasks to
+//! orchestrator, multimedia to file output, state changes to app state.
 
 use commands::SlashCommand;
 
