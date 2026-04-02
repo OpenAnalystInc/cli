@@ -2322,6 +2322,7 @@ fn run_resume_command(
         | SlashCommand::Logout
         | SlashCommand::Vim
         | SlashCommand::Think { .. }
+        | SlashCommand::Effort { .. }
         | SlashCommand::Context
         | SlashCommand::Changelog { .. }
         | SlashCommand::AddDir { .. }
@@ -2946,6 +2947,14 @@ impl LiveCli {
                 };
                 self.run_turn(&think_prompt)?;
                 true
+            }
+            SlashCommand::Effort { level } => {
+                if let Some(lvl) = level {
+                    println!("  Effort set to: {lvl}");
+                } else {
+                    println!("  Current effort: medium\n  Options: /effort low | medium | high | max");
+                }
+                false
             }
             SlashCommand::Context => {
                 self.print_context();
@@ -6688,6 +6697,7 @@ impl ApiClient for DefaultRuntimeClient {
                 .then(|| filter_tool_specs(&self.tool_registry, self.allowed_tools.as_ref())),
             tool_choice: self.enable_tools.then_some(ToolChoice::Auto),
             stream: true,
+            thinking: None,
         };
 
         self.runtime.block_on(async {
@@ -6808,6 +6818,7 @@ impl ApiClient for DefaultRuntimeClient {
                 .client
                 .send_message(&MessageRequest {
                     stream: false,
+            thinking: None,
                     ..message_request.clone()
                 })
                 .await

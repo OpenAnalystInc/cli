@@ -56,6 +56,66 @@ pub struct App {
 
     // Spinner state
     pub spinner_state: tui_widgets::spinner::SpinnerState,
+
+    // Input queue — prompts submitted while streaming, sent after current turn ends
+    pub pending_queue: Vec<String>,
+
+    // Effort level — controls thinking budget for supported models
+    pub effort: EffortLevel,
+
+    // Per-action model override — used for one prompt then reverts
+    pub model_override: Option<String>,
+}
+
+/// Thinking effort level — maps to token budgets for extended thinking.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum EffortLevel {
+    Low,
+    Medium,
+    High,
+    Max,
+}
+
+impl Default for EffortLevel {
+    fn default() -> Self {
+        Self::Medium
+    }
+}
+
+impl EffortLevel {
+    /// Human-readable name.
+    #[must_use]
+    pub const fn as_str(self) -> &'static str {
+        match self {
+            Self::Low => "low",
+            Self::Medium => "medium",
+            Self::High => "high",
+            Self::Max => "max",
+        }
+    }
+
+    /// Thinking budget tokens for Anthropic extended thinking.
+    #[must_use]
+    pub const fn thinking_budget(self) -> u32 {
+        match self {
+            Self::Low => 1_024,
+            Self::Medium => 8_192,
+            Self::High => 32_000,
+            Self::Max => 128_000,
+        }
+    }
+
+    /// Parse from string.
+    #[must_use]
+    pub fn from_str_opt(s: &str) -> Option<Self> {
+        match s.to_ascii_lowercase().as_str() {
+            "low" | "l" | "1" => Some(Self::Low),
+            "medium" | "med" | "m" | "2" => Some(Self::Medium),
+            "high" | "h" | "3" => Some(Self::High),
+            "max" | "x" | "4" => Some(Self::Max),
+            _ => None,
+        }
+    }
 }
 
 impl App {
@@ -79,6 +139,9 @@ impl App {
             banner_info: None,
             banner_shown: false,
             spinner_state: tui_widgets::spinner::SpinnerState::default(),
+            pending_queue: Vec::new(),
+            effort: EffortLevel::default(),
+            model_override: None,
         }
     }
 
@@ -101,6 +164,43 @@ impl App {
             self.banner_shown = true;
         }
         self.banner_info = Some(info);
+    }
+
+    /// Check for recent sessions and offer to resume on startup.
+    pub fn check_resume_on_startup(&mut self) {
+        let sessions_dir = std::path::Path::new(".openanalyst").join("sessions");
+        if !sessions_dir.exists() {
+            return;
+        }
+        let mut entries: Vec<_> = std::fs::read_dir(&sessions_dir)
+            .ok()
+            .into_iter()
+            .flatten()
+            .filter_map(|e| e.ok())
+            .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+            .collect();
+        if entries.is_empty() {
+            return;
+        }
+        // Sort by modified time (newest first)
+        entries.sort_by(|a, b| {
+            b.metadata()
+                .and_then(|m| m.modified())
+                .ok()
+                .cmp(&a.metadata().and_then(|m| m.modified()).ok())
+        });
+        let newest = &entries[0];
+        let name = newest.file_name();
+        let size = newest.metadata().map(|m| m.len()).unwrap_or(0);
+        if size > 0 {
+            self.chat.push_system(format!(
+                "Recent session available: {} ({:.1} KB)\n\
+                 Type /resume {} to continue, or start a new conversation.",
+                name.to_string_lossy(),
+                size as f64 / 1024.0,
+                name.to_string_lossy()
+            ));
+        }
     }
 
     /// Toggle sidebar visibility.
@@ -166,16 +266,51 @@ impl App {
         }
     }
 
+    /// Run a prompt in the background — sends to orchestrator and tracks in sidebar.
+    pub fn run_in_background(&mut self, text: String) {
+        use crate::panels::sidebar::{BackgroundTask, BackgroundTaskStatus};
+
+        let task_id = format!("bg-{}", self.sidebar_state.background_tasks.len() + 1);
+        let preview = if text.chars().count() > 30 {
+            let t: String = text.chars().take(27).collect();
+            format!("{t}...")
+        } else {
+            text.clone()
+        };
+
+        self.sidebar_state.background_tasks.push(BackgroundTask {
+            id: task_id.clone(),
+            prompt_preview: preview,
+            status: BackgroundTaskStatus::Running,
+        });
+
+        self.chat.push_system(format!("Running in background: {}", &text[..text.len().min(60)]));
+
+        // Send to orchestrator as a regular prompt — orchestrator handles the rest
+        let tx = self.action_tx.clone();
+        tokio::spawn(async move {
+            let _ = tx.send(Action::SubmitPrompt(text)).await;
+        });
+    }
+
     /// Submit user input — detects `/` commands and routes accordingly.
+    /// Slash commands always execute immediately (even mid-stream).
+    /// Regular prompts are queued if streaming, sent immediately otherwise.
     pub fn submit_prompt(&mut self, text: String) {
-        // Check for slash commands first
+        // Slash commands always execute immediately — even mid-stream
         if text.starts_with('/') {
             if crate::slash_commands::handle_slash_command(self, &text) {
                 return;
             }
         }
 
-        // Regular prompt → send to orchestrator
+        // Regular prompts: queue if streaming, send immediately otherwise
+        if self.is_streaming {
+            self.pending_queue.push(text.clone());
+            self.chat.push_system(format!("[queued] {}", truncate_display(&text, 60)));
+            return;
+        }
+
         self.submit_prompt_internal(text);
     }
 
@@ -190,10 +325,22 @@ impl App {
         self.status_bar.phase = AgentPhase::Thinking;
         self.chat.auto_scroll = true;
 
+        // Clear model_override after use (will be passed via Action when orchestrator supports it)
+        let _model_override = self.model_override.take();
+        let _effort = self.effort;
+
         let tx = self.action_tx.clone();
         tokio::spawn(async move {
             let _ = tx.send(Action::SubmitPrompt(text)).await;
         });
+    }
+
+    /// Drain the pending queue — called when streaming ends.
+    fn drain_pending_queue(&mut self) {
+        if let Some(next) = self.pending_queue.first().cloned() {
+            self.pending_queue.remove(0);
+            self.submit_prompt_internal(next);
+        }
     }
 
     /// Resolve a permission dialog.
@@ -219,6 +366,8 @@ impl App {
                 if let Some(start) = self.turn_start.take() {
                     self.status_bar.elapsed = start.elapsed();
                 }
+                // Auto-send next queued prompt
+                self.drain_pending_queue();
             }
             UiEvent::ToolCallStart {
                 tool_name,
@@ -343,6 +492,8 @@ impl App {
                 self.is_streaming = false;
                 self.chat.push_system(format!("Error: {error}"));
                 self.status_bar.phase = AgentPhase::Error;
+                // Auto-send next queued prompt
+                self.drain_pending_queue();
             }
             UiEvent::Tick => {
                 self.spinner_state.calc_next();

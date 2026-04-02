@@ -1,7 +1,8 @@
 //! Status bar widget — persistent line between chat and input.
 //!
-//! Shows: spinner + phase label + elapsed time + token count.
-//! Example: `* Thinking... (4m 55s · ↓ 5.0k tokens)`
+//! Shows: spinner + phase label + elapsed time + token count on the left,
+//! keybinding hints on the right.
+//! Example: `* Thinking... (4m 55s · ↓ 5.0k tokens)          Esc:scroll · Ctrl+C:quit`
 
 use std::time::Duration;
 
@@ -25,16 +26,22 @@ pub enum AgentPhase {
 }
 
 impl AgentPhase {
-    fn label(&self) -> &str {
+    fn label(&self) -> String {
         match self {
-            Self::Idle => "Ready",
-            Self::Thinking => "Thinking...",
-            Self::ReadingFile(_) => "Reading file...",
-            Self::EditingFile(_) => "Editing...",
-            Self::RunningBash => "Running bash...",
-            Self::Searching => "Searching...",
-            Self::Done => "Done",
-            Self::Error => "Error",
+            Self::Idle => "Ready".to_string(),
+            Self::Thinking => "Thinking...".to_string(),
+            Self::ReadingFile(f) => {
+                let name = f.rsplit(['/', '\\']).next().unwrap_or(f);
+                format!("Reading {name}")
+            }
+            Self::EditingFile(f) => {
+                let name = f.rsplit(['/', '\\']).next().unwrap_or(f);
+                format!("Editing {name}")
+            }
+            Self::RunningBash => "Running bash...".to_string(),
+            Self::Searching => "Searching...".to_string(),
+            Self::Done => "Done".to_string(),
+            Self::Error => "Error".to_string(),
         }
     }
 
@@ -63,6 +70,8 @@ pub struct StatusBar {
     pub elapsed: Duration,
     pub total_tokens: u64,
     pub model_name: String,
+    /// Right-aligned keybinding hints (e.g., "Esc:scroll · Ctrl+C:quit").
+    pub hints: String,
 }
 
 impl Default for StatusBar {
@@ -72,6 +81,7 @@ impl Default for StatusBar {
             elapsed: Duration::ZERO,
             total_tokens: 0,
             model_name: String::new(),
+            hints: String::new(),
         }
     }
 }
@@ -107,6 +117,17 @@ impl Widget for StatusBar {
         let time_str = Self::format_duration(&self.elapsed);
         let token_str = Self::format_tokens(self.total_tokens);
 
+        // Build left side
+        let left_text = format!("{icon} {label} ({time_str} · ↓ {token_str} tokens)");
+        let left_len = left_text.chars().count();
+
+        // Build right side (hints)
+        let hints_len = self.hints.chars().count();
+
+        // Calculate padding
+        let total_width = area.width as usize;
+        let pad = total_width.saturating_sub(left_len + hints_len + 1);
+
         let line = Line::from(vec![
             Span::styled(
                 format!("{icon} {label}"),
@@ -117,6 +138,11 @@ impl Widget for StatusBar {
             Span::styled(
                 format!(" ({time_str} · ↓ {token_str} tokens)"),
                 Style::default().fg(Color::DarkGray),
+            ),
+            Span::raw(" ".repeat(pad)),
+            Span::styled(
+                self.hints,
+                Style::default().fg(Color::Indexed(240)),
             ),
         ]);
 

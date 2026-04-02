@@ -20,7 +20,7 @@ pub mod tool_card;
 
 pub use agent_card::AgentStatusCard;
 pub use file_tree::FileTree;
-pub use input_box::{InputBox, InputBoxState};
+pub use input_box::{InputBox, InputBoxState, InputMode};
 pub use markdown::MarkdownStream;
 pub use permission_dialog::PermissionDialog;
 pub use spinner::OaSpinner;

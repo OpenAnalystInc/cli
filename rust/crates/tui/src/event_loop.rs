@@ -20,6 +20,9 @@ pub async fn run_event_loop(
     let mut tick_interval = tokio::time::interval(tick_rate);
 
     // Crossterm event reader in a dedicated thread
+    // Check for resumable sessions on startup
+    app.check_resume_on_startup();
+
     let (cx_tx, mut cx_rx) = mpsc::channel::<ct_event::Event>(64);
     std::thread::spawn(move || loop {
         if ct_event::poll(Duration::from_millis(50)).unwrap_or(false) {

@@ -161,6 +161,7 @@ impl OpenAiCompatClient {
     ) -> Result<MessageResponse, ApiError> {
         let request = MessageRequest {
             stream: false,
+            thinking: None,
             ..request.clone()
         };
         let response = self.send_with_retry(&request).await?;
@@ -1015,6 +1016,7 @@ mod tests {
             }]),
             tool_choice: Some(ToolChoice::Auto),
             stream: false,
+            thinking: None,
         });
 
         assert_eq!(payload["messages"][0]["role"], json!("system"));

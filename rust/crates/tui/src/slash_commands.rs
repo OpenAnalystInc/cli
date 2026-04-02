@@ -607,6 +607,30 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             let p = format!("Think deeply and step-by-step about this before answering:\n\n{text}");
             app.submit_prompt_internal(p);
         }
+        SlashCommand::Effort { level } => {
+            use crate::app::EffortLevel;
+            if let Some(lvl_str) = level {
+                if let Some(lvl) = EffortLevel::from_str_opt(&lvl_str) {
+                    app.effort = lvl;
+                    app.chat.push_system(format!(
+                        "Effort set to: {} (thinking budget: {} tokens)",
+                        lvl.as_str(),
+                        lvl.thinking_budget()
+                    ));
+                } else {
+                    app.chat.push_system(format!(
+                        "Unknown effort level: {lvl_str}\nOptions: low (1K), medium (8K), high (32K), max (128K)"
+                    ));
+                }
+            } else {
+                app.chat.push_system(format!(
+                    "Current effort: {} (thinking budget: {} tokens)\n\
+                     Options: /effort low | medium | high | max",
+                    app.effort.as_str(),
+                    app.effort.thinking_budget()
+                ));
+            }
+        }
         SlashCommand::Context => {
             let tokens = app.status_bar.total_tokens;
             app.chat.push_system(format!("Context: ~{tokens} tokens used"));
@@ -625,6 +649,17 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             } else {
                 app.chat.push_system("Usage: /add-dir <directory-path>".to_string());
             }
+        }
+
+        // ── TUI control commands ──
+        SlashCommand::Exit => {
+            app.chat.push_system("Saving session and exiting...".to_string());
+            app.should_quit = true;
+        }
+        SlashCommand::Sidebar => {
+            app.toggle_sidebar();
+            let state = if app.sidebar_visible { "shown" } else { "hidden" };
+            app.chat.push_system(format!("Sidebar {state}. (Ctrl+B to toggle)"));
         }
 
         SlashCommand::Unknown(name) => {

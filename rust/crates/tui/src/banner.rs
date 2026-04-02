@@ -1,4 +1,7 @@
-//! Startup banner widget — dual-column box with OA block letters.
+//! Startup banner widget — branded OpenAnalyst banner matching Claude Code style.
+//!
+//! Blue branded box with rounded corners, OA logo, tips, and account info.
+//! Spans the full chat width like Claude Code's orange crab banner.
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -26,159 +29,169 @@ impl Banner {
         Self { info }
     }
 
-    /// Get the banner as a Vec of Lines for embedding in the chat scroll buffer.
+    /// Generate the banner as styled Lines for the chat scroll buffer.
+    ///
+    /// Design matches Claude Code's banner style:
+    /// - Colored header line with version
+    /// - Rounded-corner box with two columns
+    /// - Left: welcome + OA logo + account info
+    /// - Right: tips + recent activity
+    /// - Blue brand color (OpenAnalyst) instead of Claude's orange
     #[must_use]
     pub fn to_lines(&self) -> Vec<Line<'static>> {
-        let cyan = Style::default().fg(Color::Indexed(45));
-        let blue = Style::default().fg(Color::Indexed(39));
+        // Brand colors
+        let brand = Style::default().fg(Color::Indexed(33));          // bright blue
+        let brand_bold = brand.add_modifier(Modifier::BOLD);
+        let accent = Style::default().fg(Color::Indexed(39));          // lighter blue
+        let white_bold = Style::default().fg(Color::White).add_modifier(Modifier::BOLD);
         let white = Style::default().fg(Color::White);
-        let bold_white = Style::default().fg(Color::White).add_modifier(Modifier::BOLD);
-        let dim = Style::default().fg(Color::DarkGray);
-        let orange = Style::default().fg(Color::Indexed(208));
+        let dim = Style::default().fg(Color::Indexed(245));
+        let green = Style::default().fg(Color::Indexed(40));
+        let logo_color = Style::default().fg(Color::Indexed(33));      // blue OA logo
+
+        // Column widths
+        let left_w: usize = 40;
+        let right_w: usize = 38;
+        let total_inner = left_w + 1 + right_w; // +1 for middle │
 
         let mut lines = Vec::new();
 
-        // ── Header line ──
-        let header = format!("─── OpenAnalyst CLI v{} ", self.info.version);
-        let pad_len = 72usize.saturating_sub(header.len());
-        lines.push(Line::from(Span::styled(
-            format!("{header}{}", "─".repeat(pad_len)),
-            cyan,
-        )));
-
-        // ── Top border ──
-        //  ┌─────────────────────────────────┬──────────────────────────────────┐
-        lines.push(Line::from(Span::styled(
-            "  ┌─────────────────────────────────┬──────────────────────────────────┐",
-            dim,
-        )));
-
-        // ── Row 1: Welcome | Tips header ──
-        let welcome = format!("  Welcome back, {}!", self.info.display_name);
-        let welcome_pad = 34usize.saturating_sub(welcome.len());
+        // ── Header line: ── OpenAnalyst CLI v1.0.1 ──────────── ──
+        let ver_text = format!(" OpenAnalyst CLI v{} ", self.info.version);
+        let header_pad = total_inner.saturating_sub(ver_text.chars().count() + 4);
         lines.push(Line::from(vec![
-            Span::styled("  │", dim),
-            Span::styled(welcome, bold_white),
-            Span::raw(" ".repeat(welcome_pad)),
-            Span::styled("│", dim),
-            Span::styled(" Tips for getting started", white),
-            Span::styled("          │", dim),
+            Span::styled("── ", accent),
+            Span::styled(ver_text, brand_bold),
+            Span::styled(format!("{} ──", "─".repeat(header_pad)), accent),
         ]));
 
-        // ── Rows 2-6: OA logo | Tips content ──
+        // ── Top border with rounded corners ──
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("╭{}┬{}╮", "─".repeat(left_w), "─".repeat(right_w)),
+                brand,
+            ),
+        ]));
+
+        // Helper: build a branded dual-column row
+        let brow = |left: &str, ls: Style, right: &str, rs: Style| -> Line<'static> {
+            let lp = left_w.saturating_sub(left.chars().count());
+            let rp = right_w.saturating_sub(right.chars().count());
+            Line::from(vec![
+                Span::styled("│", brand),
+                Span::styled(left.to_string(), ls),
+                Span::raw(" ".repeat(lp)),
+                Span::styled("│", brand),
+                Span::styled(right.to_string(), rs),
+                Span::raw(" ".repeat(rp)),
+                Span::styled("│", brand),
+            ])
+        };
+
+        // ── Row: Welcome | Tips header ──
+        let welcome = format!("   Welcome back, {}!", self.info.display_name);
+        lines.push(brow(&welcome, white_bold, " Tips for getting started", green));
+
+        // ── OA Logo rows | Tips content ──
         let logo: [&str; 6] = [
-            " ████████    ████   ",
-            " ██    ██   ██  ██  ",
-            " ██    ██  ██    ██ ",
-            " ██    ██  ████████ ",
-            " ██    ██  ██    ██ ",
-            " ████████  ██    ██ ",
+            "   ████████    ████  ",
+            "   ██    ██   ██  ██ ",
+            "   ██    ██  ██    ██",
+            "   ██    ██  ████████",
+            "   ██    ██  ██    ██",
+            "   ████████  ██    ██",
         ];
 
-        let tips: [&str; 6] = [
-            " Run /init to create an          ",
-            " OPENANALYST.md file with         ",
-            " instructions for OpenAnalyst     ",
-            "──────────────────────────────────",
-            " Recent activity                  ",
-            " No recent activity               ",
+        let tip_lines: [(&str, Style); 6] = [
+            (" Run /init to create an", dim),
+            (" OPENANALYST.md file with", dim),
+            (" instructions for OpenAnalyst", dim),
+            ("", dim),       // separator
+            (" Recent activity", green),
+            (" No recent activity", dim),
         ];
 
-        for (i, (logo_line, tip_line)) in logo.iter().zip(tips.iter()).enumerate() {
-            let logo_pad = 34usize.saturating_sub(logo_line.len() + 1);
-            let is_separator = tip_line.starts_with('─');
+        for (i, (logo_line, (tip, tip_style))) in logo.iter().zip(tip_lines.iter()).enumerate() {
+            let lp = left_w.saturating_sub(logo_line.chars().count());
 
-            let mut spans = vec![
-                Span::styled("  │", dim),
-                Span::raw(" "),
-                Span::styled(*logo_line, orange),
-                Span::raw(" ".repeat(logo_pad)),
-                Span::styled("│", dim),
-            ];
-
-            if is_separator {
-                spans.push(Span::styled(*tip_line, dim));
-                spans.push(Span::styled("│", dim));
-            } else {
-                spans.push(Span::styled(*tip_line, dim));
-                spans.push(Span::styled("│", dim));
-            }
-
-            lines.push(Line::from(spans));
-
-            // After last logo line, add blank
-            if i == 5 {
+            if i == 3 {
+                // Separator row — horizontal line in right column
                 lines.push(Line::from(vec![
-                    Span::styled("  │", dim),
-                    Span::raw(" ".repeat(34)),
-                    Span::styled("│", dim),
-                    Span::raw(" ".repeat(34)),
-                    Span::styled("│", dim),
+                    Span::styled("│", brand),
+                    Span::styled(logo_line.to_string(), logo_color),
+                    Span::raw(" ".repeat(lp)),
+                    Span::styled("│", brand),
+                    Span::styled("─".repeat(right_w), brand),
+                    Span::styled("│", brand),
+                ]));
+            } else {
+                let rp = right_w.saturating_sub(tip.chars().count());
+                lines.push(Line::from(vec![
+                    Span::styled("│", brand),
+                    Span::styled(logo_line.to_string(), logo_color),
+                    Span::raw(" ".repeat(lp)),
+                    Span::styled("│", brand),
+                    Span::styled(tip.to_string(), *tip_style),
+                    Span::raw(" ".repeat(rp)),
+                    Span::styled("│", brand),
                 ]));
             }
         }
 
-        // ── Model/provider row ──
-        let model_line = format!("  {} · {}", self.info.model_display, self.info.provider_name);
-        let model_pad = 34usize.saturating_sub(model_line.len());
-        lines.push(Line::from(vec![
-            Span::styled("  │", dim),
-            Span::styled(model_line, white),
-            Span::raw(" ".repeat(model_pad)),
-            Span::styled("│", dim),
-            Span::raw(" ".repeat(34)),
-            Span::styled("│", dim),
-        ]));
+        // ── Blank separator ──
+        lines.push(brow("", dim, "", dim));
 
-        // ── User info row ──
-        let mut user_line = String::new();
+        // ── Model + provider ──
+        let model_line = format!(
+            "   {} · {}",
+            self.info.model_display, self.info.provider_name
+        );
+        lines.push(brow(&model_line, white, "", dim));
+
+        // ── Email + org ──
         if let Some(ref email) = self.info.user_email {
-            user_line.push_str(&format!("  {email}"));
+            let mut info = format!("      {email}");
             if let Some(ref org) = self.info.organization {
-                user_line.push_str(&format!(" · {org}"));
+                info = format!("{info} · {org}'s Organization");
             }
-        }
-        if !user_line.is_empty() {
-            let user_pad = 34usize.saturating_sub(user_line.len());
-            lines.push(Line::from(vec![
-                Span::styled("  │", dim),
-                Span::styled(user_line, dim),
-                Span::raw(" ".repeat(user_pad)),
-                Span::styled("│", dim),
-                Span::raw(" ".repeat(34)),
-                Span::styled("│", dim),
-            ]));
+            // Truncate if too long
+            if info.chars().count() > left_w {
+                let t: String = info.chars().take(left_w - 3).collect();
+                info = format!("{t}...");
+            }
+            lines.push(brow(&info, dim, "", dim));
         }
 
-        // ── CWD row ──
-        let cwd_display = if self.info.cwd.len() > 32 {
-            format!("  …{}", &self.info.cwd[self.info.cwd.len()-30..])
+        // ── CWD ──
+        let cwd_display = if self.info.cwd.chars().count() > left_w - 8 {
+            let keep = left_w - 10;
+            let start = self.info.cwd.chars().count() - keep;
+            let truncated: String = self.info.cwd.chars().skip(start).collect();
+            format!("      …{truncated}")
         } else {
-            format!("  {}", self.info.cwd)
+            format!("      {}", self.info.cwd)
         };
-        let cwd_pad = 34usize.saturating_sub(cwd_display.len());
-        lines.push(Line::from(vec![
-            Span::styled("  │", dim),
-            Span::styled(cwd_display, dim),
-            Span::raw(" ".repeat(cwd_pad)),
-            Span::styled("│", dim),
-            Span::raw(" ".repeat(34)),
-            Span::styled("│", dim),
-        ]));
+        lines.push(brow(&cwd_display, dim, "", dim));
 
-        // ── Bottom border ──
-        lines.push(Line::from(Span::styled(
-            "  └─────────────────────────────────┴──────────────────────────────────┘",
-            dim,
-        )));
+        // ── Bottom border with rounded corners ──
+        lines.push(Line::from(vec![
+            Span::styled(
+                format!("╰{}┴{}╯", "─".repeat(left_w), "─".repeat(right_w)),
+                brand,
+            ),
+        ]));
 
         lines.push(Line::from(""));
 
-        // ── Hint ──
-        lines.push(Line::from(Span::styled(
-            "  /help for commands · /model to switch · ctrl+c to exit",
-            dim,
-        )));
+        // ── Hint line ──
+        lines.push(Line::from(vec![
+            Span::styled("  /help", accent),
+            Span::styled(" for commands · ", dim),
+            Span::styled("/model", accent),
+            Span::styled(" to switch · ", dim),
+            Span::styled("ctrl+c", accent),
+            Span::styled(" to exit", dim),
+        ]));
 
         lines.push(Line::from(""));
 

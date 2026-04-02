@@ -159,6 +159,7 @@ impl ApiClient for ChannelApiClient {
             },
             tool_choice: None,
             stream: true,
+            thinking: None,
         };
 
         let ui_tx = self.ui_tx.clone();
@@ -303,7 +304,6 @@ struct TuiPermissionPrompter {
 impl PermissionPrompter for TuiPermissionPrompter {
     fn decide(&mut self, request: &PermissionRequest) -> PermissionPromptDecision {
         let request_id = format!("perm-{}-{}", self.agent_id, request.tool_name);
-
         // Send permission request to TUI — shows the dialog for user visibility
         let _ = self.ui_tx.blocking_send(UiEvent::PermissionRequest {
             request_id: request_id.clone(),
