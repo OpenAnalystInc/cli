@@ -8,6 +8,38 @@ use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarStat
 
 use tui_widgets::{MarkdownStream, ToolCallCard};
 
+/// Type of file output from multimedia commands.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FileType {
+    Image,
+    Audio,
+    Diagram,
+    Text,
+    Unknown,
+}
+
+impl FileType {
+    fn icon(&self) -> &str {
+        match self {
+            Self::Image => "[IMG]",
+            Self::Audio => "[AUD]",
+            Self::Diagram => "[DGM]",
+            Self::Text => "[TXT]",
+            Self::Unknown => "[FILE]",
+        }
+    }
+
+    fn color(&self) -> Color {
+        match self {
+            Self::Image => Color::Magenta,
+            Self::Audio => Color::Yellow,
+            Self::Diagram => Color::Cyan,
+            Self::Text => Color::Green,
+            Self::Unknown => Color::DarkGray,
+        }
+    }
+}
+
 /// A single message in the chat.
 #[derive(Debug, Clone)]
 pub enum ChatMessage {
@@ -22,6 +54,12 @@ pub enum ChatMessage {
     ToolCall { card: ToolCallCard },
     /// System notice (e.g., "Agent spawned").
     System { text: String },
+    /// File output from multimedia commands (/image, /speak, /diagram).
+    FileOutput {
+        path: String,
+        file_type: FileType,
+        description: String,
+    },
 }
 
 /// The main chat panel state.
@@ -83,6 +121,21 @@ impl ChatPanel {
     /// Add a system notice.
     pub fn push_system(&mut self, text: String) {
         self.messages.push(ChatMessage::System { text });
+        if self.auto_scroll {
+            self.scroll_to_bottom();
+        }
+    }
+
+    /// Add a file output message from multimedia commands.
+    pub fn push_file_output(&mut self, path: String, file_type: FileType, description: String) {
+        self.messages.push(ChatMessage::FileOutput {
+            path,
+            file_type,
+            description,
+        });
+        if self.auto_scroll {
+            self.scroll_to_bottom();
+        }
     }
 
     /// Scroll to the bottom.
@@ -151,10 +204,40 @@ impl ChatPanel {
                     )));
                 }
                 ChatMessage::System { text } => {
-                    all_lines.push(Line::from(Span::styled(
-                        text.as_str(),
-                        Style::default().fg(Color::DarkGray),
-                    )));
+                    for line in text.lines() {
+                        all_lines.push(Line::from(Span::styled(
+                            line.to_string(),
+                            Style::default().fg(Color::DarkGray),
+                        )));
+                    }
+                }
+                ChatMessage::FileOutput {
+                    path,
+                    file_type,
+                    description,
+                } => {
+                    let icon = file_type.icon();
+                    let color = file_type.color();
+                    all_lines.push(Line::from(vec![
+                        Span::styled(
+                            format!("  {icon} "),
+                            Style::default().fg(color).add_modifier(Modifier::BOLD),
+                        ),
+                        Span::styled(
+                            description.as_str(),
+                            Style::default().fg(Color::Indexed(252)),
+                        ),
+                    ]));
+                    all_lines.push(Line::from(vec![
+                        Span::raw("     "),
+                        Span::styled(
+                            path.as_str(),
+                            Style::default()
+                                .fg(Color::Blue)
+                                .add_modifier(Modifier::UNDERLINED),
+                        ),
+                    ]));
+                    all_lines.push(Line::from(""));
                 }
             }
         }

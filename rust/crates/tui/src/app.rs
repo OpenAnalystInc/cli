@@ -82,9 +82,25 @@ impl App {
         self.banner_info = Some(info);
     }
 
-    /// Submit a prompt to the orchestrator.
+    /// Submit user input — detects `/` commands and routes accordingly.
     pub fn submit_prompt(&mut self, text: String) {
-        self.chat.push_user(text.clone());
+        // Check for slash commands first
+        if text.starts_with('/') {
+            if crate::slash_commands::handle_slash_command(self, &text) {
+                return;
+            }
+        }
+
+        // Regular prompt → send to orchestrator
+        self.submit_prompt_internal(text);
+    }
+
+    /// Send a prompt directly to the orchestrator (used by slash commands too).
+    pub fn submit_prompt_internal(&mut self, text: String) {
+        if !self.chat.messages.last().is_some_and(|m| matches!(m, crate::panels::chat::ChatMessage::User { .. })) {
+            // Only add user message if not already added by slash command handler
+            self.chat.push_user(text.clone());
+        }
         self.chat.start_assistant();
         self.turn_start = Some(Instant::now());
         self.status_bar.phase = AgentPhase::Thinking;

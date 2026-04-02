@@ -9,6 +9,7 @@ pub mod event_loop;
 pub mod keybindings;
 pub mod layout;
 pub mod panels;
+pub mod slash_commands;
 pub mod theme;
 
 use std::io;
