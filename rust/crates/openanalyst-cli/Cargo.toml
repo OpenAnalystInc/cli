@@ -12,7 +12,8 @@ path = "src/main.rs"
 [dependencies]
 api = { path = "../api" }
 openanalyst-agent = { path = "../openanalyst-agent" }
-reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
+base64 = "0.22"
+reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json", "multipart", "stream"] }
 commands = { path = "../commands" }
 compat-harness = { path = "../compat-harness" }
 crossterm = "0.28"
@@ -24,6 +25,9 @@ serde_json.workspace = true
 syntect = "5"
 tokio = { version = "1", features = ["rt-multi-thread", "time"] }
 tools = { path = "../tools" }
+tui = { path = "../tui" }
+orchestrator = { path = "../orchestrator" }
+events = { path = "../events" }
 
 [lints]
 workspace = true

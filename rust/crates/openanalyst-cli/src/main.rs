@@ -8,6 +8,7 @@ use std::fmt::Write as _;
 use std::fs;
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -159,7 +160,14 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             model,
             allowed_tools,
             permission_mode,
-        } => run_repl(model, allowed_tools, permission_mode)?,
+            use_tui,
+        } => {
+            if use_tui {
+                run_tui(model, allowed_tools, permission_mode)?;
+            } else {
+                run_repl(model, allowed_tools, permission_mode)?;
+            }
+        }
         CliAction::Help => print_help(),
     }
     Ok(())
@@ -198,6 +206,7 @@ enum CliAction {
         model: String,
         allowed_tools: Option<AllowedToolSet>,
         permission_mode: PermissionMode,
+        use_tui: bool,
     },
     Agent {
         task: String,
@@ -235,6 +244,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
     let mut output_format = CliOutputFormat::Text;
     let mut permission_mode = default_permission_mode();
     let mut wants_version = false;
+    let mut wants_tui = false;
     let mut allowed_tool_values = Vec::new();
     let mut rest = Vec::new();
     let mut index = 0;
@@ -243,6 +253,10 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
         match args[index].as_str() {
             "--version" | "-V" => {
                 wants_version = true;
+                index += 1;
+            }
+            "--tui" => {
+                wants_tui = true;
                 index += 1;
             }
             "--model" => {
@@ -334,6 +348,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
             model,
             allowed_tools,
             permission_mode,
+            use_tui: wants_tui,
         });
     }
     if matches!(rest.first().map(String::as_str), Some("--help" | "-h")) {
@@ -1396,8 +1411,73 @@ fn run_resume_command(
         | SlashCommand::Permissions { .. }
         | SlashCommand::Session { .. }
         | SlashCommand::Plugins { .. }
+        | SlashCommand::Image { .. }
+        | SlashCommand::Voice { .. }
+        | SlashCommand::Speak { .. }
+        | SlashCommand::Vision { .. }
+        | SlashCommand::Diagram { .. }
+        | SlashCommand::Translate { .. }
+        | SlashCommand::Tokens { .. }
+        | SlashCommand::DiffReview { .. }
+        | SlashCommand::Scrape { .. }
+        | SlashCommand::Json { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
+}
+
+fn run_tui(
+    model: String,
+    allowed_tools: Option<AllowedToolSet>,
+    permission_mode: PermissionMode,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use orchestrator::OrchestratorConfig;
+    use tui::banner::BannerAccountInfo;
+
+    let (ui_tx, ui_rx) = tokio::sync::mpsc::channel(256);
+    let (action_tx, action_rx) = tokio::sync::mpsc::channel(64);
+
+    let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+
+    // Load system prompt
+    let system_prompt = runtime::load_system_prompt(&cwd, DEFAULT_DATE, "Windows", "11")?;
+
+    let config = OrchestratorConfig {
+        model: model.clone(),
+        permission_mode,
+        allowed_tools,
+        cwd: cwd.clone(),
+        system_prompt,
+    };
+
+    let orchestrator = orchestrator::AgentOrchestrator::new(config, ui_tx, action_rx, None);
+
+    let mut app = tui::app::App::new(ui_rx, action_tx);
+
+    // Set banner info
+    let account = fetch_startup_account_info(&model);
+    app.set_banner(BannerAccountInfo {
+        display_name: account.display_name,
+        model_display: account.model_display,
+        provider_name: account.provider_name,
+        user_email: account.user_email,
+        organization: account.organization,
+        cwd: cwd.display().to_string(),
+        version: VERSION.to_string(),
+    });
+
+    let rt = tokio::runtime::Runtime::new()?;
+    rt.block_on(async {
+        // Spawn orchestrator in background
+        tokio::spawn(orchestrator.run());
+
+        // Run TUI event loop
+        let terminal = tui::setup_terminal()?;
+        let result = tui::event_loop::run_event_loop(app, terminal).await;
+        tui::restore_terminal()?;
+        result
+    })?;
+
+    Ok(())
 }
 
 fn run_repl(
@@ -1850,6 +1930,47 @@ impl LiveCli {
             }
             SlashCommand::CommitPushPr { .. } => {
                 eprintln!("commit-push-pr not yet wired to REPL");
+                false
+            }
+            // ── Multimedia & AI Commands ──
+            SlashCommand::Image { prompt } => {
+                self.run_image(prompt.as_deref())?;
+                false
+            }
+            SlashCommand::Voice { file_path } => {
+                self.run_voice(file_path.as_deref())?;
+                false
+            }
+            SlashCommand::Speak { text } => {
+                self.run_speak(text.as_deref())?;
+                false
+            }
+            SlashCommand::Vision { image_path, prompt } => {
+                self.run_vision(image_path.as_deref(), prompt.as_deref())?;
+                false
+            }
+            SlashCommand::Diagram { description } => {
+                self.run_diagram(description.as_deref())?;
+                false
+            }
+            SlashCommand::Translate { language, text } => {
+                self.run_translate(language.as_deref(), text.as_deref())?;
+                false
+            }
+            SlashCommand::Tokens { target } => {
+                self.run_tokens(target.as_deref())?;
+                false
+            }
+            SlashCommand::DiffReview { file } => {
+                self.run_diff_review(file.as_deref())?;
+                false
+            }
+            SlashCommand::Scrape { url, selector } => {
+                Self::run_scrape(url.as_deref(), selector.as_deref())?;
+                false
+            }
+            SlashCommand::Json { url } => {
+                Self::run_json(url.as_deref())?;
                 false
             }
             SlashCommand::Unknown(name) => {
@@ -2470,6 +2591,544 @@ impl LiveCli {
         println!("Issue draft\n  Title            {title}\n\n{body}");
         Ok(())
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    //  Multimedia & AI Slash Commands
+    // ════════════════════════════════════════════════════════════════════
+
+    fn run_image(&self, prompt: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(prompt) = prompt else {
+            println!("Usage: /image <prompt>\n  Example: /image a sunset over mountains in watercolor style");
+            return Ok(());
+        };
+        // Try providers in order: Gemini Imagen, OpenAI DALL-E, Stability
+        let (provider, api_key, url, request_body) =
+            if let Some(key) = env::var("GEMINI_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
+                ("Gemini Imagen", key.clone(),
+                 format!("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={key}"),
+                 json!({
+                     "contents": [{"parts": [{"text": format!("Generate an image: {prompt}")}]}],
+                     "generationConfig": {"responseModalities": ["TEXT","IMAGE"]}
+                 }))
+            } else if let Some(key) = env::var("OPENAI_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
+                ("DALL-E 3", key,
+                 "https://api.openai.com/v1/images/generations".to_string(),
+                 json!({
+                     "model": "dall-e-3",
+                     "prompt": prompt,
+                     "n": 1,
+                     "size": "1024x1024",
+                     "response_format": "b64_json"
+                 }))
+            } else if let Some(key) = env::var("STABILITY_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
+                ("Stability AI", key,
+                 "https://api.stability.ai/v2beta/stable-image/generate/sd3".to_string(),
+                 json!({ "prompt": prompt, "output_format": "png" }))
+            } else {
+                println!("No image generation API key found.\n  Set GEMINI_API_KEY, OPENAI_API_KEY, or STABILITY_API_KEY.");
+                return Ok(());
+            };
+
+        println!("  Generating image via {provider}...");
+        let rt = tokio::runtime::Runtime::new()?;
+        let result: Result<serde_json::Value, Box<dyn std::error::Error>> = rt.block_on(async {
+            let client = reqwest::Client::builder().timeout(Duration::from_secs(60)).build()?;
+            let mut req = client.post(&url).json(&request_body);
+            if provider != "Gemini Imagen" {
+                req = req.bearer_auth(&api_key);
+            }
+            let resp = req.send().await?;
+            let status = resp.status();
+            let body: serde_json::Value = resp.json().await?;
+            if !status.is_success() {
+                return Err(format!("API error {status}: {body}").into());
+            }
+            Ok(body)
+        });
+
+        match result {
+            Ok(body) => {
+                let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+                let filename = format!("generated-{timestamp}.png");
+                // Try to extract base64 image from response
+                let b64 = body.pointer("/data/0/b64_json")
+                    .or_else(|| body.pointer("/artifacts/0/base64"))
+                    .and_then(|v| v.as_str());
+                if let Some(b64_data) = b64 {
+                    use std::io::Write as _;
+                    let decoded = base64_decode(b64_data);
+                    let mut file = fs::File::create(&filename)?;
+                    file.write_all(&decoded)?;
+                    println!("  Image saved: {filename} ({} bytes)", decoded.len());
+                } else {
+                    // Gemini might return image URL or inline data differently
+                    let url = body.pointer("/data/0/url")
+                        .or_else(|| body.pointer("/candidates/0/content/parts/0/inlineData/data"))
+                        .and_then(|v| v.as_str());
+                    if let Some(img_url_or_data) = url {
+                        if img_url_or_data.starts_with("http") {
+                            println!("  Image URL: {img_url_or_data}");
+                        } else {
+                            use std::io::Write as _;
+                            let decoded = base64_decode(img_url_or_data);
+                            let mut file = fs::File::create(&filename)?;
+                            file.write_all(&decoded)?;
+                            println!("  Image saved: {filename} ({} bytes)", decoded.len());
+                        }
+                    } else {
+                        println!("  Response: {}", serde_json::to_string_pretty(&body)?);
+                    }
+                }
+            }
+            Err(e) => println!("  Image generation failed: {e}"),
+        }
+        Ok(())
+    }
+
+    fn run_voice(&self, file_path: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(file_path) = file_path else {
+            println!("Usage: /voice <audio-file>\n  Supported: mp3, wav, m4a, webm, mp4, ogg, flac");
+            return Ok(());
+        };
+        if !Path::new(file_path).exists() {
+            println!("  File not found: {file_path}");
+            return Ok(());
+        }
+        let api_key = env::var("OPENAI_API_KEY")
+            .or_else(|_| env::var("GEMINI_API_KEY"))
+            .map(|k| k.trim().to_string())
+            .ok()
+            .filter(|k| !k.is_empty());
+        let Some(api_key) = api_key else {
+            println!("No transcription API key found.\n  Set OPENAI_API_KEY (Whisper) or GEMINI_API_KEY.");
+            return Ok(());
+        };
+
+        let is_openai = env::var("OPENAI_API_KEY").is_ok();
+        let provider = if is_openai { "OpenAI Whisper" } else { "Gemini" };
+        println!("  Transcribing via {provider}...");
+
+        let file_bytes = fs::read(file_path)?;
+        let file_name = Path::new(file_path)
+            .file_name()
+            .unwrap_or_default()
+            .to_string_lossy()
+            .to_string();
+
+        let rt = tokio::runtime::Runtime::new()?;
+        let result: Result<String, Box<dyn std::error::Error>> = rt.block_on(async {
+            let client = reqwest::Client::builder().timeout(Duration::from_secs(120)).build()?;
+            if is_openai {
+                let part = reqwest::multipart::Part::bytes(file_bytes)
+                    .file_name(file_name)
+                    .mime_str("audio/mpeg")?;
+                let form = reqwest::multipart::Form::new()
+                    .text("model", "whisper-1")
+                    .text("response_format", "text")
+                    .part("file", part);
+                let resp = client.post("https://api.openai.com/v1/audio/transcriptions")
+                    .bearer_auth(&api_key)
+                    .multipart(form)
+                    .send().await?;
+                let status = resp.status();
+                let text = resp.text().await?;
+                if !status.is_success() {
+                    return Err(format!("Whisper API error {status}: {text}").into());
+                }
+                Ok(text)
+            } else {
+                // Gemini: upload file inline as base64
+                use base64::Engine as _;
+                let b64 = base64::engine::general_purpose::STANDARD.encode(&file_bytes);
+                let body = json!({
+                    "contents": [{"parts": [
+                        {"inlineData": {"mimeType": "audio/mpeg", "data": b64}},
+                        {"text": "Transcribe this audio accurately. Return only the transcription text."}
+                    ]}]
+                });
+                let resp = client.post(format!(
+                    "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+                )).json(&body).send().await?;
+                let status = resp.status();
+                let result: serde_json::Value = resp.json().await?;
+                if !status.is_success() {
+                    return Err(format!("Gemini API error {status}: {result}").into());
+                }
+                let text = result.pointer("/candidates/0/content/parts/0/text")
+                    .and_then(|v| v.as_str())
+                    .unwrap_or("(no transcription)")
+                    .to_string();
+                Ok(text)
+            }
+        });
+
+        match result {
+            Ok(transcript) => {
+                println!("\n  Transcript:\n  {}", transcript.trim().replace('\n', "\n  "));
+            }
+            Err(e) => println!("  Transcription failed: {e}"),
+        }
+        Ok(())
+    }
+
+    fn run_speak(&self, text: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(text) = text else {
+            println!("Usage: /speak <text>\n  Example: /speak Hello, this is OpenAnalyst speaking.");
+            return Ok(());
+        };
+        let api_key = env::var("OPENAI_API_KEY").map(|k| k.trim().to_string()).ok().filter(|k| !k.is_empty());
+        let Some(api_key) = api_key else {
+            println!("No TTS API key found.\n  Set OPENAI_API_KEY for text-to-speech.");
+            return Ok(());
+        };
+
+        println!("  Generating speech via OpenAI TTS...");
+        let rt = tokio::runtime::Runtime::new()?;
+        let result: Result<Vec<u8>, Box<dyn std::error::Error>> = rt.block_on(async {
+            let client = reqwest::Client::builder().timeout(Duration::from_secs(60)).build()?;
+            let resp = client.post("https://api.openai.com/v1/audio/speech")
+                .bearer_auth(&api_key)
+                .json(&json!({
+                    "model": "tts-1",
+                    "input": text,
+                    "voice": "alloy",
+                    "response_format": "mp3"
+                }))
+                .send().await?;
+            let status = resp.status();
+            if !status.is_success() {
+                let error_text = resp.text().await?;
+                return Err(format!("TTS API error {status}: {error_text}").into());
+            }
+            let bytes = resp.bytes().await?.to_vec();
+            Ok(bytes)
+        });
+
+        match result {
+            Ok(bytes) => {
+                let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+                let filename = format!("speech-{timestamp}.mp3");
+                fs::write(&filename, &bytes)?;
+                println!("  Audio saved: {filename} ({} bytes)", bytes.len());
+            }
+            Err(e) => println!("  Speech generation failed: {e}"),
+        }
+        Ok(())
+    }
+
+    fn run_vision(
+        &self,
+        image_path: Option<&str>,
+        prompt: Option<&str>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(image_path) = image_path else {
+            println!("Usage: /vision <image-path> [prompt]\n  Example: /vision screenshot.png What does this show?");
+            return Ok(());
+        };
+        if !Path::new(image_path).exists() {
+            println!("  File not found: {image_path}");
+            return Ok(());
+        }
+        let prompt = prompt.unwrap_or("Describe this image in detail.");
+        let file_bytes = fs::read(image_path)?;
+        let b64 = base64_encode(&file_bytes);
+        let mime = if image_path.ends_with(".png") { "image/png" }
+            else if image_path.ends_with(".webp") { "image/webp" }
+            else { "image/jpeg" };
+
+        // Try providers: Gemini, OpenAI, Anthropic
+        let (provider, api_key) =
+            if let Some(key) = env::var("GEMINI_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
+                ("Gemini", key)
+            } else if let Some(key) = env::var("OPENAI_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
+                ("GPT-4o", key)
+            } else if let Some(key) = env::var("ANTHROPIC_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
+                ("Claude", key)
+            } else {
+                println!("No vision API key found.\n  Set GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY.");
+                return Ok(());
+            };
+
+        println!("  Analyzing image via {provider}...");
+        let rt = tokio::runtime::Runtime::new()?;
+        let result: Result<String, Box<dyn std::error::Error>> = rt.block_on(async {
+            let client = reqwest::Client::builder().timeout(Duration::from_secs(60)).build()?;
+            match provider {
+                "Gemini" => {
+                    let body = json!({
+                        "contents": [{"parts": [
+                            {"inlineData": {"mimeType": mime, "data": b64}},
+                            {"text": prompt}
+                        ]}]
+                    });
+                    let resp = client.post(format!(
+                        "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key={api_key}"
+                    )).json(&body).send().await?;
+                    let result: serde_json::Value = resp.json().await?;
+                    Ok(result.pointer("/candidates/0/content/parts/0/text")
+                        .and_then(|v| v.as_str()).unwrap_or("(no response)").to_string())
+                }
+                "GPT-4o" => {
+                    let body = json!({
+                        "model": "gpt-4o",
+                        "messages": [{"role": "user", "content": [
+                            {"type": "image_url", "image_url": {"url": format!("data:{mime};base64,{b64}")}},
+                            {"type": "text", "text": prompt}
+                        ]}],
+                        "max_tokens": 1024
+                    });
+                    let resp = client.post("https://api.openai.com/v1/chat/completions")
+                        .bearer_auth(&api_key).json(&body).send().await?;
+                    let result: serde_json::Value = resp.json().await?;
+                    Ok(result.pointer("/choices/0/message/content")
+                        .and_then(|v| v.as_str()).unwrap_or("(no response)").to_string())
+                }
+                _ => {
+                    let body = json!({
+                        "model": "claude-sonnet-4-6",
+                        "max_tokens": 1024,
+                        "messages": [{"role": "user", "content": [
+                            {"type": "image", "source": {"type": "base64", "media_type": mime, "data": b64}},
+                            {"type": "text", "text": prompt}
+                        ]}]
+                    });
+                    let resp = client.post("https://api.anthropic.com/v1/messages")
+                        .header("x-api-key", &api_key)
+                        .header("anthropic-version", "2023-06-01")
+                        .json(&body).send().await?;
+                    let result: serde_json::Value = resp.json().await?;
+                    Ok(result.pointer("/content/0/text")
+                        .and_then(|v| v.as_str()).unwrap_or("(no response)").to_string())
+                }
+            }
+        });
+
+        match result {
+            Ok(description) => println!("\n{description}"),
+            Err(e) => println!("  Vision analysis failed: {e}"),
+        }
+        Ok(())
+    }
+
+    fn run_diagram(&mut self, description: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(description) = description else {
+            println!("Usage: /diagram <description>\n  Example: /diagram user authentication flow with JWT");
+            return Ok(());
+        };
+        let diagram_prompt = format!(
+            "Generate a Mermaid diagram for: {description}\n\n\
+             Return ONLY the Mermaid code block, no explanation. Start with the diagram type (graph, sequenceDiagram, classDiagram, etc)."
+        );
+        self.run_turn(&diagram_prompt)?;
+
+        // Save the last assistant response as .mmd file if it contains mermaid
+        let last_text = self.runtime.session().messages.iter().rev()
+            .find(|m| m.role == MessageRole::Assistant)
+            .map(|m| m.blocks.iter().filter_map(|b| match b {
+                ContentBlock::Text { text } => Some(text.as_str()),
+                _ => None,
+            }).collect::<Vec<_>>().join(""))
+            .unwrap_or_default();
+
+        if last_text.contains("graph") || last_text.contains("Diagram") || last_text.contains("sequenceDiagram") || last_text.contains("classDiagram") {
+            let mermaid_code = last_text
+                .lines()
+                .skip_while(|l| !l.starts_with("```"))
+                .skip(1)
+                .take_while(|l| !l.starts_with("```"))
+                .collect::<Vec<_>>()
+                .join("\n");
+            if !mermaid_code.is_empty() {
+                let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+                let filename = format!("diagram-{timestamp}.mmd");
+                fs::write(&filename, &mermaid_code)?;
+                println!("\n  Diagram saved: {filename}");
+            }
+        }
+        Ok(())
+    }
+
+    fn run_translate(
+        &mut self,
+        language: Option<&str>,
+        text: Option<&str>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(language) = language else {
+            println!("Usage: /translate <language> <text>\n  Example: /translate Spanish Hello, how are you?");
+            return Ok(());
+        };
+        let Some(text) = text else {
+            println!("Usage: /translate {language} <text>");
+            return Ok(());
+        };
+        let translate_prompt = format!(
+            "Translate the following text to {language}. Return ONLY the translation, no explanation.\n\n{text}"
+        );
+        self.run_turn(&translate_prompt)
+    }
+
+    fn run_tokens(&self, target: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let content = match target {
+            Some(path) if Path::new(path).exists() => fs::read_to_string(path)?,
+            Some(text) => text.to_string(),
+            None => {
+                println!("Usage: /tokens <file-path or text>\n  Example: /tokens src/main.rs\n  Example: /tokens \"Hello world\"");
+                return Ok(());
+            }
+        };
+        // Rough estimation: ~4 chars per token for English, ~2 for code
+        let char_count = content.len();
+        let word_count = content.split_whitespace().count();
+        let line_count = content.lines().count();
+        let estimated_tokens = char_count / 4; // conservative estimate
+        println!(
+            "Token estimate\n  Characters       {char_count}\n  Words            {word_count}\n  Lines            {line_count}\n  Est. tokens      ~{estimated_tokens}\n  Model            {model}",
+            model = self.model
+        );
+        Ok(())
+    }
+
+    fn run_diff_review(&mut self, file: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let diff = if let Some(file) = file {
+            let output = std::process::Command::new("git")
+                .args(["diff", "--", file])
+                .output()?;
+            String::from_utf8_lossy(&output.stdout).to_string()
+        } else {
+            let output = std::process::Command::new("git")
+                .args(["diff"])
+                .output()?;
+            String::from_utf8_lossy(&output.stdout).to_string()
+        };
+        if diff.trim().is_empty() {
+            println!("  No changes to review (git diff is empty).");
+            return Ok(());
+        }
+        let review_prompt = format!(
+            "Review this git diff. Focus on:\n\
+             - Bugs or logic errors\n\
+             - Security issues\n\
+             - Performance concerns\n\
+             - Code style issues\n\n\
+             Be concise. If the changes look good, say so briefly.\n\n\
+             ```diff\n{diff}\n```"
+        );
+        self.run_turn(&review_prompt)
+    }
+
+    fn run_scrape(url: Option<&str>, selector: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(url) = url else {
+            println!("Usage: /scrape <url> [css-selector]\n  Example: /scrape https://example.com h1");
+            return Ok(());
+        };
+        println!("  Fetching {url}...");
+        let rt = tokio::runtime::Runtime::new()?;
+        let result = rt.block_on(async {
+            let client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(20))
+                .user_agent("openanalyst-cli/1.0")
+                .redirect(reqwest::redirect::Policy::limited(10))
+                .build()?;
+            let resp = client.get(url).send().await?;
+            let status = resp.status();
+            let body = resp.text().await?;
+            Ok::<_, Box<dyn std::error::Error>>((status, body))
+        });
+
+        match result {
+            Ok((status, body)) => {
+                println!("  Status: {status}");
+                if let Some(sel) = selector {
+                    // Simple CSS selector extraction (tag name matching)
+                    let tag = sel.trim_start_matches('.');
+                    let extracted: Vec<String> = body.split(&format!("<{tag}"))
+                        .skip(1)
+                        .filter_map(|part| {
+                            let inner = part.split('>').nth(1)?;
+                            let text = inner.split(&format!("</{tag}")).next()?;
+                            let clean = strip_html_tags(text);
+                            (!clean.trim().is_empty()).then(|| clean.trim().to_string())
+                        })
+                        .take(20)
+                        .collect();
+                    if extracted.is_empty() {
+                        println!("  No matches for selector: {sel}");
+                    } else {
+                        for (i, item) in extracted.iter().enumerate() {
+                            println!("  [{i}] {item}");
+                        }
+                    }
+                } else {
+                    // Full text extraction
+                    let text = strip_html_tags(&body);
+                    let preview: String = text.lines()
+                        .filter(|l| !l.trim().is_empty())
+                        .take(50)
+                        .collect::<Vec<_>>()
+                        .join("\n");
+                    println!("{preview}");
+                }
+            }
+            Err(e) => println!("  Fetch failed: {e}"),
+        }
+        Ok(())
+    }
+
+    fn run_json(url: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(url) = url else {
+            println!("Usage: /json <url>\n  Example: /json https://api.github.com/repos/rust-lang/rust");
+            return Ok(());
+        };
+        println!("  Fetching {url}...");
+        let rt = tokio::runtime::Runtime::new()?;
+        let result = rt.block_on(async {
+            let client = reqwest::Client::builder()
+                .timeout(Duration::from_secs(20))
+                .user_agent("openanalyst-cli/1.0")
+                .build()?;
+            let resp = client.get(url)
+                .header("Accept", "application/json")
+                .send().await?;
+            let status = resp.status();
+            let body: serde_json::Value = resp.json().await?;
+            Ok::<_, Box<dyn std::error::Error>>((status, body))
+        });
+
+        match result {
+            Ok((status, body)) => {
+                println!("  Status: {status}\n");
+                println!("{}", serde_json::to_string_pretty(&body)?);
+            }
+            Err(e) => println!("  Fetch failed: {e}"),
+        }
+        Ok(())
+    }
+}
+
+fn base64_encode(data: &[u8]) -> String {
+    use base64::Engine as _;
+    base64::engine::general_purpose::STANDARD.encode(data)
+}
+
+fn base64_decode(input: &str) -> Vec<u8> {
+    use base64::Engine as _;
+    base64::engine::general_purpose::STANDARD.decode(input).unwrap_or_default()
+}
+
+fn strip_html_tags(html: &str) -> String {
+    let mut result = String::with_capacity(html.len());
+    let mut in_tag = false;
+    for ch in html.chars() {
+        if ch == '<' {
+            in_tag = true;
+        } else if ch == '>' {
+            in_tag = false;
+            result.push(' ');
+        } else if !in_tag {
+            result.push(ch);
+        }
+    }
+    result
 }
 
 fn sessions_dir() -> Result<PathBuf, Box<dyn std::error::Error>> {
@@ -4768,6 +5427,7 @@ mod tests {
                 model: DEFAULT_MODEL.to_string(),
                 allowed_tools: None,
                 permission_mode: PermissionMode::DangerFullAccess,
+                use_tui: false,
             }
         );
     }
