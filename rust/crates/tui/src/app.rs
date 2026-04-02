@@ -47,6 +47,8 @@ pub struct App {
     pub exit_state: ExitState,
     pub turn_start: Option<Instant>,
     pub is_streaming: bool,
+    /// Set after Ctrl+C cancel — prevents StreamEnd from draining pending queue.
+    pub cancelled: bool,
 
     // Channels
     pub ui_rx: UiEventRx,
@@ -97,6 +99,7 @@ impl App {
             exit_state: ExitState::Running,
             turn_start: None,
             is_streaming: false,
+            cancelled: false,
             ui_rx,
             action_tx,
             banner_info: None,
@@ -258,13 +261,17 @@ impl App {
         self.scroll_mode = self.focus == PanelId::Chat;
     }
 
-    /// Cancel all running agents.
+    /// Cancel all running agents. Sets `cancelled` flag to prevent
+    /// StreamEnd from draining the pending queue (race condition fix).
     pub fn cancel_current_agent(&mut self) {
         if self.is_streaming {
             self.chat.finish_assistant();
             self.chat.push_system("Request cancelled.".to_string());
             self.status_bar.phase = AgentPhase::Done;
             self.is_streaming = false;
+            self.cancelled = true; // Prevent StreamEnd from draining queue
+            // Clear pending queue — user cancelled, don't auto-send
+            self.pending_queue.clear();
             if let Some(start) = self.turn_start.take() {
                 self.status_bar.elapsed = start.elapsed();
             }
@@ -464,8 +471,12 @@ impl App {
                 if self.chat.messages.len() > 500 {
                     crate::slash_commands::auto_compact_if_needed(self);
                 }
-                // Auto-send next queued prompt
-                self.drain_pending_queue();
+                // Auto-send next queued prompt (skip if user cancelled)
+                if self.cancelled {
+                    self.cancelled = false;
+                } else {
+                    self.drain_pending_queue();
+                }
             }
             UiEvent::ToolCallStart {
                 tool_name,
@@ -594,8 +605,12 @@ impl App {
                 if let Some(bt) = self.sidebar_state.background_tasks.iter_mut().find(|bt| bt.id == agent_id && bt.status == BackgroundTaskStatus::Running) {
                     bt.status = BackgroundTaskStatus::Failed;
                 }
-                // Auto-send next queued prompt
-                self.drain_pending_queue();
+                // Auto-send next queued prompt (skip if user cancelled)
+                if self.cancelled {
+                    self.cancelled = false;
+                } else {
+                    self.drain_pending_queue();
+                }
             }
             UiEvent::Tick => {
                 self.spinner_state.calc_next();

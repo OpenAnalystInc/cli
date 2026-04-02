@@ -9,6 +9,7 @@
 pub mod agent;
 pub mod autonomous;
 pub mod context;
+pub mod knowledge;
 pub mod moe;
 pub mod registry;
 pub mod router;
