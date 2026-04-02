@@ -1,4 +1,4 @@
-//! Startup banner widget — Claude Code-style dual-column box with OA block letters.
+//! Startup banner widget — dual-column box with OA block letters.
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
