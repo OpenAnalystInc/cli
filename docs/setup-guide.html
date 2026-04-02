@@ -3,341 +3,448 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenAnalyst CLI — Documentation</title>
+<title>OpenAnalyst CLI — The Universal AI Agent for Your Terminal</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
-  :root{--bg:#0a0e17;--card:#111827;--code:#0d1321;--border:#1e293b;--text:#e2e8f0;--dim:#64748b;--muted:#94a3b8;--accent:#0ea5e9;--accent2:#38bdf8;--glow:rgba(14,165,233,0.15);--green:#22c55e;--yellow:#eab308;--purple:#a78bfa;--cyan:#22d3ee;--pink:#f472b6;--orange:#f97316;--red:#ef4444}
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);line-height:1.6}
-  body::before{content:'';position:fixed;inset:0;background:radial-gradient(ellipse at 20% 0%,rgba(14,165,233,0.08),transparent 50%),radial-gradient(ellipse at 80% 100%,rgba(139,92,246,0.06),transparent 50%);pointer-events:none}
-  .wrap{max-width:900px;margin:0 auto;padding:40px 24px;position:relative;z-index:1}
-  .hdr{text-align:center;margin-bottom:48px}
-  .oa{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:20px;font-weight:700;padding:6px 14px;border:2px solid var(--accent);border-radius:8px;color:var(--accent);letter-spacing:4px;box-shadow:0 0 20px var(--glow),inset 0 0 20px var(--glow);margin-bottom:16px}
-  .title{font-family:'JetBrains Mono',monospace;font-size:44px;font-weight:700;letter-spacing:-2px;background:linear-gradient(135deg,var(--accent),var(--cyan),var(--accent2));background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:sh 3s ease-in-out infinite}
-  @keyframes sh{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
-  .sub{color:var(--muted);font-size:16px;margin-top:4px}
-  .ver{display:inline-block;background:var(--glow);border:1px solid rgba(14,165,233,0.3);color:var(--accent2);font-family:'JetBrains Mono',monospace;font-size:13px;padding:4px 12px;border-radius:20px;margin-top:12px}
-  .card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;margin-bottom:24px;position:relative;overflow:hidden;transition:border-color .3s}
-  .card:hover{border-color:rgba(14,165,233,0.3)}
-  .card .num{position:absolute;top:20px;right:28px;font-family:'JetBrains Mono',monospace;font-size:64px;font-weight:700;color:rgba(14,165,233,0.07);line-height:1}
-  .card h2{font-size:20px;font-weight:600;margin-bottom:16px;display:flex;align-items:center;gap:10px}
-  .ic{width:28px;height:28px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:14px;flex-shrink:0}
-  .ic.bl{background:var(--glow);color:var(--accent)}.ic.gn{background:rgba(34,197,94,.15);color:var(--green)}.ic.or{background:rgba(249,115,22,.15);color:var(--orange)}.ic.pu{background:rgba(167,139,250,.15);color:var(--purple)}.ic.pk{background:rgba(244,114,182,.15);color:var(--pink)}.ic.cy{background:rgba(34,211,238,.15);color:var(--cyan)}
-  .tabs{display:flex;gap:0}.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--dim);background:0;border:1px solid var(--border);border-bottom:0;border-radius:8px 8px 0 0;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.tab.on{background:var(--code);color:var(--accent)}.tc{display:none}.tc.on{display:block}.tc .cb{border-top-left-radius:0;margin-top:0}
-  .cb{background:var(--code);border:1px solid var(--border);border-radius:10px;margin:12px 0;overflow:hidden}
-  .ch{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;background:rgba(255,255,255,.02);border-bottom:1px solid var(--border)}
-  .cl{font-size:12px;font-weight:500;color:var(--dim);display:flex;align-items:center;gap:6px}
-  .dt{width:8px;height:8px;border-radius:50%}.d1{background:#ef4444}.d2{background:#eab308}.d3{background:#22c55e}
-  .cp{background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.cp:hover{background:var(--glow);border-color:var(--accent);color:var(--accent)}
-  pre.cd{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:13.5px;line-height:1.8;overflow-x:auto;white-space:pre;color:var(--text)}
-  .cm{color:var(--dim)}.kw{color:var(--pink)}.vr{color:var(--purple)}.st{color:var(--yellow)}.gn{color:var(--green)}.cn{color:var(--cyan)}
-  .pg{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:12px;margin-top:16px}
-  .pc{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:16px;transition:.2s}.pc:hover{border-color:rgba(14,165,233,.3)}.pc.df{border-color:rgba(14,165,233,.3);background:var(--glow)}
-  .pn{font-weight:600;font-size:14px;margin-bottom:4px;display:flex;align-items:center;gap:8px}.pn .bd{font-size:10px;font-weight:500;padding:2px 6px;border-radius:4px;background:rgba(14,165,233,.2);color:var(--accent)}
-  .pe{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--purple);margin:4px 0}.pm{font-size:12px;color:var(--dim)}
-  .ut{width:100%;margin-top:12px;border-collapse:collapse}.ut td{padding:10px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}.ut td:first-child{font-family:'JetBrains Mono',monospace;color:var(--green);padding-right:16px;white-space:nowrap}.ut td:last-child{color:var(--dim)}
-  /* Command reference table */
-  .cmd-table{width:100%;border-collapse:collapse;margin-top:12px}
-  .cmd-table th{text-align:left;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:1px;padding:8px 0;border-bottom:1px solid var(--border)}
-  .cmd-table td{padding:8px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,.04);vertical-align:top}
-  .cmd-table td:first-child{font-family:'JetBrains Mono',monospace;color:var(--cyan);padding-right:16px;white-space:nowrap}
-  .cmd-table td:last-child{color:var(--muted)}
-  .cmd-cat{font-size:12px;font-weight:600;color:var(--accent);padding:14px 0 6px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(14,165,233,.15)}
-  .tag{display:inline-block;font-size:10px;padding:1px 6px;border-radius:4px;margin-left:6px;font-weight:500}
-  .tag-r{background:rgba(34,197,94,.12);color:var(--green);border:1px solid rgba(34,197,94,.2)}
-  .tag-n{background:rgba(234,179,8,.12);color:var(--yellow);border:1px solid rgba(234,179,8,.2)}
-  /* Features grid */
-  .fg{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:12px;margin-top:16px}
-  .fc{background:rgba(255,255,255,.02);border:1px solid var(--border);border-radius:10px;padding:16px;transition:.2s}.fc:hover{border-color:rgba(14,165,233,.3)}
-  .fc .fn{font-weight:600;font-size:14px;margin-bottom:4px;color:var(--text)}.fc .fd{font-size:12px;color:var(--dim);line-height:1.5}
-  .ft{text-align:center;margin-top:48px;padding-top:32px;border-top:1px solid var(--border);color:var(--dim);font-size:13px}.ft a{color:var(--accent);text-decoration:none}.ft a:hover{text-decoration:underline}
-  .note{background:rgba(14,165,233,.06);border:1px solid rgba(14,165,233,.15);border-radius:10px;padding:14px 18px;font-size:13px;color:var(--muted);margin:16px 0;line-height:1.6}
-  .note strong{color:var(--accent)}
-  @media(max-width:640px){.wrap{padding:24px 16px}.title{font-size:28px}.card{padding:24px}.pg,.fg{grid-template-columns:1fr}}
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0a0e17;--bg2:#0f1520;--card:#111827;--code:#0d1321;--border:#1e293b;--border2:#2d3a4d;--text:#e2e8f0;--dim:#64748b;--muted:#94a3b8;--accent:#0ea5e9;--accent2:#38bdf8;--accent3:#7dd3fc;--glow:rgba(14,165,233,0.12);--glow2:rgba(14,165,233,0.06);--green:#22c55e;--yellow:#eab308;--purple:#a78bfa;--cyan:#22d3ee;--pink:#f472b6;--orange:#f97316;--red:#ef4444}
+*{margin:0;padding:0;box-sizing:border-box}
+html{scroll-behavior:smooth;scroll-padding-top:72px}
+body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased}
+
+/* ── Navbar ── */
+.nav{position:sticky;top:0;z-index:100;background:rgba(10,14,23,0.85);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto}
+.nav-logo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;color:var(--accent);letter-spacing:4px;border:1.5px solid var(--accent);padding:3px 10px;border-radius:6px;text-decoration:none;box-shadow:0 0 12px var(--glow)}
+.nav-links{display:flex;gap:24px;list-style:none}.nav-links a{color:var(--dim);text-decoration:none;font-size:13px;font-weight:500;transition:color .2s}.nav-links a:hover{color:var(--accent)}
+@media(max-width:640px){.nav-links{display:none}}
+
+/* ── Sections ── */
+.wrap{max-width:960px;margin:0 auto;padding:0 24px}
+section{padding:64px 0}
+.section-label{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
+.section-title{font-size:28px;font-weight:700;margin-bottom:12px;color:var(--text)}
+.section-sub{color:var(--muted);font-size:15px;margin-bottom:32px;max-width:640px}
+
+/* ── Hero ── */
+.hero{text-align:center;padding:100px 24px 80px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(14,165,233,0.1),transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(139,92,246,0.06),transparent 50%);pointer-events:none}
+.hero-badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;padding:6px 16px;border:2px solid var(--accent);border-radius:10px;color:var(--accent);letter-spacing:6px;box-shadow:0 0 24px var(--glow);margin-bottom:24px;position:relative}
+.hero h1{font-size:clamp(36px,6vw,56px);font-weight:800;letter-spacing:-2px;background:linear-gradient(135deg,var(--accent),var(--cyan),var(--accent2));background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradient-shift 4s ease-in-out infinite;margin-bottom:16px;position:relative}
+@keyframes gradient-shift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
+.hero-sub{color:var(--muted);font-size:18px;margin-bottom:8px;position:relative}
+.hero-cycle{color:var(--accent2);font-weight:600;display:inline-block;min-width:180px;text-align:left}
+.hero-status{margin:28px auto 32px;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--dim);position:relative}
+.hero-status .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:8px;animation:pulse 2s ease-in-out infinite}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
+.cta-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative}
+.btn{padding:12px 28px;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;transition:all .2s;cursor:pointer;border:none;font-family:'Inter',sans-serif}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 0 20px var(--glow)}.btn-primary:hover{background:var(--accent2);box-shadow:0 0 30px rgba(14,165,233,0.25)}
+.btn-outline{background:transparent;color:var(--accent);border:1.5px solid rgba(14,165,233,0.4)}.btn-outline:hover{border-color:var(--accent);background:var(--glow)}
+
+/* ── Cards ── */
+.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;position:relative;overflow:hidden;transition:border-color .3s}.card:hover{border-color:rgba(14,165,233,0.25)}
+
+/* ── Code blocks ── */
+.cb{background:var(--code);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:12px 0}
+.cb-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)}
+.cb-dots{display:flex;gap:6px}.cb-dot{width:10px;height:10px;border-radius:50%}.d1{background:#ef4444}.d2{background:#eab308}.d3{background:#22c55e}
+.cb-label{font-size:12px;font-weight:500;color:var(--dim)}
+.cb-copy{background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.cb-copy:hover{background:var(--glow);border-color:var(--accent);color:var(--accent)}
+pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:13.5px;line-height:1.9;overflow-x:auto;white-space:pre;color:var(--text)}
+.c-g{color:var(--green)}.c-c{color:var(--cyan)}.c-p{color:var(--purple)}.c-y{color:var(--yellow)}.c-d{color:var(--dim)}.c-k{color:var(--pink)}.c-o{color:var(--orange)}
+
+/* ── Tabs ── */
+.tabs{display:flex;gap:0;margin-bottom:0}.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--dim);background:transparent;border:1px solid var(--border);border-bottom:0;border-radius:10px 10px 0 0;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.tab.on{background:var(--code);color:var(--accent);border-color:var(--border)}.tc{display:none}.tc.on{display:block}.tc .cb{border-top-left-radius:0;margin-top:0}
+
+/* ── Provider grid ── */
+.pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:20px}
+.pcard{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:18px;transition:.2s}.pcard:hover{border-color:rgba(14,165,233,0.3)}.pcard.df{border-color:rgba(14,165,233,0.35);background:var(--glow2)}
+.pcard-name{font-weight:600;font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:8px}.pcard-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(14,165,233,0.2);color:var(--accent)}
+.pcard-env{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--purple);margin:5px 0}.pcard-desc{font-size:12px;color:var(--dim)}
+
+/* ── Accordion ── */
+.acc{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;transition:border-color .2s}.acc:hover{border-color:rgba(14,165,233,0.2)}
+.acc-header{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;background:rgba(255,255,255,0.01);transition:background .2s;user-select:none}
+.acc-header:hover{background:rgba(255,255,255,0.03)}
+.acc-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
+.acc-title{font-weight:600;font-size:15px;flex:1}
+.acc-arrow{color:var(--dim);font-size:12px;transition:transform .2s}.acc.open .acc-arrow{transform:rotate(90deg)}
+.acc-body{max-height:0;overflow:hidden;transition:max-height .3s ease}.acc.open .acc-body{max-height:600px}
+.acc-content{padding:0 20px 20px;color:var(--muted);font-size:14px;line-height:1.7}
+
+/* ── Tool grid ── */
+.tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
+.tcard{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;padding:14px;transition:.2s}.tcard:hover{border-color:rgba(14,165,233,0.3)}
+.tcard-name{font-weight:600;font-size:14px;margin-bottom:3px}.tcard-desc{font-size:12px;color:var(--dim);line-height:1.5}
+
+/* ── Command table ── */
+.cmd-table{width:100%;border-collapse:collapse;margin-top:8px}
+.cmd-table th{text-align:left;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:1px;padding:8px 0;border-bottom:1px solid var(--border)}
+.cmd-table td{padding:8px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:top}
+.cmd-table td:first-child{font-family:'JetBrains Mono',monospace;color:var(--cyan);padding-right:16px;white-space:nowrap}
+.cmd-table td:last-child{color:var(--muted)}
+.cmd-cat{font-size:12px;font-weight:600;color:var(--accent);padding:14px 0 6px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(14,165,233,0.12)}
+.tag{display:inline-block;font-size:9px;padding:1px 6px;border-radius:4px;margin-left:6px;font-weight:600;letter-spacing:0.5px}
+.tag-n{background:rgba(234,179,8,0.12);color:var(--yellow);border:1px solid rgba(234,179,8,0.2)}
+
+/* ── Config table ── */
+.cfg-table{width:100%;border-collapse:collapse}.cfg-table td{padding:10px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top}.cfg-table td:first-child{font-family:'JetBrains Mono',monospace;color:var(--green);padding-right:16px;white-space:nowrap}.cfg-table td:last-child{color:var(--dim)}
+
+/* ── Footer ── */
+.footer{border-top:1px solid var(--border);padding:40px 0;text-align:center;color:var(--dim);font-size:13px}
+.footer strong{color:var(--text)}.footer a{color:var(--accent);text-decoration:none}.footer a:hover{text-decoration:underline}
+
+/* ── Credits card ── */
+.credits{background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:32px}
+
+/* ── Responsive ── */
+@media(max-width:640px){section{padding:40px 0}.hero{padding:60px 16px 48px}.hero h1{font-size:32px}.pgrid,.tgrid{grid-template-columns:1fr}.cta-row{flex-direction:column;align-items:center}.card{padding:20px}}
 </style>
 </head>
 <body>
+
+<!-- ═══ 1. NAVBAR ═══ -->
+<nav style="position:sticky;top:0;z-index:100;background:rgba(10,14,23,0.88);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06)">
+<div class="nav">
+  <a href="#" class="nav-logo">O A</a>
+  <ul class="nav-links">
+    <li><a href="#install">Install</a></li>
+    <li><a href="#providers">Providers</a></li>
+    <li><a href="#features">Features</a></li>
+    <li><a href="#commands">Commands</a></li>
+    <li><a href="#tools">Tools</a></li>
+    <li><a href="#architecture">Architecture</a></li>
+    <li><a href="#credits">Credits</a></li>
+  </ul>
+</div>
+</nav>
+
+<!-- ═══ 2. HERO ═══ -->
+<div class="hero">
+  <div class="hero-badge">O A</div>
+  <h1>OpenAnalyst CLI</h1>
+  <p class="hero-sub">The universal AI agent <span class="hero-cycle" id="cycle">for your terminal</span></p>
+  <div class="hero-status"><span class="dot"></span><span id="status-text">Ready</span></div>
+  <div class="cta-row">
+    <a href="#install" class="btn btn-primary">Get Started</a>
+    <a href="https://github.com/AnitChaudhry/openanalyst-cli" class="btn btn-outline" target="_blank">View on GitHub</a>
+  </div>
+</div>
+
+<!-- ═══ 3. INSTALL ═══ -->
+<section id="install">
 <div class="wrap">
+  <div class="section-label">Get Started</div>
+  <div class="section-title">Install in seconds</div>
+  <div class="section-sub">One command. Native binary. No runtime dependencies.</div>
 
-  <div class="hdr">
-    <div class="oa">O A</div>
-    <div class="title">OpenAnalyst CLI</div>
-    <div class="sub">The Universal AI Agent for Your Terminal &mdash; 7 Providers, 38 Commands, Full TUI</div>
-    <div class="ver">v1.0.1</div>
+  <div class="tabs">
+    <button class="tab on" onclick="sw(event,'ins-1')">macOS / Linux</button>
+    <button class="tab" onclick="sw(event,'ins-2')">Windows</button>
+    <button class="tab" onclick="sw(event,'ins-3')">Build from Source</button>
+  </div>
+  <div id="ins-1" class="tc on">
+    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Terminal</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
+<pre class="code"><span class="c-g">curl</span> <span class="c-c">-fsSL</span> https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | <span class="c-g">bash</span></pre></div>
+  </div>
+  <div id="ins-2" class="tc">
+    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">PowerShell</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
+<pre class="code"><span class="c-g">irm</span> https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | <span class="c-g">iex</span></pre></div>
+  </div>
+  <div id="ins-3" class="tc">
+    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Terminal</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
+<pre class="code"><span class="c-g">git clone</span> https://github.com/AnitChaudhry/openanalyst-cli.git
+<span class="c-g">cd</span> openanalyst-cli/rust
+<span class="c-g">cargo</span> build --release</pre></div>
   </div>
 
-  <!-- USP Banner -->
-  <div class="card" style="border-color:rgba(14,165,233,0.4);background:linear-gradient(135deg,rgba(14,165,233,0.08),rgba(139,92,246,0.06))">
-    <h2 style="font-size:18px;margin-bottom:12px"><span class="ic cy" style="font-size:16px">&#9889;</span> Switch Models Mid-Conversation &mdash; Session Persists</h2>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">The game-changer: switch between <strong style="color:var(--text)">any LLM provider</strong> mid-conversation. Your session ID, chat history, tool results, and context carry over seamlessly. No other CLI does this.</p>
-    <div class="cb"><div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span></div>
-<pre class="cd"><span class="gn">&gt;</span> /model
-  Available models (fetching from providers...)
+  <div style="margin-top:24px">
+    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Login &mdash; Interactive Provider Picker</span></div></div>
+<pre class="code"><span class="c-g">$</span> openanalyst login
 
-  <span class="gn">●</span> <span class="cn">OpenAnalyst</span>
-    openanalyst-beta, openanalyst-pro
-  <span class="gn">●</span> <span class="cn">OpenAI</span>
-    gpt-4o, gpt-4.1, o3, o4-mini (+12 more)
-  <span class="gn">●</span> <span class="cn">xAI</span>
-    grok-3, grok-3-mini
-  <span class="cm">○ Anthropic (run: openanalyst login)</span>
+  Select your LLM provider:
 
-<span class="gn">&gt;</span> Explain this codebase                     <span class="cm"># openanalyst-beta answers</span>
+  <span class="c-g">&gt;</span> <span class="c-c">OpenAnalyst</span>          OpenAnalyst API (default)
+    Anthropic / Claude
+    OpenAI / GPT
+    Google Gemini
+    xAI / Grok
+    OpenRouter
+    Amazon Bedrock
 
-<span class="gn">&gt;</span> /model gpt-4o
-  Model updated
-  Previous         openanalyst-beta
-  Current          gpt-4o
-  Provider         OpenAI
-  Session          persisted (3 messages)    <span class="cm"># conversation carries over</span>
+  Enter your API key: <span class="c-d">sk-oa-...</span>
+  <span class="c-g">Testing connection... Connected</span>
+  Login complete</pre></div>
+  </div>
+</div>
+</section>
 
-<span class="gn">&gt;</span> Now fix the bug you found                 <span class="cm"># gpt-4o sees full history</span>
+<!-- ═══ 4. PROVIDERS ═══ -->
+<section id="providers" style="background:var(--bg2)">
+<div class="wrap">
+  <div class="section-label">Multi-Provider</div>
+  <div class="section-title">7 LLM providers. One interface.</div>
+  <div class="section-sub">Switch models mid-conversation. Session persists across providers. No other CLI does this.</div>
 
-<span class="gn">&gt;</span> /model grok
-  Provider         xAI
-  Session          persisted (5 messages)    <span class="cm"># same session ID</span>
-
-<span class="gn">&gt;</span> /model sonnet
-  Session          persisted (7 messages)    <span class="cm"># 4 providers, 1 conversation</span></pre></div>
+  <div class="pgrid">
+    <div class="pcard df"><div class="pcard-name">OpenAnalyst <span class="pcard-badge">DEFAULT</span></div><div class="pcard-env">OPENANALYST_AUTH_TOKEN</div><div class="pcard-desc">Models fetched live from API</div></div>
+    <div class="pcard"><div class="pcard-name">Anthropic / Claude</div><div class="pcard-env">ANTHROPIC_API_KEY</div><div class="pcard-desc">opus, sonnet, haiku &mdash; fetched live</div></div>
+    <div class="pcard"><div class="pcard-name">OpenAI / GPT</div><div class="pcard-env">OPENAI_API_KEY</div><div class="pcard-desc">gpt-4o, o3, codex &mdash; fetched live</div></div>
+    <div class="pcard"><div class="pcard-name">Google Gemini</div><div class="pcard-env">GEMINI_API_KEY</div><div class="pcard-desc">gemini-2.5-pro, flash &mdash; fetched live</div></div>
+    <div class="pcard"><div class="pcard-name">xAI / Grok</div><div class="pcard-env">XAI_API_KEY</div><div class="pcard-desc">grok-3, grok-mini &mdash; fetched live</div></div>
+    <div class="pcard"><div class="pcard-name">OpenRouter</div><div class="pcard-env">OPENROUTER_API_KEY</div><div class="pcard-desc">350+ models via one key</div></div>
+    <div class="pcard"><div class="pcard-name">Amazon Bedrock</div><div class="pcard-env">BEDROCK_API_KEY</div><div class="pcard-desc">Fetched live from gateway</div></div>
   </div>
 
-  <!-- 1. Install -->
-  <div class="card">
-    <div class="num">01</div>
-    <h2><span class="ic bl">&#8595;</span> Install</h2>
-    <div class="tabs">
-      <button class="tab on" onclick="sw(event,'i1')">macOS / Linux</button>
-      <button class="tab" onclick="sw(event,'i2')">Windows</button>
-    </div>
-    <div id="i1" class="tc on">
-      <div class="cb"><div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span><button class="cp" onclick="cc(this)">Copy</button></div>
-<pre class="cd"><span class="gn">curl</span> <span class="cn">-fsSL</span> https://install.openanalyst.com | <span class="gn">bash</span></pre></div>
-    </div>
-    <div id="i2" class="tc">
-      <div class="cb"><div class="ch"><span class="cl">PowerShell</span><button class="cp" onclick="cc(this)">Copy</button></div>
-<pre class="cd"><span class="gn">irm</span> https://install.openanalyst.com/win | <span class="gn">iex</span></pre></div>
-    </div>
+  <div style="margin-top:24px">
+    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Mid-Conversation Provider Switching</span></div></div>
+<pre class="code"><span class="c-g">&gt;</span> Explain this codebase                     <span class="c-d"># openanalyst-beta answers</span>
+
+<span class="c-g">&gt;</span> /model gpt-4o
+  <span class="c-c">Model updated &middot; Provider: OpenAI</span>
+  <span class="c-d">Session persisted (3 messages)</span>              <span class="c-d"># conversation carries over</span>
+
+<span class="c-g">&gt;</span> Now fix the bug you found                 <span class="c-d"># gpt-4o sees full history</span>
+
+<span class="c-g">&gt;</span> /model gemini-2.5-pro
+  <span class="c-c">Model updated &middot; Provider: Google Gemini</span>
+  <span class="c-d">Session persisted (5 messages)</span>              <span class="c-d"># 3 providers, 1 conversation</span></pre></div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ 5. FEATURES — ACCORDION ═══ -->
+<section id="features">
+<div class="wrap">
+  <div class="section-label">Capabilities</div>
+  <div class="section-title">What you can do</div>
+  <div class="section-sub">Everything you need for AI-powered software engineering, in one tool.</div>
+
+  <div class="acc open" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:var(--glow);color:var(--accent)">&#9889;</div><div class="acc-title">Switch Models Mid-Conversation</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Switch between any LLM provider mid-conversation. Your session ID, chat history, tool results, and context persist across provider boundaries. Start with Claude, continue with GPT-4o, finish with Gemini &mdash; all in one session.</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(139,92,246,0.15);color:var(--purple)">&#9608;</div><div class="acc-title">Full Terminal UI (Ratatui TUI)</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Default mode is a full Ratatui-based TUI with scrollable chat, inline tool call cards, animated status bar, vim-mode input (via edtui), permission dialogs as modal overlays, and mouse/keyboard navigation. Not just a readline prompt.</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(34,197,94,0.15);color:var(--green)">&#9881;</div><div class="acc-title">Multi-Agent Orchestrator</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Spawn parallel sub-agents for complex tasks. Each agent has its own conversation runtime, tool permissions, and lifecycle. The orchestrator bridges sync execution to the async TUI via channels. Watch agents work in real-time.</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(244,114,182,0.15);color:var(--pink)">&#9998;</div><div class="acc-title">38 Slash Commands</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Session management, git integration, AI planning, multimedia generation, web scraping, code analysis, plugin management, and more. Every command works with every provider. Type <code style="color:var(--cyan)">/help</code> to see them all.</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(249,115,22,0.15);color:var(--orange)">&#9836;</div><div class="acc-title">Multimedia AI</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content"><strong>/image</strong> &mdash; Generate images (Gemini Imagen, DALL-E, Stability AI)<br><strong>/voice</strong> &mdash; Transcribe audio (Whisper, Gemini)<br><strong>/speak</strong> &mdash; Text-to-speech (OpenAI TTS)<br><strong>/vision</strong> &mdash; Analyze images (Gemini, GPT-4o, Claude)<br><strong>/diagram</strong> &mdash; Generate Mermaid diagrams</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(34,211,238,0.15);color:var(--cyan)">&#9095;</div><div class="acc-title">Git Integration</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Commit, branch, PR, issue creation, diff review &mdash; all from slash commands. <code style="color:var(--cyan)">/commit</code> generates a message and commits. <code style="color:var(--cyan)">/pr</code> drafts a pull request. <code style="color:var(--cyan)">/diff-review</code> gets AI-powered code review of your changes.</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(234,179,8,0.15);color:var(--yellow)">&#9733;</div><div class="acc-title">19 Built-in Tools + Plugin System</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Bash, file read/write/edit, glob/grep search, web search/fetch, sub-agents, notebooks, REPL, PowerShell, and more. Plus a full plugin system &mdash; install custom tools from local paths or git repos with <code style="color:var(--cyan)">/plugin install</code>.</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(14,165,233,0.15);color:var(--accent)">&#9881;</div><div class="acc-title">Cross-Platform Native Binary</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Single Rust binary. No Node.js, no Python, no Docker. Native on macOS (Intel + Apple Silicon), Linux (x64 + ARM), and Windows. Fast startup, low memory.</div></div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ 6. COMMAND REFERENCE — TABBED ═══ -->
+<section id="commands" style="background:var(--bg2)">
+<div class="wrap">
+  <div class="section-label">Reference</div>
+  <div class="section-title">38 slash commands</div>
+  <div class="section-sub">All commands work identically regardless of which LLM provider you use.</div>
+
+  <div class="tabs">
+    <button class="tab on" onclick="sw(event,'cmd-1')">Session</button>
+    <button class="tab" onclick="sw(event,'cmd-2')">Git</button>
+    <button class="tab" onclick="sw(event,'cmd-3')">Multimedia</button>
+    <button class="tab" onclick="sw(event,'cmd-4')">Analysis</button>
+    <button class="tab" onclick="sw(event,'cmd-5')">Config</button>
   </div>
 
-  <!-- 2. Configure -->
-  <div class="card">
-    <div class="num">02</div>
-    <h2><span class="ic gn">&#9881;</span> Configure</h2>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">Set your API key. The CLI auto-detects the provider from your model or key.</p>
-    <div class="tabs">
-      <button class="tab on" onclick="sw(event,'c1')">macOS / Linux</button>
-      <button class="tab" onclick="sw(event,'c2')">Windows</button>
-    </div>
-    <div id="c1" class="tc on">
-      <div class="cb"><div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; ~/.zshrc</span><button class="cp" onclick="cc(this)">Copy</button></div>
-<pre class="cd"><span class="cm"># Set one or more provider keys</span>
-<span class="kw">export</span> <span class="vr">OPENANALYST_AUTH_TOKEN</span>=<span class="st">"your-key"</span>      <span class="cm"># OpenAnalyst</span>
-<span class="kw">export</span> <span class="vr">ANTHROPIC_API_KEY</span>=<span class="st">"sk-ant-..."</span>        <span class="cm"># Claude</span>
-<span class="kw">export</span> <span class="vr">OPENAI_API_KEY</span>=<span class="st">"sk-..."</span>              <span class="cm"># GPT / Codex</span>
-<span class="kw">export</span> <span class="vr">OPENROUTER_API_KEY</span>=<span class="st">"sk-or-..."</span>       <span class="cm"># OpenRouter</span>
-<span class="kw">export</span> <span class="vr">XAI_API_KEY</span>=<span class="st">"xai-..."</span>               <span class="cm"># Grok</span>
-<span class="kw">export</span> <span class="vr">GEMINI_API_KEY</span>=<span class="st">"AIza..."</span>             <span class="cm"># Gemini</span>
-<span class="kw">export</span> <span class="vr">BEDROCK_API_KEY</span>=<span class="st">"..."</span>               <span class="cm"># Bedrock</span></pre></div>
-    </div>
-    <div id="c2" class="tc">
-      <div class="cb"><div class="ch"><span class="cl">PowerShell</span><button class="cp" onclick="cc(this)">Copy</button></div>
-<pre class="cd"><span class="vr">$env:OPENANALYST_AUTH_TOKEN</span> = <span class="st">"your-key"</span>      <span class="cm"># OpenAnalyst</span>
-<span class="vr">$env:ANTHROPIC_API_KEY</span> = <span class="st">"sk-ant-..."</span>        <span class="cm"># Claude</span>
-<span class="vr">$env:OPENAI_API_KEY</span> = <span class="st">"sk-..."</span>              <span class="cm"># GPT / Codex</span>
-<span class="vr">$env:OPENROUTER_API_KEY</span> = <span class="st">"sk-or-..."</span>       <span class="cm"># OpenRouter</span></pre></div>
-    </div>
-  </div>
-
-  <!-- 3. Use -->
-  <div class="card">
-    <div class="num">03</div>
-    <h2><span class="ic or">&#9654;</span> Start Using</h2>
-    <div class="cb"><div class="ch"><span class="cl"><span class="dt d1"></span><span class="dt d2"></span><span class="dt d3"></span>&nbsp; Terminal</span></div>
-<pre class="cd"><span class="gn">$</span> openanalyst
-<span class="cm"># Connected &middot; Model: openanalyst-beta</span>
-
-<span class="gn">$</span> openanalyst <span class="st">"explain this codebase"</span>
-<span class="cm"># One-shot prompt</span>
-
-<span class="gn">$</span> openanalyst <span class="cn">--model</span> gpt-4o <span class="st">"summarize this repo"</span>
-<span class="cm"># Use OpenAI</span>
-
-<span class="gn">$</span> openanalyst <span class="cn">--model</span> sonnet <span class="st">"fix the bug in main.rs"</span>
-<span class="cm"># Use Claude</span>
-
-<span class="gn">$</span> openanalyst init
-<span class="cm"># Create project config (OPENANALYST.md)</span></pre></div>
-  </div>
-
-  <!-- 4. Providers -->
-  <div class="card">
-    <div class="num">04</div>
-    <h2><span class="ic pu">&#9733;</span> Supported Providers</h2>
-    <div class="pg">
-      <div class="pc df"><div class="pn">OpenAnalyst <span class="bd">DEFAULT</span></div><div class="pe">OPENANALYST_AUTH_TOKEN</div><div class="pm">Models fetched live from API &mdash; run <code style="color:var(--cyan)">/model</code> to see available</div></div>
-      <div class="pc"><div class="pn">Anthropic / Claude</div><div class="pe">ANTHROPIC_API_KEY</div><div class="pm">Models fetched live &mdash; opus, sonnet, haiku, and more</div></div>
-      <div class="pc"><div class="pn">OpenAI / GPT</div><div class="pe">OPENAI_API_KEY</div><div class="pm">Models fetched live &mdash; gpt-4o, o3, codex, and more</div></div>
-      <div class="pc"><div class="pn">xAI / Grok</div><div class="pe">XAI_API_KEY</div><div class="pm">Models fetched live &mdash; grok-3, grok-mini, and more</div></div>
-      <div class="pc"><div class="pn">OpenRouter</div><div class="pe">OPENROUTER_API_KEY</div><div class="pm">350+ models fetched live &mdash; any provider via one key</div></div>
-      <div class="pc"><div class="pn">Google Gemini</div><div class="pe">GEMINI_API_KEY</div><div class="pm">Models fetched live &mdash; gemini-2.5-pro, gemini-2.5-flash, and more</div></div>
-      <div class="pc"><div class="pn">Amazon Bedrock</div><div class="pe">BEDROCK_API_KEY</div><div class="pm">Models fetched live from your Bedrock gateway</div></div>
-    </div>
-  </div>
-
-  <!-- 5. Commands Reference -->
-  <div class="card">
-    <div class="num">05</div>
-    <h2><span class="ic cy">&#9000;</span> Command Reference</h2>
-    <div class="note"><strong>All commands work identically</strong> regardless of which LLM provider you use &mdash; OpenAnalyst, Claude, OpenAI, Grok, or OpenRouter. Same skills, same tools, same slash commands.</div>
-
-    <h3 style="font-size:15px;font-weight:600;margin:20px 0 8px;color:var(--text)">CLI Commands</h3>
+  <div id="cmd-1" class="tc on" style="background:var(--card);border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;padding:20px">
     <table class="cmd-table">
       <tr><th>Command</th><th>Description</th></tr>
-      <tr><td>openanalyst</td><td>Start interactive REPL session</td></tr>
-      <tr><td>openanalyst "prompt"</td><td>One-shot prompt, then exit</td></tr>
-      <tr><td>openanalyst prompt "text"</td><td>Explicit prompt mode (supports --output-format json)</td></tr>
-      <tr><td>openanalyst --model MODEL</td><td>Use a specific model (auto-detects provider)</td></tr>
-      <tr><td>openanalyst --resume FILE</td><td>Resume a saved session</td></tr>
-      <tr><td>openanalyst init</td><td>Create OPENANALYST.md and project config</td></tr>
-      <tr><td>openanalyst login</td><td>Interactive provider picker &mdash; select provider, enter API key, test connection, save credentials</td></tr>
-      <tr><td>openanalyst logout</td><td>Clear all saved provider credentials</td></tr>
-      <tr><td>openanalyst agents</td><td>List configured agents</td></tr>
-      <tr><td>openanalyst skills</td><td>List available skills</td></tr>
-      <tr><td>openanalyst --version</td><td>Print version info</td></tr>
-    </table>
-
-    <h3 style="font-size:15px;font-weight:600;margin:24px 0 8px;color:var(--text)">Interactive Slash Commands</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">All commands work in both TUI mode and legacy REPL mode.</p>
-
-    <table class="cmd-table">
-      <tr><td colspan="2" class="cmd-cat">Session</td></tr>
       <tr><td>/help</td><td>Show all available commands</td></tr>
-      <tr><td>/status</td><td>Model, permissions, tokens, cost, git branch, session info</td></tr>
-      <tr><td>/cost</td><td>Show cumulative token usage and cost breakdown</td></tr>
-      <tr><td>/model [name]</td><td>Show live models from all configured providers, or switch mid-session (e.g. <code style="color:var(--cyan)">/model gpt-4o</code>). Session persists across provider switches.</td></tr>
-      <tr><td>/clear [--confirm]</td><td>Start a fresh session</td></tr>
-      <tr><td>/compact</td><td>Compact conversation history to save context</td></tr>
-      <tr><td>/session [list|switch]</td><td>List or switch between saved sessions</td></tr>
-      <tr><td>/export [file]</td><td>Export conversation transcript to a file</td></tr>
-      <tr><td>/resume &lt;path&gt;</td><td>Load a saved session into the REPL</td></tr>
+      <tr><td>/status</td><td>Model, permissions, tokens, cost, session info</td></tr>
+      <tr><td>/cost</td><td>Cumulative token usage and cost breakdown</td></tr>
+      <tr><td>/model [name]</td><td>Show live models or switch mid-session</td></tr>
+      <tr><td>/clear</td><td>Start a fresh session</td></tr>
+      <tr><td>/compact</td><td>Compact conversation to save context</td></tr>
+      <tr><td>/session [list|switch]</td><td>List or switch saved sessions</td></tr>
+      <tr><td>/export [file]</td><td>Export conversation transcript</td></tr>
+      <tr><td>/version</td><td>Show CLI version and build info</td></tr>
+      <tr><td>/resume &lt;path&gt;</td><td>Load a saved session</td></tr>
+    </table>
+  </div>
 
-      <tr><td colspan="2" class="cmd-cat">Code &amp; Git</td></tr>
+  <div id="cmd-2" class="tc" style="background:var(--card);border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;padding:20px">
+    <table class="cmd-table">
+      <tr><th>Command</th><th>Description</th></tr>
       <tr><td>/diff</td><td>Show git diff of workspace changes</td></tr>
-      <tr><td>/commit</td><td>Generate commit message and create a git commit</td></tr>
-      <tr><td>/commit-push-pr [ctx]</td><td>Commit, push branch, and open a pull request</td></tr>
-      <tr><td>/pr [context]</td><td>Draft or create a GitHub pull request</td></tr>
+      <tr><td>/commit</td><td>Generate commit message and commit</td></tr>
+      <tr><td>/commit-push-pr [ctx]</td><td>Commit, push, and open a PR</td></tr>
+      <tr><td>/pr [context]</td><td>Draft or create a pull request</td></tr>
       <tr><td>/issue [context]</td><td>Draft or create a GitHub issue</td></tr>
       <tr><td>/branch [list|create|switch]</td><td>Manage git branches</td></tr>
       <tr><td>/worktree [list|add|remove]</td><td>Manage git worktrees</td></tr>
-      <tr><td>/teleport &lt;symbol&gt;</td><td>Jump to a file or symbol in the workspace</td></tr>
+      <tr><td>/teleport &lt;symbol&gt;</td><td>Jump to a file or symbol</td></tr>
+      <tr><td>/diff-review [file] <span class="tag tag-n">NEW</span></td><td>AI-powered review of git diff</td></tr>
+    </table>
+  </div>
 
-      <tr><td colspan="2" class="cmd-cat">Analysis &amp; Planning</td></tr>
+  <div id="cmd-3" class="tc" style="background:var(--card);border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;padding:20px">
+    <table class="cmd-table">
+      <tr><th>Command</th><th>Description</th></tr>
+      <tr><td>/image &lt;prompt&gt; <span class="tag tag-n">NEW</span></td><td>Generate image (Gemini Imagen / DALL-E / Stability)</td></tr>
+      <tr><td>/voice &lt;file&gt; <span class="tag tag-n">NEW</span></td><td>Transcribe audio/video (Whisper / Gemini)</td></tr>
+      <tr><td>/speak &lt;text&gt; <span class="tag tag-n">NEW</span></td><td>Text-to-speech audio (OpenAI TTS)</td></tr>
+      <tr><td>/vision &lt;image&gt; [prompt] <span class="tag tag-n">NEW</span></td><td>Analyze image (Gemini / GPT-4o / Claude)</td></tr>
+      <tr><td>/diagram &lt;desc&gt; <span class="tag tag-n">NEW</span></td><td>Generate Mermaid diagram</td></tr>
+      <tr><td>/translate &lt;lang&gt; &lt;text&gt; <span class="tag tag-n">NEW</span></td><td>Translate text to any language</td></tr>
+      <tr><td>/tokens [text] <span class="tag tag-n">NEW</span></td><td>Estimate token count</td></tr>
+      <tr><td>/scrape &lt;url&gt; [selector] <span class="tag tag-n">NEW</span></td><td>Fetch URL and extract text</td></tr>
+      <tr><td>/json &lt;url&gt; <span class="tag tag-n">NEW</span></td><td>Fetch JSON API and pretty-print</td></tr>
+    </table>
+  </div>
+
+  <div id="cmd-4" class="tc" style="background:var(--card);border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;padding:20px">
+    <table class="cmd-table">
+      <tr><th>Command</th><th>Description</th></tr>
       <tr><td>/bughunter [scope]</td><td>Scan codebase for likely bugs</td></tr>
       <tr><td>/ultraplan [task]</td><td>Deep multi-step planning with reasoning</td></tr>
       <tr><td>/debug-tool-call</td><td>Replay last tool call with debug output</td></tr>
+    </table>
+  </div>
 
-      <tr><td colspan="2" class="cmd-cat">Config &amp; Memory</td></tr>
+  <div id="cmd-5" class="tc" style="background:var(--card);border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;padding:20px">
+    <table class="cmd-table">
+      <tr><th>Command</th><th>Description</th></tr>
       <tr><td>/config [section]</td><td>Inspect config (env, hooks, model, plugins)</td></tr>
-      <tr><td>/memory</td><td>Show loaded OPENANALYST.md instruction files</td></tr>
-      <tr><td>/init</td><td>Create starter OPENANALYST.md for this repo</td></tr>
+      <tr><td>/memory</td><td>Show loaded OPENANALYST.md files</td></tr>
+      <tr><td>/init</td><td>Create starter OPENANALYST.md</td></tr>
       <tr><td>/permissions [mode]</td><td>Show or switch permission mode</td></tr>
-      <tr><td>/version</td><td>Show CLI version and build info</td></tr>
-
-      <tr><td colspan="2" class="cmd-cat">Multimedia &amp; AI</td></tr>
-      <tr><td>/image &lt;prompt&gt; <span class="tag tag-n">new</span></td><td>Generate an image from text (Gemini Imagen / DALL-E / Stability)</td></tr>
-      <tr><td>/voice &lt;file&gt; <span class="tag tag-n">new</span></td><td>Transcribe audio/video to text (Whisper / Gemini)</td></tr>
-      <tr><td>/speak &lt;text&gt; <span class="tag tag-n">new</span></td><td>Convert text to speech audio (OpenAI TTS)</td></tr>
-      <tr><td>/vision &lt;image&gt; [prompt] <span class="tag tag-n">new</span></td><td>Analyze or describe an image (Gemini / GPT-4o / Claude)</td></tr>
-      <tr><td>/diagram &lt;desc&gt; <span class="tag tag-n">new</span></td><td>Generate a Mermaid diagram from description</td></tr>
-      <tr><td>/translate &lt;lang&gt; &lt;text&gt; <span class="tag tag-n">new</span></td><td>Translate text to any language</td></tr>
-      <tr><td>/tokens [text] <span class="tag tag-n">new</span></td><td>Estimate token count for text or a file</td></tr>
-
-      <tr><td colspan="2" class="cmd-cat">Web</td></tr>
-      <tr><td>/scrape &lt;url&gt; [selector] <span class="tag tag-n">new</span></td><td>Fetch a URL and extract text content</td></tr>
-      <tr><td>/json &lt;url&gt; <span class="tag tag-n">new</span></td><td>Fetch JSON API endpoint and pretty-print</td></tr>
-      <tr><td>/diff-review [file] <span class="tag tag-n">new</span></td><td>AI-powered review of current git diff</td></tr>
-
-      <tr><td colspan="2" class="cmd-cat">Extensions</td></tr>
       <tr><td>/agents</td><td>List configured agents</td></tr>
       <tr><td>/skills</td><td>List available skills</td></tr>
       <tr><td>/plugin [list|install|enable|disable]</td><td>Manage plugins</td></tr>
     </table>
   </div>
+</div>
+</section>
 
-  <!-- 6. Built-in Tools -->
-  <div class="card">
-    <div class="num">06</div>
-    <h2><span class="ic pk">&#9879;</span> Built-in Tools</h2>
-    <p style="color:var(--muted);font-size:14px;margin-bottom:16px">The AI agent uses these tools automatically during conversations &mdash; works with every supported provider.</p>
-    <div class="fg">
-      <div class="fc"><div class="fn">Bash</div><div class="fd">Execute shell commands, run scripts, install packages</div></div>
-      <div class="fc"><div class="fn">ReadFile</div><div class="fd">Read any file with line numbers, offsets, and limits</div></div>
-      <div class="fc"><div class="fn">WriteFile</div><div class="fd">Create new files with content</div></div>
-      <div class="fc"><div class="fn">EditFile</div><div class="fd">Precise string replacements in existing files</div></div>
-      <div class="fc"><div class="fn">GlobSearch</div><div class="fd">Find files by pattern (e.g. **/*.ts)</div></div>
-      <div class="fc"><div class="fn">GrepSearch</div><div class="fd">Search file contents with regex</div></div>
-      <div class="fc"><div class="fn">WebSearch</div><div class="fd">Search the web for documentation and answers</div></div>
-      <div class="fc"><div class="fn">WebFetch</div><div class="fd">Fetch content from URLs</div></div>
-      <div class="fc"><div class="fn">Agent</div><div class="fd">Launch sub-agents for parallel tasks</div></div>
-      <div class="fc"><div class="fn">TodoWrite</div><div class="fd">Track tasks and progress within a session</div></div>
-      <div class="fc"><div class="fn">NotebookEdit</div><div class="fd">Edit Jupyter notebook cells</div></div>
-      <div class="fc"><div class="fn">Skill</div><div class="fd">Invoke registered skills and workflows</div></div>
-      <div class="fc"><div class="fn">ToolSearch</div><div class="fd">Search for deferred and specialized tools</div></div>
-      <div class="fc"><div class="fn">REPL</div><div class="fd">Execute code in subprocess (Python, Node, etc.)</div></div>
-      <div class="fc"><div class="fn">PowerShell</div><div class="fd">Execute PowerShell commands on Windows</div></div>
-      <div class="fc"><div class="fn">Config</div><div class="fd">Get/set OpenAnalyst settings programmatically</div></div>
-      <div class="fc"><div class="fn">Sleep</div><div class="fd">Wait for a duration between operations</div></div>
-      <div class="fc"><div class="fn">StructuredOutput</div><div class="fd">Return structured JSON responses</div></div>
-      <div class="fc"><div class="fn">SendUserMessage</div><div class="fd">Send messages to the user during execution</div></div>
+<!-- ═══ 7. BUILT-IN TOOLS ═══ -->
+<section id="tools">
+<div class="wrap">
+  <div class="section-label">Tools</div>
+  <div class="section-title">19 built-in tools</div>
+  <div class="section-sub">The AI agent uses these automatically during conversations. Works with every provider.</div>
+
+  <div class="tgrid">
+    <div class="tcard"><div class="tcard-name">Bash</div><div class="tcard-desc">Execute shell commands and scripts</div></div>
+    <div class="tcard"><div class="tcard-name">ReadFile</div><div class="tcard-desc">Read files with line numbers and offsets</div></div>
+    <div class="tcard"><div class="tcard-name">WriteFile</div><div class="tcard-desc">Create new files with content</div></div>
+    <div class="tcard"><div class="tcard-name">EditFile</div><div class="tcard-desc">Precise string replacements</div></div>
+    <div class="tcard"><div class="tcard-name">GlobSearch</div><div class="tcard-desc">Find files by pattern</div></div>
+    <div class="tcard"><div class="tcard-name">GrepSearch</div><div class="tcard-desc">Search file contents with regex</div></div>
+    <div class="tcard"><div class="tcard-name">WebSearch</div><div class="tcard-desc">Search the web for answers</div></div>
+    <div class="tcard"><div class="tcard-name">WebFetch</div><div class="tcard-desc">Fetch content from URLs</div></div>
+    <div class="tcard"><div class="tcard-name">Agent</div><div class="tcard-desc">Spawn sub-agents for parallel tasks</div></div>
+    <div class="tcard"><div class="tcard-name">TodoWrite</div><div class="tcard-desc">Track tasks within a session</div></div>
+    <div class="tcard"><div class="tcard-name">NotebookEdit</div><div class="tcard-desc">Edit Jupyter notebook cells</div></div>
+    <div class="tcard"><div class="tcard-name">Skill</div><div class="tcard-desc">Invoke registered skills</div></div>
+    <div class="tcard"><div class="tcard-name">ToolSearch</div><div class="tcard-desc">Search for specialized tools</div></div>
+    <div class="tcard"><div class="tcard-name">REPL</div><div class="tcard-desc">Execute code in subprocess</div></div>
+    <div class="tcard"><div class="tcard-name">PowerShell</div><div class="tcard-desc">Execute PowerShell on Windows</div></div>
+    <div class="tcard"><div class="tcard-name">Config</div><div class="tcard-desc">Get/set settings programmatically</div></div>
+    <div class="tcard"><div class="tcard-name">Sleep</div><div class="tcard-desc">Wait between operations</div></div>
+    <div class="tcard"><div class="tcard-name">StructuredOutput</div><div class="tcard-desc">Return structured JSON</div></div>
+    <div class="tcard"><div class="tcard-name">SendMessage</div><div class="tcard-desc">Send messages during execution</div></div>
+  </div>
+</div>
+</section>
+
+<!-- ═══ 8. ARCHITECTURE ═══ -->
+<section id="architecture" style="background:var(--bg2)">
+<div class="wrap">
+  <div class="section-label">Architecture</div>
+  <div class="section-title">14-crate Rust workspace</div>
+  <div class="section-sub">Modular, testable, zero-dependency binary. Built with ecosystem crates, not reinvented.</div>
+
+  <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">rust/crates/</span></div></div>
+<pre class="code"><span class="c-c">api/</span>                 <span class="c-d"># Multi-provider API client (7 providers)</span>
+<span class="c-c">commands/</span>            <span class="c-d"># 38 slash commands</span>
+<span class="c-c">events/</span>              <span class="c-d"># Shared TUI &harr; backend event types</span>
+<span class="c-c">orchestrator/</span>        <span class="c-d"># Multi-agent lifecycle + channel bridge</span>
+<span class="c-c">tui/</span>                 <span class="c-d"># Ratatui full-screen TUI application</span>
+<span class="c-c">tui-widgets/</span>         <span class="c-d"># Markdown, tool cards, input, spinner</span>
+<span class="c-c">runtime/</span>             <span class="c-d"># Conversation engine, session, MCP</span>
+<span class="c-c">tools/</span>               <span class="c-d"># 19 built-in tool implementations</span>
+<span class="c-c">plugins/</span>             <span class="c-d"># Plugin system (install, enable, hooks)</span>
+<span class="c-c">openanalyst-cli/</span>     <span class="c-d"># Binary entry point</span>
+<span class="c-c">openanalyst-agent/</span>   <span class="c-d"># Headless autonomous agent runner</span>
+<span class="c-c">server/</span>              <span class="c-d"># HTTP/SSE server (axum)</span>
+<span class="c-c">lsp/</span>                 <span class="c-d"># Language Server Protocol integration</span>
+<span class="c-c">compat-harness/</span>      <span class="c-d"># Upstream manifest extraction</span></pre></div>
+
+  <div style="margin-top:20px;display:grid;grid-template-columns:1fr 1fr;gap:12px">
+    <div class="card" style="padding:20px">
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--accent)">Ecosystem Crates</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.8">
+        <strong style="color:var(--text)">tui-markdown</strong> &mdash; Markdown rendering<br>
+        <strong style="color:var(--text)">edtui</strong> &mdash; Vim-mode editor<br>
+        <strong style="color:var(--text)">tui-tree-widget</strong> &mdash; File tree<br>
+        <strong style="color:var(--text)">throbber-widgets-tui</strong> &mdash; Spinner<br>
+        <strong style="color:var(--text)">syntect-tui</strong> &mdash; Syntax highlighting
+      </div>
+    </div>
+    <div class="card" style="padding:20px">
+      <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--green)">Key Metrics</div>
+      <div style="font-size:13px;color:var(--muted);line-height:1.8">
+        <strong style="color:var(--text)">14</strong> crates in workspace<br>
+        <strong style="color:var(--text)">7</strong> LLM providers<br>
+        <strong style="color:var(--text)">38</strong> slash commands<br>
+        <strong style="color:var(--text)">19</strong> built-in tools<br>
+        <strong style="color:var(--text)">MIT</strong> license
+      </div>
     </div>
   </div>
+</div>
+</section>
 
-  <!-- 7. Features -->
-  <div class="card">
-    <div class="num">07</div>
-    <h2><span class="ic gn">&#10003;</span> Features</h2>
-    <div class="fg">
-      <div class="fc"><div class="fn">Cross-Provider /model Switch</div><div class="fd">Switch from OpenAnalyst to GPT to Grok to Claude mid-conversation. Session ID, history, and context persist across providers.</div></div>
-      <div class="fc"><div class="fn">Live Model Discovery</div><div class="fd">/model fetches available models from each provider's API in real-time. No hardcoded lists.</div></div>
-      <div class="fc"><div class="fn">Multi-Provider Login</div><div class="fd">Run openanalyst login multiple times to add keys for different providers. All keys loaded on startup.</div></div>
-      <div class="fc"><div class="fn">OPENANALYST.md</div><div class="fd">Project-specific AI instructions. Detected automatically in directory tree.</div></div>
-      <div class="fc"><div class="fn">Session Persistence</div><div class="fd">Save, resume, list, and export conversation sessions.</div></div>
-      <div class="fc"><div class="fn">Streaming Output</div><div class="fd">Real-time streaming with syntax-highlighted Markdown rendering.</div></div>
-      <div class="fc"><div class="fn">Permission System</div><div class="fd">read-only, workspace-write, or danger-full-access modes.</div></div>
-      <div class="fc"><div class="fn">Git Integration</div><div class="fd">Commit, branch, PR, issue creation &mdash; all from slash commands.</div></div>
-      <div class="fc"><div class="fn">Config Hierarchy</div><div class="fd">.openanalyst.json &rarr; .openanalyst/settings.json &rarr; settings.local.json</div></div>
-      <div class="fc"><div class="fn">Plugin System</div><div class="fd">Install, enable, and manage custom tool plugins.</div></div>
-      <div class="fc"><div class="fn">Cost Tracking</div><div class="fd">Per-turn and cumulative token usage and cost display.</div></div>
-      <div class="fc"><div class="fn">Cross-Platform</div><div class="fd">Native binaries for macOS, Linux, and Windows.</div></div>
-      <div class="fc"><div class="fn">Full Ratatui TUI</div><div class="fd">Scrollable chat, inline tool cards, status bar, vim-mode input, permission dialogs. Default mode.</div></div>
-      <div class="fc"><div class="fn">Multi-Agent Orchestrator</div><div class="fd">Spawn parallel sub-agents with independent tool permissions and real-time status tracking.</div></div>
-      <div class="fc"><div class="fn">Multimedia Commands</div><div class="fd">Generate images, transcribe audio, text-to-speech, image analysis, Mermaid diagrams.</div></div>
-      <div class="fc"><div class="fn">7 LLM Providers</div><div class="fd">OpenAnalyst, Anthropic, OpenAI, Google Gemini, xAI, OpenRouter, Amazon Bedrock.</div></div>
-    </div>
-  </div>
+<!-- ═══ 9. CONFIGURATION ═══ -->
+<section>
+<div class="wrap">
+  <div class="section-label">Config</div>
+  <div class="section-title">Project configuration</div>
+  <table class="cfg-table" style="margin-top:20px">
+    <tr><td>OPENANALYST.md</td><td>Project-specific AI instructions (auto-detected in parent dirs)</td></tr>
+    <tr><td>.openanalyst.json</td><td>Shared project defaults (permissions, model, tools)</td></tr>
+    <tr><td>.openanalyst/settings.json</td><td>Project-level settings</td></tr>
+    <tr><td>.openanalyst/settings.local.json</td><td>Machine-local overrides (gitignored)</td></tr>
+    <tr><td>~/.openanalyst/credentials.json</td><td>Saved provider API keys</td></tr>
+    <tr><td>.openanalyst/sessions/</td><td>Saved conversation sessions</td></tr>
+    <tr><td>.openanalyst/skills/</td><td>Custom skill definitions</td></tr>
+    <tr><td>.openanalyst/commands/</td><td>Custom slash commands</td></tr>
+  </table>
+</div>
+</section>
 
-  <!-- 8. Project Config -->
-  <div class="card">
-    <div class="num">08</div>
-    <h2><span class="ic bl">&#128193;</span> Project Config Files</h2>
-    <table class="cmd-table">
-      <tr><th>File</th><th>Purpose</th></tr>
-      <tr><td>OPENANALYST.md</td><td>Project instructions for the AI (auto-detected in parent dirs)</td></tr>
-      <tr><td>.openanalyst.json</td><td>Shared project defaults (permissions, model, tools)</td></tr>
-      <tr><td>.openanalyst/settings.json</td><td>Project-level settings</td></tr>
-      <tr><td>.openanalyst/settings.local.json</td><td>Machine-local overrides (gitignored)</td></tr>
-      <tr><td>.openanalyst/sessions/</td><td>Saved conversation sessions</td></tr>
-      <tr><td>.openanalyst/skills/</td><td>Custom skill definitions</td></tr>
-      <tr><td>.openanalyst/agents/</td><td>Custom agent configurations</td></tr>
-      <tr><td>.openanalyst/commands/</td><td>Custom slash commands</td></tr>
-    </table>
-  </div>
+<!-- ═══ 10. CREDITS ═══ -->
+<section id="credits" style="background:var(--bg2)">
+<div class="wrap">
+  <div class="section-label">Legal</div>
+  <div class="section-title">Credits &amp; Trademarks</div>
 
-  <!-- Credits -->
-  <div class="card" style="border-color:rgba(255,255,255,0.1)">
-    <h2 style="font-size:16px"><span class="ic gn">&#9733;</span> Credits &amp; Trademarks</h2>
-    <p style="color:var(--muted);font-size:13px;line-height:1.8">
-      <strong style="color:var(--text)">OpenAnalyst CLI</strong> is an independent, open-source product by OpenAnalyst Inc.<br>
+  <div class="credits">
+    <p style="font-size:14px;color:var(--text);font-weight:600;margin-bottom:12px">OpenAnalyst CLI is an independent, open-source product by OpenAnalyst Inc.</p>
+    <p style="font-size:13px;color:var(--muted);line-height:1.9">
       All provider trademarks belong to their respective owners:<br>
       <strong style="color:var(--dim)">Claude</strong> &mdash; Anthropic, PBC &middot;
       <strong style="color:var(--dim)">GPT, DALL-E, Whisper, Codex</strong> &mdash; OpenAI, Inc &middot;
@@ -346,17 +453,41 @@
       <strong style="color:var(--dim)">Bedrock</strong> &mdash; Amazon Web Services, Inc &middot;
       <strong style="color:var(--dim)">OpenRouter</strong> &mdash; OpenRouter, Inc
     </p>
+    <p style="font-size:13px;color:var(--muted);margin-top:12px;line-height:1.9">
+      Use of these providers' APIs is subject to each provider's Terms of Service. OpenAnalyst CLI facilitates access to these APIs &mdash; it does not claim ownership of any provider's services, models, or intellectual property. Licensed under MIT.
+    </p>
   </div>
-
-  <div class="ft">
-    <p><strong style="color:var(--text)">OpenAnalyst CLI v1.0.1</strong> &middot; An independent, open-source AI agent for the terminal</p>
-    <p style="margin-top:4px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a></p>
-  </div>
-
 </div>
+</section>
+
+<!-- ═══ 11. FOOTER ═══ -->
+<div class="footer" style="padding:40px 24px">
+  <p><strong>OpenAnalyst CLI v1.0.1</strong></p>
+  <p style="margin-top:6px">An independent, open-source AI agent for the terminal</p>
+  <p style="margin-top:12px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a> &middot; <a href="https://github.com/AnitChaudhry/openanalyst-cli" target="_blank">GitHub</a></p>
+</div>
+
+<!-- ═══ SCRIPTS ═══ -->
 <script>
-function sw(e,id){const p=e.target.closest('.card');p.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));p.querySelectorAll('.tc').forEach(c=>c.classList.remove('on'));e.target.classList.add('on');document.getElementById(id).classList.add('on')}
-function cc(b){const c=b.closest('.cb').querySelector('.cd').innerText;navigator.clipboard.writeText(c).then(()=>{b.textContent='Copied!';b.style.color='var(--green)';b.style.borderColor='var(--green)';setTimeout(()=>{b.textContent='Copy';b.style.color='';b.style.borderColor=''},2000)})}
+// Tab switcher
+function sw(e,id){const p=e.target.closest('section')||e.target.closest('.card');p.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));p.querySelectorAll('.tc').forEach(c=>c.classList.remove('on'));e.target.classList.add('on');document.getElementById(id).classList.add('on')}
+
+// Copy button
+function cc(b){const c=b.closest('.cb').querySelector('.code').innerText;navigator.clipboard.writeText(c).then(()=>{b.textContent='Copied!';b.style.color='var(--green)';b.style.borderColor='var(--green)';setTimeout(()=>{b.textContent='Copy';b.style.color='';b.style.borderColor=''},2e3)})}
+
+// Accordion toggle
+function toggleAcc(el){el.classList.toggle('open')}
+
+// Hero typewriter cycling
+const phrases=["for your terminal","for developers","for every LLM","for teams","for code review","for debugging"];
+let pi=0;const cyc=document.getElementById('cycle');
+setInterval(()=>{cyc.style.opacity=0;setTimeout(()=>{pi=(pi+1)%phrases.length;cyc.textContent=phrases[pi];cyc.style.opacity=1},400)},3e3);
+cyc.style.transition='opacity 0.4s';
+
+// Hero status cycling
+const statuses=["Ready","Thinking...","Reading file...","Editing...","Searching...","Running bash...","Streaming...","Done"];
+let si=0;const st=document.getElementById('status-text');
+setInterval(()=>{si=(si+1)%statuses.length;st.textContent=statuses[si]},2e3);
 </script>
 </body>
 </html>
