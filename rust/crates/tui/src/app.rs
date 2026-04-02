@@ -3,6 +3,7 @@
 use std::time::{Duration, Instant};
 
 use events::{Action, ActionTx, AgentStatus, PanelId, UiEvent, UiEventRx};
+use orchestrator::router::ModelRouter;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::widgets::Widget;
@@ -61,10 +62,10 @@ pub struct App {
     // Input queue — prompts submitted while streaming, sent after current turn ends
     pub pending_queue: Vec<String>,
 
-    // Effort level — controls thinking budget for supported models
-    pub effort: EffortLevel,
+    // Smart per-action model router — routes prompts to (model, effort) by category
+    pub router: ModelRouter,
 
-    // Per-action model override — used for one prompt then reverts
+    // Per-prompt model override — used for one prompt then reverts
     pub model_override: Option<String>,
 
     // Slash command autocomplete
@@ -74,60 +75,9 @@ pub struct App {
     pub history: InputHistory,
 }
 
-/// Thinking effort level — maps to token budgets for extended thinking.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum EffortLevel {
-    Low,
-    Medium,
-    High,
-    Max,
-}
-
-impl Default for EffortLevel {
-    fn default() -> Self {
-        Self::Medium
-    }
-}
-
-impl EffortLevel {
-    /// Human-readable name.
-    #[must_use]
-    pub const fn as_str(self) -> &'static str {
-        match self {
-            Self::Low => "low",
-            Self::Medium => "medium",
-            Self::High => "high",
-            Self::Max => "max",
-        }
-    }
-
-    /// Thinking budget tokens for Anthropic extended thinking.
-    #[must_use]
-    pub const fn thinking_budget(self) -> u32 {
-        match self {
-            Self::Low => 1_024,
-            Self::Medium => 8_192,
-            Self::High => 32_000,
-            Self::Max => 128_000,
-        }
-    }
-
-    /// Parse from string.
-    #[must_use]
-    pub fn from_str_opt(s: &str) -> Option<Self> {
-        match s.to_ascii_lowercase().as_str() {
-            "low" | "l" | "1" => Some(Self::Low),
-            "medium" | "med" | "m" | "2" => Some(Self::Medium),
-            "high" | "h" | "3" => Some(Self::High),
-            "max" | "x" | "4" => Some(Self::Max),
-            _ => None,
-        }
-    }
-}
-
 impl App {
-    /// Create a new App.
-    pub fn new(ui_rx: UiEventRx, action_tx: ActionTx) -> Self {
+    /// Create a new App with smart per-action routing based on the user's model.
+    pub fn new(ui_rx: UiEventRx, action_tx: ActionTx, default_model: &str) -> Self {
         Self {
             chat: ChatPanel::default(),
             status_bar: StatusBar::default(),
@@ -147,7 +97,7 @@ impl App {
             banner_shown: false,
             spinner_state: tui_widgets::spinner::SpinnerState::default(),
             pending_queue: Vec::new(),
-            effort: EffortLevel::default(),
+            router: ModelRouter::from_default_model(default_model),
             model_override: None,
             suggestions: SlashSuggestions::default(),
             history: InputHistory::default(),
@@ -387,6 +337,7 @@ impl App {
     }
 
     /// Send a prompt directly to the orchestrator (used by slash commands too).
+    /// Uses the smart per-action router to determine model + effort from prompt content.
     pub fn submit_prompt_internal(&mut self, text: String) {
         if !self.chat.messages.last().is_some_and(|m| matches!(m, ChatMessage::User { .. })) {
             self.chat.push_user(text.clone());
@@ -397,8 +348,10 @@ impl App {
         self.status_bar.phase = AgentPhase::Thinking;
         self.chat.auto_scroll = true;
 
-        let model_override = self.model_override.take();
-        let effort_budget = Some(self.effort.thinking_budget());
+        // Smart routing: classify prompt → pick (model, effort) from routing table
+        let route = self.router.route_prompt(&text);
+        let model_override = self.model_override.take().or(Some(route.model));
+        let effort_budget = Some(route.effort_budget);
 
         let tx = self.action_tx.clone();
         tokio::spawn(async move {

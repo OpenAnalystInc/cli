@@ -607,28 +607,116 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             let p = format!("Think deeply and step-by-step about this before answering:\n\n{text}");
             app.submit_prompt_internal(p);
         }
-        SlashCommand::Effort { level } => {
-            use crate::app::EffortLevel;
-            if let Some(lvl_str) = level {
-                if let Some(lvl) = EffortLevel::from_str_opt(&lvl_str) {
-                    app.effort = lvl;
+        SlashCommand::Effort { category, level } => {
+            use orchestrator::router::{ActionCategory, EffortLevel};
+            match (category, level) {
+                // /effort <category> <level> — set effort for one category
+                (Some(cat_str), Some(lvl_str)) => {
+                    if let (Some(cat), Some(lvl)) = (ActionCategory::from_str_opt(&cat_str), EffortLevel::from_str_opt(&lvl_str)) {
+                        app.router.table.set_effort(cat, lvl);
+                        app.chat.push_system(format!(
+                            "Effort for {cat} set to: {lvl} ({} tokens)",
+                            lvl.thinking_budget()
+                        ));
+                    } else {
+                        app.chat.push_system(format!(
+                            "Unknown category or level.\n\
+                             Categories: explore, research, code, write\n\
+                             Levels: low (1K), medium (8K), high (32K), max (128K)"
+                        ));
+                    }
+                }
+                // /effort <level> — set effort globally
+                (None, Some(lvl_str)) => {
+                    if let Some(lvl) = EffortLevel::from_str_opt(&lvl_str) {
+                        app.router.table.set_effort_all(lvl);
+                        app.chat.push_system(format!(
+                            "Effort set globally to: {lvl} ({} tokens)\nAll categories updated.",
+                            lvl.thinking_budget()
+                        ));
+                    } else {
+                        app.chat.push_system(format!(
+                            "Unknown effort level: {lvl_str}\n\
+                             Options: low (1K), medium (8K), high (32K), max (128K)\n\
+                             Per-category: /effort <category> <level>"
+                        ));
+                    }
+                }
+                // /effort <category> — show that category's current config
+                (Some(cat_str), None) => {
+                    if let Some(cat) = ActionCategory::from_str_opt(&cat_str) {
+                        let profile = app.router.table.get(cat);
+                        let model = app.router.resolver.resolve(profile.model_tier);
+                        app.chat.push_system(format!(
+                            "{cat}: effort={}, tier={}, model={model}",
+                            profile.effort, profile.model_tier
+                        ));
+                    } else {
+                        app.chat.push_system(format!(
+                            "Unknown category: {cat_str}\n\
+                             Options: explore, research, code, write"
+                        ));
+                    }
+                }
+                // /effort — show routing table
+                (None, None) => {
+                    let table = app.router.render_table();
+                    app.chat.push_system(format!("Routing table:\n{table}\n\n\
+                        Usage: /effort <level> (global) or /effort <category> <level>"));
+                }
+            }
+        }
+        SlashCommand::Route { args } => {
+            use orchestrator::router::{ActionCategory, ModelTier};
+            match args.as_deref() {
+                // /route — show the routing table
+                None | Some("") => {
+                    let table = app.router.render_table();
                     app.chat.push_system(format!(
-                        "Effort set to: {} (thinking budget: {} tokens)",
-                        lvl.as_str(),
-                        lvl.thinking_budget()
-                    ));
-                } else {
-                    app.chat.push_system(format!(
-                        "Unknown effort level: {lvl_str}\nOptions: low (1K), medium (8K), high (32K), max (128K)"
+                        "Per-action routing table:\n{table}\n\n\
+                         Edit: /route <category> <tier>\n\
+                         Tiers: fast, balanced, capable\n\
+                         Reset: /route reset"
                     ));
                 }
-            } else {
-                app.chat.push_system(format!(
-                    "Current effort: {} (thinking budget: {} tokens)\n\
-                     Options: /effort low | medium | high | max",
-                    app.effort.as_str(),
-                    app.effort.thinking_budget()
-                ));
+                Some("reset") => {
+                    app.router.table = orchestrator::router::RoutingTable::default();
+                    let table = app.router.render_table();
+                    app.chat.push_system(format!("Routing table reset to defaults:\n{table}"));
+                }
+                Some(rest) => {
+                    let mut parts = rest.split_whitespace();
+                    let cat_str = parts.next().unwrap_or("");
+                    let tier_str = parts.next();
+                    if let Some(cat) = ActionCategory::from_str_opt(cat_str) {
+                        if let Some(tier_s) = tier_str {
+                            if let Some(tier) = ModelTier::from_str_opt(tier_s) {
+                                app.router.table.set_tier(cat, tier);
+                                let model = app.router.resolver.resolve(tier);
+                                app.chat.push_system(format!(
+                                    "{cat} tier set to: {tier} ({model})"
+                                ));
+                            } else {
+                                app.chat.push_system(format!(
+                                    "Unknown tier: {tier_s}\nOptions: fast, balanced, capable"
+                                ));
+                            }
+                        } else {
+                            // Show single category
+                            let profile = app.router.table.get(cat);
+                            let model = app.router.resolver.resolve(profile.model_tier);
+                            app.chat.push_system(format!(
+                                "{cat}: tier={}, effort={}, model={model}",
+                                profile.model_tier, profile.effort
+                            ));
+                        }
+                    } else {
+                        app.chat.push_system(format!(
+                            "Unknown category: {cat_str}\n\
+                             Options: explore, research, code, write"
+                        ));
+                    }
+                }
             }
         }
         SlashCommand::Context => {
@@ -660,6 +748,59 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.toggle_sidebar();
             let state = if app.sidebar_visible { "shown" } else { "hidden" };
             app.chat.push_system(format!("Sidebar {state}. (Ctrl+B to toggle)"));
+        }
+        SlashCommand::Swarm { task } => {
+            if let Some(task_text) = task {
+                app.chat.push_system(format!("Spawning agent swarm for: {task_text}"));
+
+                // Phase 1: Spawn an Explore agent to gather context
+                let explore_prompt = format!(
+                    "You are a fast exploration agent. Quickly scan the codebase to understand the structure \
+                     relevant to this task. List key files, functions, and patterns. Be concise.\n\nTask: {task_text}"
+                );
+
+                // Phase 2: Spawn a Plan agent to design the approach
+                let plan_prompt = format!(
+                    "You are a planning agent. Design a step-by-step implementation plan for this task. \
+                     Identify files to modify, functions to change, and potential risks. Be thorough.\n\nTask: {task_text}"
+                );
+
+                // Send both as sub-agent spawn requests via the orchestrator
+                let tx = app.action_tx.clone();
+                let spawn_tx = tx.clone();
+                let task_for_primary = task_text.clone();
+
+                // Spawn explore + plan in parallel, then primary executes
+                tokio::spawn(async move {
+                    // First: explore (fast model)
+                    let _ = spawn_tx.send(events::Action::SubmitPrompt {
+                        text: explore_prompt,
+                        effort_budget: Some(1_024), // low effort for exploration
+                        model_override: Some("claude-haiku-4-5".to_string()),
+                    }).await;
+                });
+
+                // Queue the plan and then the actual task
+                app.pending_queue.push(plan_prompt);
+                app.pending_queue.push(format!(
+                    "Now execute this task based on the exploration and planning above:\n\n{task_for_primary}"
+                ));
+
+                app.sidebar_state.update_agent(
+                    "swarm-explore".to_string(),
+                    events::AgentType::Explore,
+                    format!("Scan: {}", &task_text[..task_text.len().min(30)]),
+                    events::AgentStatus::Running,
+                );
+                app.sidebar_state.update_agent(
+                    "swarm-plan".to_string(),
+                    events::AgentType::Plan,
+                    format!("Plan: {}", &task_text[..task_text.len().min(30)]),
+                    events::AgentStatus::Pending,
+                );
+            } else {
+                app.chat.push_system("Usage: /swarm <task description>".to_string());
+            }
         }
 
         SlashCommand::Unknown(name) => {

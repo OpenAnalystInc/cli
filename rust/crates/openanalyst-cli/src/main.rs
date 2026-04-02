@@ -2323,11 +2323,13 @@ fn run_resume_command(
         | SlashCommand::Vim
         | SlashCommand::Think { .. }
         | SlashCommand::Effort { .. }
+        | SlashCommand::Route { .. }
         | SlashCommand::Context
         | SlashCommand::Changelog { .. }
         | SlashCommand::AddDir { .. }
         | SlashCommand::Exit
         | SlashCommand::Sidebar
+        | SlashCommand::Swarm { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -2358,7 +2360,7 @@ fn run_tui(
 
     let orchestrator = orchestrator::AgentOrchestrator::new(config, ui_tx, action_rx, None);
 
-    let mut app = tui::app::App::new(ui_rx, action_tx);
+    let mut app = tui::app::App::new(ui_rx, action_tx, &model);
 
     // Set banner info
     let account = fetch_startup_account_info(&model);
@@ -2948,12 +2950,17 @@ impl LiveCli {
                 self.run_turn(&think_prompt)?;
                 true
             }
-            SlashCommand::Effort { level } => {
-                if let Some(lvl) = level {
-                    println!("  Effort set to: {lvl}");
-                } else {
-                    println!("  Current effort: medium\n  Options: /effort low | medium | high | max");
+            SlashCommand::Effort { category, level } => {
+                match (category, level) {
+                    (Some(cat), Some(lvl)) => println!("  Effort for {cat} set to: {lvl}"),
+                    (None, Some(lvl)) => println!("  Effort set globally to: {lvl}"),
+                    (Some(cat), None) => println!("  Showing config for: {cat}"),
+                    (None, None) => println!("  Current effort: medium\n  Options: /effort [category] <level>\n  Categories: explore, research, code, write"),
                 }
+                false
+            }
+            SlashCommand::Route { .. } => {
+                println!("  /route is only available in TUI mode.");
                 false
             }
             SlashCommand::Context => {
@@ -2973,6 +2980,11 @@ impl LiveCli {
             }
             SlashCommand::Sidebar => {
                 // Sidebar is TUI-only, no-op in legacy REPL
+                false
+            }
+            SlashCommand::Swarm { .. } => {
+                // Swarm is TUI-only
+                eprintln!("Swarm mode requires the TUI (remove --no-tui)");
                 false
             }
             SlashCommand::Unknown(name) => {

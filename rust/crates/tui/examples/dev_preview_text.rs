@@ -22,7 +22,7 @@ fn main() {
     // Create app with dummy channels
     let (_ui_tx, ui_rx) = tokio::sync::mpsc::channel(1);
     let (action_tx, _action_rx) = tokio::sync::mpsc::channel(1);
-    let mut app = App::new(ui_rx, action_tx);
+    let mut app = App::new(ui_rx, action_tx, "openanalyst-beta");
 
     // Inject banner
     app.set_banner(BannerAccountInfo {
