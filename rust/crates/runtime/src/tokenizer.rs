@@ -79,4 +79,45 @@ mod tests {
             count_tokens_for_model(text, "claude-opus-4-6")
         );
     }
+
+    // ── Edge case tests ──
+
+    #[test]
+    fn counts_unicode_text() {
+        let text = "日本語テスト こんにちは世界";
+        let count = count_tokens(text);
+        assert!(count > 0);
+    }
+
+    #[test]
+    fn counts_emoji_text() {
+        let text = "Hello 👋 World 🌍 Test 🧪";
+        let count = count_tokens(text);
+        assert!(count > 3);
+    }
+
+    #[test]
+    fn counts_very_long_text() {
+        let text = "token ".repeat(10_000);
+        let count = count_tokens(&text);
+        assert!(count > 9_000);
+        assert!(count < 11_000);
+    }
+
+    #[test]
+    fn budget_boundary_uses_exact_count() {
+        // Near the boundary — should trigger exact counting
+        let text = "word ".repeat(50); // ~50 tokens
+        assert!(!exceeds_budget(&text, 200)); // Well under
+        assert!(exceeds_budget(&text, 10));    // Well over
+        // Near boundary — exact count kicks in
+        assert!(!exceeds_budget(&text, 60));
+    }
+
+    #[test]
+    fn handles_special_characters() {
+        let text = "a\nb\tc\r\n\x00\x01\x02";
+        let count = count_tokens(text);
+        assert!(count > 0);
+    }
 }

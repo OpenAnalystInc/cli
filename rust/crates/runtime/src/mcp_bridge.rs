@@ -498,4 +498,111 @@ mod tests {
         assert_eq!(r1["id"], 1);
         assert_eq!(r2["id"], 2);
     }
+
+    // ── Edge case / fuzz-like tests ──
+
+    #[test]
+    fn read_truncated_body_returns_none() {
+        // Content-Length says 100 but body is only 10 bytes
+        let frame = "Content-Length: 100\r\n\r\n{\"short\":1}";
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        assert!(read_jsonrpc_response(&mut reader).is_none());
+    }
+
+    #[test]
+    fn read_zero_content_length_returns_none() {
+        let frame = "Content-Length: 0\r\n\r\n";
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        // Empty body is not valid JSON
+        assert!(read_jsonrpc_response(&mut reader).is_none());
+    }
+
+    #[test]
+    fn read_malformed_json_returns_none() {
+        let body = "not json at all {{{";
+        let frame = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        assert!(read_jsonrpc_response(&mut reader).is_none());
+    }
+
+    #[test]
+    fn read_extra_headers_ignored() {
+        let body = r#"{"jsonrpc":"2.0","id":1,"result":"ok"}"#;
+        let frame = format!(
+            "X-Custom: ignored\r\nContent-Length: {}\r\nX-Another: also-ignored\r\n\r\n{}",
+            body.len(),
+            body
+        );
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        let result = read_jsonrpc_response(&mut reader).expect("should parse with extra headers");
+        assert_eq!(result["id"], 1);
+    }
+
+    #[test]
+    fn read_unicode_json_body() {
+        let body = r#"{"jsonrpc":"2.0","id":1,"result":"Héllo wörld 日本語"}"#;
+        let frame = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        let result = read_jsonrpc_response(&mut reader).expect("should parse unicode");
+        assert!(result["result"].as_str().unwrap().contains("日本語"));
+    }
+
+    #[test]
+    fn read_large_json_body() {
+        // Simulate a large tools/list response
+        let mut tools = Vec::new();
+        for i in 0..100 {
+            tools.push(serde_json::json!({
+                "name": format!("tool_{i}"),
+                "description": format!("Description for tool number {i} with some extra text to increase size"),
+                "inputSchema": {"type": "object", "properties": {"arg": {"type": "string"}}}
+            }));
+        }
+        let body = serde_json::json!({"jsonrpc":"2.0","id":2,"result":{"tools": tools}}).to_string();
+        let frame = format!("Content-Length: {}\r\n\r\n{}", body.len(), body);
+        let mut reader = BufReader::new(Cursor::new(frame.as_bytes().to_vec()));
+        let result = read_jsonrpc_response(&mut reader).expect("should parse large body");
+        let parsed_tools = parse_tools_list("big", &result);
+        assert_eq!(parsed_tools.len(), 100);
+    }
+
+    #[test]
+    fn extract_mcp_result_handles_error_response() {
+        let response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "error": {"code": -32600, "message": "Invalid Request"}
+        });
+        let result = extract_mcp_result(&response);
+        assert!(result.is_err());
+        assert!(result.unwrap_err().contains("Invalid Request"));
+    }
+
+    #[test]
+    fn extract_mcp_result_handles_empty_content() {
+        let response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {"content": []}
+        });
+        let result = extract_mcp_result(&response).unwrap();
+        assert!(result.is_empty());
+    }
+
+    #[test]
+    fn extract_mcp_result_handles_mixed_content_types() {
+        let response = serde_json::json!({
+            "jsonrpc": "2.0",
+            "id": 3,
+            "result": {
+                "content": [
+                    {"type": "text", "text": "Hello"},
+                    {"type": "image", "data": "base64..."},
+                    {"type": "text", "text": "World"}
+                ]
+            }
+        });
+        let result = extract_mcp_result(&response).unwrap();
+        assert_eq!(result, "Hello\nWorld");
+    }
 }

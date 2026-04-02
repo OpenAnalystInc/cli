@@ -1460,6 +1460,22 @@ async fn kb_fetch(endpoint: &str, api_key: &str, query: &str) -> Result<String, 
 
 /// Compact chat messages — remove tool call details, merge consecutive system messages,
 /// and trim old messages to keep the session manageable.
+/// Auto-compact if session exceeds threshold. Called from app.rs on StreamEnd.
+pub fn auto_compact_if_needed(app: &mut App) {
+    const AUTO_COMPACT_THRESHOLD: usize = 500;
+    if app.chat.messages.len() > AUTO_COMPACT_THRESHOLD {
+        let before = app.chat.messages.len();
+        compact_chat_messages(app);
+        let after = app.chat.messages.len();
+        let removed = before.saturating_sub(after);
+        if removed > 0 {
+            app.chat.push_system(format!(
+                "(auto-compacted: {removed} old messages compressed, {after} kept)"
+            ));
+        }
+    }
+}
+
 fn compact_chat_messages(app: &mut App) {
     let messages = &mut app.chat.messages;
 
