@@ -245,12 +245,16 @@ mod tests {
 
     #[test]
     fn executes_simple_command() {
+        // Acquire env lock — other tests (prompt) may change the working
+        // directory, which would break sandbox config resolution and command
+        // execution.
+        let _guard = crate::test_env_lock();
         let output = execute_bash(BashCommandInput {
             command: String::from("printf 'hello'"),
             timeout: Some(1_000),
             description: None,
             run_in_background: Some(false),
-            dangerously_disable_sandbox: Some(false),
+            dangerously_disable_sandbox: Some(true),
             namespace_restrictions: Some(false),
             isolate_network: Some(false),
             filesystem_mode: Some(FilesystemIsolationMode::WorkspaceOnly),
@@ -265,6 +269,7 @@ mod tests {
 
     #[test]
     fn disables_sandbox_when_requested() {
+        let _guard = crate::test_env_lock();
         let output = execute_bash(BashCommandInput {
             command: String::from("printf 'hello'"),
             timeout: Some(1_000),

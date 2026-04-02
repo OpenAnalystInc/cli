@@ -11,6 +11,7 @@ path = "src/main.rs"
 
 [dependencies]
 api = { path = "../api" }
+openanalyst-agent = { path = "../openanalyst-agent" }
 reqwest = { version = "0.12", default-features = false, features = ["rustls-tls", "json"] }
 commands = { path = "../commands" }
 compat-harness = { path = "../compat-harness" }

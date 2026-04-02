@@ -37,6 +37,8 @@ pub enum ProviderKind {
     OpenRouter,
     /// Amazon Bedrock (OpenAI-compatible gateway)
     Bedrock,
+    /// Google Gemini (OpenAI-compatible gateway)
+    Gemini,
 }
 
 impl ProviderKind {
@@ -50,6 +52,7 @@ impl ProviderKind {
             Self::Xai => "xAI",
             Self::OpenRouter => "OpenRouter",
             Self::Bedrock => "Amazon Bedrock",
+            Self::Gemini => "Google Gemini",
         }
     }
 }
@@ -220,6 +223,44 @@ const MODEL_REGISTRY: &[(&str, ProviderMetadata)] = &[
         base_url_env: "BEDROCK_BASE_URL",
         default_base_url: openai_compat::DEFAULT_BEDROCK_BASE_URL,
     }),
+
+    // ── Google Gemini (via OpenAI-compat gateway) ──
+    ("gemini-2.5-pro", ProviderMetadata {
+        provider: ProviderKind::Gemini,
+        auth_env: "GEMINI_API_KEY",
+        base_url_env: "GEMINI_BASE_URL",
+        default_base_url: openai_compat::DEFAULT_GEMINI_BASE_URL,
+    }),
+    ("gemini-2.5-flash", ProviderMetadata {
+        provider: ProviderKind::Gemini,
+        auth_env: "GEMINI_API_KEY",
+        base_url_env: "GEMINI_BASE_URL",
+        default_base_url: openai_compat::DEFAULT_GEMINI_BASE_URL,
+    }),
+    ("gemini-2.0-flash", ProviderMetadata {
+        provider: ProviderKind::Gemini,
+        auth_env: "GEMINI_API_KEY",
+        base_url_env: "GEMINI_BASE_URL",
+        default_base_url: openai_compat::DEFAULT_GEMINI_BASE_URL,
+    }),
+    ("gemini-2.0-flash-lite", ProviderMetadata {
+        provider: ProviderKind::Gemini,
+        auth_env: "GEMINI_API_KEY",
+        base_url_env: "GEMINI_BASE_URL",
+        default_base_url: openai_compat::DEFAULT_GEMINI_BASE_URL,
+    }),
+    ("gemini-1.5-pro", ProviderMetadata {
+        provider: ProviderKind::Gemini,
+        auth_env: "GEMINI_API_KEY",
+        base_url_env: "GEMINI_BASE_URL",
+        default_base_url: openai_compat::DEFAULT_GEMINI_BASE_URL,
+    }),
+    ("gemini-1.5-flash", ProviderMetadata {
+        provider: ProviderKind::Gemini,
+        auth_env: "GEMINI_API_KEY",
+        base_url_env: "GEMINI_BASE_URL",
+        default_base_url: openai_compat::DEFAULT_GEMINI_BASE_URL,
+    }),
 ];
 
 #[must_use]
@@ -245,7 +286,8 @@ pub fn resolve_model_alias(model: &str) -> String {
                 },
                 ProviderKind::OpenAi
                 | ProviderKind::OpenRouter
-                | ProviderKind::Bedrock => trimmed,
+                | ProviderKind::Bedrock
+                | ProviderKind::Gemini => trimmed,
             })
         })
         .map_or_else(|| trimmed.to_string(), ToOwned::to_owned)
@@ -296,6 +338,14 @@ pub fn metadata_for_model(model: &str) -> Option<ProviderMetadata> {
             default_base_url: openai_compat::DEFAULT_BEDROCK_BASE_URL,
         });
     }
+    if lower.starts_with("gemini") {
+        return Some(ProviderMetadata {
+            provider: ProviderKind::Gemini,
+            auth_env: "GEMINI_API_KEY",
+            base_url_env: "GEMINI_BASE_URL",
+            default_base_url: openai_compat::DEFAULT_GEMINI_BASE_URL,
+        });
+    }
     None
 }
 
@@ -322,6 +372,9 @@ pub fn detect_provider_kind(model: &str) -> ProviderKind {
     if openai_compat::has_api_key("BEDROCK_API_KEY") {
         return ProviderKind::Bedrock;
     }
+    if openai_compat::has_api_key("GEMINI_API_KEY") {
+        return ProviderKind::Gemini;
+    }
     if openai_compat::has_api_key("ANTHROPIC_API_KEY") {
         return ProviderKind::Anthropic;
     }
@@ -334,6 +387,15 @@ pub fn max_tokens_for_model(model: &str) -> u32 {
     let canonical = resolve_model_alias(model);
     if canonical.contains("opus") {
         32_000
+    } else if canonical.starts_with("gemini-2.5") {
+        // Gemini 2.5 Pro/Flash support up to 65k output tokens via OpenAI-compat
+        65_536
+    } else if canonical.starts_with("gemini-1.5") {
+        // Gemini 1.5 Pro supports 8k output tokens
+        8_192
+    } else if canonical.starts_with("gemini") {
+        // Gemini 2.0 Flash models
+        8_192
     } else {
         64_000
     }
@@ -374,6 +436,14 @@ mod tests {
         assert_eq!(detect_provider_kind("grok"), ProviderKind::Xai);
         assert_eq!(detect_provider_kind("openanalyst-beta"), ProviderKind::OpenAnalystApi);
         assert_eq!(detect_provider_kind("claude-sonnet-4-6"), ProviderKind::OpenAnalystApi);
+    }
+
+    #[test]
+    fn resolves_gemini_models() {
+        assert_eq!(detect_provider_kind("gemini-2.5-pro"), ProviderKind::Gemini);
+        assert_eq!(detect_provider_kind("gemini-2.5-flash"), ProviderKind::Gemini);
+        assert_eq!(detect_provider_kind("gemini-2.0-flash"), ProviderKind::Gemini);
+        assert_eq!(detect_provider_kind("gemini-1.5-pro"), ProviderKind::Gemini);
     }
 
     #[test]

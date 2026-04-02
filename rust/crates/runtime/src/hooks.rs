@@ -237,21 +237,9 @@ fn format_hook_warning(command: &str, code: i32, stdout: Option<&str>, stderr: &
 }
 
 fn shell_command(command: &str) -> CommandWithStdin {
-    #[cfg(windows)]
-    let mut command_builder = {
-        let mut command_builder = Command::new("cmd");
-        command_builder.arg("/C").arg(command);
-        CommandWithStdin::new(command_builder)
-    };
-
-    #[cfg(not(windows))]
-    let command_builder = {
-        let mut command_builder = Command::new("sh");
-        command_builder.arg("-lc").arg(command);
-        CommandWithStdin::new(command_builder)
-    };
-
-    command_builder
+    let mut cmd = Command::new("sh");
+    cmd.arg("-lc").arg(command);
+    CommandWithStdin::new(cmd)
 }
 
 struct CommandWithStdin {
@@ -304,6 +292,7 @@ mod tests {
 
     #[test]
     fn allows_exit_code_zero_and_captures_stdout() {
+        let _guard = crate::test_env_lock();
         let runner = HookRunner::new(RuntimeHookConfig::new(
             vec![shell_snippet("printf 'pre ok'")],
             Vec::new(),
@@ -316,6 +305,7 @@ mod tests {
 
     #[test]
     fn denies_exit_code_two() {
+        let _guard = crate::test_env_lock();
         let runner = HookRunner::new(RuntimeHookConfig::new(
             vec![shell_snippet("printf 'blocked by hook'; exit 2")],
             Vec::new(),
@@ -329,6 +319,7 @@ mod tests {
 
     #[test]
     fn warns_for_other_non_zero_statuses() {
+        let _guard = crate::test_env_lock();
         let runner = HookRunner::from_feature_config(&RuntimeFeatureConfig::default().with_hooks(
             RuntimeHookConfig::new(
                 vec![shell_snippet("printf 'warning hook'; exit 1")],
@@ -345,12 +336,6 @@ mod tests {
             .any(|message| message.contains("allowing tool execution to continue")));
     }
 
-    #[cfg(windows)]
-    fn shell_snippet(script: &str) -> String {
-        script.replace('\'', "\"")
-    }
-
-    #[cfg(not(windows))]
     fn shell_snippet(script: &str) -> String {
         script.to_string()
     }

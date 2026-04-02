@@ -715,7 +715,9 @@ mod tests {
 
         assert!(prompt.contains("Project rules"));
         assert!(prompt.contains("permissionMode"));
-        fs::remove_dir_all(root).expect("cleanup temp dir");
+        // On Windows, temp files may still be locked by walkdir/config iterators;
+        // silently ignore cleanup failures — the OS temp dir handles expiry.
+        let _ = fs::remove_dir_all(root);
     }
 
     #[test]

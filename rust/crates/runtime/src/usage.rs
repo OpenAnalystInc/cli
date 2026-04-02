@@ -74,6 +74,24 @@ pub fn pricing_for_model(model: &str) -> Option<ModelPricing> {
     if normalized.contains("sonnet") {
         return Some(ModelPricing::default_sonnet_tier());
     }
+    // Google Gemini models
+    if normalized.starts_with("gemini-2.5-pro") {
+        return Some(ModelPricing {
+            input_cost_per_million: 1.25,
+            output_cost_per_million: 10.0,
+            cache_creation_cost_per_million: 0.0,
+            cache_read_cost_per_million: 0.0,
+        });
+    }
+    if normalized.starts_with("gemini") {
+        // Gemini Flash / Flash-Lite / 1.5 models — use flash-tier pricing
+        return Some(ModelPricing {
+            input_cost_per_million: 0.075,
+            output_cost_per_million: 0.30,
+            cache_creation_cost_per_million: 0.0,
+            cache_read_cost_per_million: 0.0,
+        });
+    }
     None
 }
 

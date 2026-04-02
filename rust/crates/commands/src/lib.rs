@@ -2410,7 +2410,17 @@ mod tests {
         assert!(created.contains("feature/demo"));
         assert!(switched.contains("main"));
         assert!(added.contains("wt-demo"));
-        assert!(listed_worktrees.contains(worktree_path.to_str().expect("utf8 path")));
+        // On Windows, git uses forward slashes but PathBuf uses backslashes;
+        // normalize for comparison.
+        let expected_path = worktree_path
+            .to_str()
+            .expect("utf8 path")
+            .replace('\\', "/");
+        let normalized_list = listed_worktrees.replace('\\', "/");
+        assert!(
+            normalized_list.contains(&expected_path),
+            "worktree list should contain {expected_path}: {listed_worktrees}"
+        );
         assert!(removed.contains("Result           removed"));
 
         let _ = fs::remove_dir_all(repo);
