@@ -4000,7 +4000,7 @@ impl LiveCli {
             return Ok(());
         };
 
-        // Check for API key
+        // Check for API key — required for KB access
         let api_key = env::var("OPENANALYST_API_KEY").or_else(|_| env::var("OA_API_KEY"));
         let Ok(api_key) = api_key else {
             println!("  \x1b[33m[!]\x1b[0m OPENANALYST_API_KEY not set.\n");
@@ -4012,7 +4012,7 @@ impl LiveCli {
         };
 
         let kb_endpoint = env::var("OPENANALYST_KB_URL")
-            .unwrap_or_else(|_| "https://kb.openanalyst.com/v1/knowledge/query".to_string());
+            .unwrap_or_else(|_| "http://44.200.9.142:8420/v1/knowledge/query".to_string());
 
         println!("  \x1b[38;5;45m[>]\x1b[0m Searching knowledge base...");
         println!("  \x1b[2mQuery: {}\x1b[0m\n", truncate_for_prompt(query, 80));

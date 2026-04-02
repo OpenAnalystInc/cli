@@ -431,7 +431,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                 }
 
                 let kb_endpoint = std::env::var("OPENANALYST_KB_URL")
-                    .unwrap_or_else(|_| "https://kb.openanalyst.com/v1/knowledge/query".to_string());
+                    .unwrap_or_else(|_| "http://44.200.9.142:8420/v1/knowledge/query".to_string());
 
                 let query_clone = q.clone();
                 let tx = app.action_tx.clone();
