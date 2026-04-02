@@ -318,6 +318,13 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: Some("<url>"),
         resume_supported: false,
     },
+    SlashCommandSpec {
+        name: "dev",
+        aliases: &["browser", "playwright"],
+        summary: "Control a local browser via Playwright for testing & automation",
+        argument_hint: Some("<open URL|screenshot|click SELECTOR|type SELECTOR TEXT|test DESCRIPTION|start|stop|install>"),
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -424,6 +431,10 @@ pub enum SlashCommand {
     },
     Json {
         url: Option<String>,
+    },
+    Dev {
+        action: Option<String>,
+        target: Option<String>,
     },
     Unknown(String),
 }
@@ -553,6 +564,13 @@ impl SlashCommand {
             },
             "json" | "api" => Self::Json {
                 url: parts.next().map(ToOwned::to_owned),
+            },
+            "dev" | "browser" | "playwright" => Self::Dev {
+                action: parts.next().map(ToOwned::to_owned),
+                target: {
+                    let rest = parts.collect::<Vec<_>>().join(" ");
+                    (!rest.is_empty()).then_some(rest)
+                },
             },
             other => Self::Unknown(other.to_string()),
         })
@@ -1798,6 +1816,7 @@ pub fn handle_slash_command(
         | SlashCommand::DiffReview { .. }
         | SlashCommand::Scrape { .. }
         | SlashCommand::Json { .. }
+        | SlashCommand::Dev { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2154,7 +2173,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 38);
+        assert_eq!(slash_command_specs().len(), 39);
         assert_eq!(resume_supported_slash_commands().len(), 13);
     }
 

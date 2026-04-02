@@ -1430,6 +1430,7 @@ fn run_resume_command(
         | SlashCommand::DiffReview { .. }
         | SlashCommand::Scrape { .. }
         | SlashCommand::Json { .. }
+        | SlashCommand::Dev { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -1980,6 +1981,10 @@ impl LiveCli {
             }
             SlashCommand::Json { url } => {
                 Self::run_json(url.as_deref())?;
+                false
+            }
+            SlashCommand::Dev { action, target } => {
+                self.run_dev(action.as_deref(), target.as_deref())?;
                 false
             }
             SlashCommand::Unknown(name) => {
@@ -3123,7 +3128,442 @@ impl LiveCli {
         }
         Ok(())
     }
+
+    // ════════════════════════════════════════════════════════════════════
+    //  /dev — Playwright Browser Control
+    // ════════════════════════════════════════════════════════════════════
+
+    fn run_dev(
+        &mut self,
+        action: Option<&str>,
+        target: Option<&str>,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        match action {
+            None => {
+                println!(
+                    "Usage: /dev <action> [target]\n\n\
+                     Actions:\n\
+                     \x1b[1m  install\x1b[0m              Install/update Playwright + Chromium (latest)\n\
+                     \x1b[1m  start\x1b[0m                Launch a headed browser session\n\
+                     \x1b[1m  open <url>\x1b[0m            Navigate to a URL\n\
+                     \x1b[1m  screenshot [file]\x1b[0m     Capture screenshot (default: screenshot-<ts>.png)\n\
+                     \x1b[1m  click <selector>\x1b[0m      Click an element by CSS selector or text\n\
+                     \x1b[1m  type <selector> <text>\x1b[0m Type text into an input field\n\
+                     \x1b[1m  eval <js>\x1b[0m             Evaluate JavaScript in the page\n\
+                     \x1b[1m  test <description>\x1b[0m    Generate & run a Playwright test via AI\n\
+                     \x1b[1m  stop\x1b[0m                  Close the browser session\n\
+                     \x1b[1m  status\x1b[0m                Show Playwright installation status\n\n\
+                     Aliases: /browser, /playwright"
+                );
+                Ok(())
+            }
+            Some("install") => self.dev_install(),
+            Some("status") => self.dev_status(),
+            Some("start") => self.dev_start(),
+            Some("stop") => self.dev_stop(),
+            Some("open") => self.dev_open(target),
+            Some("screenshot") => self.dev_screenshot(target),
+            Some("click") => self.dev_click(target),
+            Some("type") => self.dev_type(target),
+            Some("eval") => self.dev_eval(target),
+            Some("test") => self.dev_test(target),
+            Some(other) => {
+                // Treat bare URL as /dev open <url>
+                if other.starts_with("http://") || other.starts_with("https://") {
+                    self.dev_open(Some(other))
+                } else {
+                    println!("Unknown /dev action: {other}\n  Run /dev for usage.");
+                    Ok(())
+                }
+            }
+        }
+    }
+
+    fn dev_install(&self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("  Installing Playwright (latest) + Chromium...");
+        // Install latest playwright globally — always fetch newest version
+        let npm_install = Command::new("npm")
+            .args(["install", "-g", "playwright@latest"])
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit())
+            .status();
+        match npm_install {
+            Ok(s) if s.success() => println!("  Playwright package installed."),
+            Ok(s) => {
+                println!("  npm install exited with {s}. Trying npx fallback...");
+            }
+            Err(e) => {
+                println!("  npm not found ({e}). Ensure Node.js is installed.");
+                return Ok(());
+            }
+        }
+        // Install browser binaries
+        println!("  Downloading Chromium browser...");
+        let browser_install = Command::new("npx")
+            .args(["playwright", "install", "chromium"])
+            .stdout(std::process::Stdio::inherit())
+            .stderr(std::process::Stdio::inherit())
+            .status();
+        match browser_install {
+            Ok(s) if s.success() => {
+                println!("  Chromium installed successfully.");
+                println!("\n  \x1b[38;5;46mPlaywright ready.\x1b[0m Run \x1b[1m/dev start\x1b[0m to launch a browser.");
+            }
+            Ok(s) => println!("  Browser install exited with {s}."),
+            Err(e) => println!("  Failed to install browser: {e}"),
+        }
+        Ok(())
+    }
+
+    fn dev_status(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let version = Command::new("npx")
+            .args(["playwright", "--version"])
+            .output();
+        match version {
+            Ok(out) if out.status.success() => {
+                let ver = String::from_utf8_lossy(&out.stdout).trim().to_string();
+                println!("  Playwright: {ver}");
+                // Check if chromium is installed
+                let browsers = Command::new("npx")
+                    .args(["playwright", "install", "--dry-run"])
+                    .output();
+                if let Ok(b) = browsers {
+                    let info = String::from_utf8_lossy(&b.stdout);
+                    if info.contains("chromium") {
+                        println!("  Chromium:    installed");
+                    } else {
+                        println!("  Chromium:    not found (run /dev install)");
+                    }
+                }
+                // Check for running session
+                let session_file = self.dev_session_file();
+                if session_file.exists() {
+                    println!("  Session:     \x1b[38;5;46mactive\x1b[0m");
+                } else {
+                    println!("  Session:     not running");
+                }
+            }
+            _ => {
+                println!("  Playwright:  not installed");
+                println!("  Run \x1b[1m/dev install\x1b[0m to set up Playwright.");
+            }
+        }
+        Ok(())
+    }
+
+    fn dev_start(&self) -> Result<(), Box<dyn std::error::Error>> {
+        if !Self::playwright_available() {
+            println!("  Playwright not installed. Run \x1b[1m/dev install\x1b[0m first.");
+            return Ok(());
+        }
+        let script = self.dev_helper_script();
+        if !script.exists() {
+            self.write_dev_helper_script(&script)?;
+        }
+        println!("  Launching browser...");
+        let child = Command::new("node")
+            .arg(&script)
+            .arg("start")
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .spawn()?;
+
+        // Store the PID so we can stop it later
+        let session_file = self.dev_session_file();
+        fs::write(&session_file, child.id().to_string())?;
+        // Give browser time to launch
+        std::thread::sleep(Duration::from_secs(2));
+        println!("  \x1b[38;5;46mBrowser started.\x1b[0m PID: {}", child.id());
+        println!("  Use \x1b[1m/dev open <url>\x1b[0m to navigate.");
+        Ok(())
+    }
+
+    fn dev_stop(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let session_file = self.dev_session_file();
+        if !session_file.exists() {
+            println!("  No browser session running.");
+            return Ok(());
+        }
+        let pid_str = fs::read_to_string(&session_file)?;
+        let _ = fs::remove_file(&session_file);
+        // Kill the node process
+        #[cfg(windows)]
+        let _ = Command::new("taskkill")
+            .args(["/F", "/PID", pid_str.trim()])
+            .output();
+        #[cfg(not(windows))]
+        let _ = Command::new("kill").arg(pid_str.trim()).output();
+        println!("  Browser session stopped.");
+        Ok(())
+    }
+
+    fn dev_open(&self, url: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(url) = url else {
+            println!("Usage: /dev open <url>");
+            return Ok(());
+        };
+        self.dev_run_action("open", &json!({ "url": url }))
+    }
+
+    fn dev_screenshot(&self, file: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+        let filename = file.unwrap_or("").to_string();
+        let filename = if filename.is_empty() {
+            format!("screenshot-{timestamp}.png")
+        } else {
+            filename
+        };
+        self.dev_run_action("screenshot", &json!({ "path": filename }))
+    }
+
+    fn dev_click(&self, selector: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(selector) = selector else {
+            println!("Usage: /dev click <selector-or-text>");
+            return Ok(());
+        };
+        self.dev_run_action("click", &json!({ "selector": selector }))
+    }
+
+    fn dev_type(&self, args: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(args) = args else {
+            println!("Usage: /dev type <selector> <text>");
+            return Ok(());
+        };
+        let mut parts = args.splitn(2, ' ');
+        let selector = parts.next().unwrap_or_default();
+        let text = parts.next().unwrap_or_default();
+        if text.is_empty() {
+            println!("Usage: /dev type <selector> <text>");
+            return Ok(());
+        }
+        self.dev_run_action("type", &json!({ "selector": selector, "text": text }))
+    }
+
+    fn dev_eval(&self, js: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(js) = js else {
+            println!("Usage: /dev eval <javascript>");
+            return Ok(());
+        };
+        self.dev_run_action("eval", &json!({ "expression": js }))
+    }
+
+    fn dev_test(&mut self, description: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(description) = description else {
+            println!("Usage: /dev test <description>\n  Example: /dev test login form submits correctly");
+            return Ok(());
+        };
+        let test_prompt = format!(
+            "Write a Playwright test for: {description}\n\n\
+             Rules:\n\
+             - Use `const {{ test, expect }} = require('@playwright/test');`\n\
+             - Use `test('...', async ({{ page }}) => {{ ... }});` format\n\
+             - Use `await page.goto('...')` to navigate\n\
+             - Return ONLY the test code in a ```javascript block, no explanation\n\
+             - Make it a complete, runnable Playwright test file"
+        );
+        self.run_turn(&test_prompt)?;
+
+        // Extract test code from response and save
+        let last_text = self.runtime.session().messages.iter().rev()
+            .find(|m| m.role == MessageRole::Assistant)
+            .map(|m| m.blocks.iter().filter_map(|b| match b {
+                ContentBlock::Text { text } => Some(text.as_str()),
+                _ => None,
+            }).collect::<Vec<_>>().join(""))
+            .unwrap_or_default();
+
+        let test_code = last_text
+            .lines()
+            .skip_while(|l| !l.starts_with("```"))
+            .skip(1)
+            .take_while(|l| !l.starts_with("```"))
+            .collect::<Vec<_>>()
+            .join("\n");
+
+        if !test_code.is_empty() {
+            let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
+            let filename = format!("test-{timestamp}.spec.js");
+            fs::write(&filename, &test_code)?;
+            println!("\n  Test saved: {filename}");
+            println!("  Run with: npx playwright test {filename}");
+
+            print!("  Run now? [y/N]: ");
+            io::stdout().flush()?;
+            let mut response = String::new();
+            io::stdin().read_line(&mut response)?;
+            if response.trim().eq_ignore_ascii_case("y") {
+                println!("  Running test...\n");
+                let _ = Command::new("npx")
+                    .args(["playwright", "test", &filename, "--reporter=line"])
+                    .stdout(std::process::Stdio::inherit())
+                    .stderr(std::process::Stdio::inherit())
+                    .status();
+            }
+        }
+        Ok(())
+    }
+
+    // ── Dev helper infrastructure ──
+
+    fn dev_session_file(&self) -> PathBuf {
+        env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(".openanalyst")
+            .join("dev-session.pid")
+    }
+
+    fn dev_helper_script(&self) -> PathBuf {
+        env::current_dir()
+            .unwrap_or_else(|_| PathBuf::from("."))
+            .join(".openanalyst")
+            .join("dev-helper.js")
+    }
+
+    fn playwright_available() -> bool {
+        Command::new("npx")
+            .args(["playwright", "--version"])
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .map(|s| s.success())
+            .unwrap_or(false)
+    }
+
+    fn write_dev_helper_script(&self, path: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        if let Some(parent) = path.parent() {
+            fs::create_dir_all(parent)?;
+        }
+        fs::write(path, DEV_HELPER_JS)?;
+        Ok(())
+    }
+
+    fn dev_run_action(
+        &self,
+        action: &str,
+        params: &serde_json::Value,
+    ) -> Result<(), Box<dyn std::error::Error>> {
+        if !Self::playwright_available() {
+            println!("  Playwright not installed. Run \x1b[1m/dev install\x1b[0m first.");
+            return Ok(());
+        }
+        let script = self.dev_helper_script();
+        if !script.exists() {
+            self.write_dev_helper_script(&script)?;
+        }
+        let output = Command::new("node")
+            .arg(&script)
+            .arg(action)
+            .arg(params.to_string())
+            .output()?;
+        let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
+        let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        if output.status.success() {
+            if !stdout.is_empty() {
+                println!("  {stdout}");
+            } else {
+                println!("  Done.");
+            }
+        } else {
+            let msg = if stderr.is_empty() { &stdout } else { &stderr };
+            println!("  Error: {msg}");
+        }
+        Ok(())
+    }
 }
+
+/// Playwright helper script — Node.js bridge for browser control.
+/// This gets written to .openanalyst/dev-helper.js on first use.
+const DEV_HELPER_JS: &str = r#"
+const { chromium } = require('playwright');
+const fs = require('fs');
+const path = require('path');
+
+const SESSION_FILE = path.join('.openanalyst', 'dev-browser.json');
+
+async function getPage() {
+  if (!fs.existsSync(SESSION_FILE)) {
+    throw new Error('No browser session. Run /dev start first.');
+  }
+  const session = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf8'));
+  const browser = await chromium.connectOverCDP(session.wsEndpoint);
+  const contexts = browser.contexts();
+  const page = contexts[0]?.pages()[0];
+  if (!page) throw new Error('No page found in browser session.');
+  return { browser, page };
+}
+
+async function start() {
+  const browser = await chromium.launch({
+    headless: false,
+    args: ['--no-sandbox']
+  });
+  const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+  const page = await context.newPage();
+  const wsEndpoint = browser.wsEndpoint?.() || '';
+
+  // For CDP connection, launch with cdp server
+  fs.mkdirSync('.openanalyst', { recursive: true });
+  fs.writeFileSync(SESSION_FILE, JSON.stringify({ wsEndpoint, pid: process.pid }));
+
+  console.log('Browser launched. Keeping alive...');
+  // Keep process alive
+  await new Promise(() => {});
+}
+
+async function run() {
+  const action = process.argv[2];
+  const rawParams = process.argv[3] || '{}';
+  let params;
+  try { params = JSON.parse(rawParams); } catch { params = { value: rawParams }; }
+
+  if (action === 'start') return start();
+
+  const { browser, page } = await getPage();
+
+  try {
+    switch (action) {
+      case 'open':
+        await page.goto(params.url, { waitUntil: 'domcontentloaded', timeout: 30000 });
+        console.log(`Navigated to ${params.url} (${await page.title()})`);
+        break;
+      case 'screenshot': {
+        const filePath = params.path || 'screenshot.png';
+        await page.screenshot({ path: filePath, fullPage: false });
+        console.log(`Screenshot saved: ${filePath}`);
+        break;
+      }
+      case 'click':
+        try {
+          await page.click(params.selector, { timeout: 5000 });
+        } catch {
+          // Fallback: try clicking by text content
+          await page.getByText(params.selector).first().click({ timeout: 5000 });
+        }
+        console.log(`Clicked: ${params.selector}`);
+        break;
+      case 'type':
+        await page.fill(params.selector, params.text);
+        console.log(`Typed into ${params.selector}`);
+        break;
+      case 'eval': {
+        const result = await page.evaluate(params.expression);
+        console.log(JSON.stringify(result, null, 2));
+        break;
+      }
+      default:
+        console.error(`Unknown action: ${action}`);
+        process.exit(1);
+    }
+  } finally {
+    // Don't close — keep session alive
+  }
+}
+
+run().catch(err => {
+  console.error(err.message);
+  process.exit(1);
+});
+"#;
 
 fn base64_encode(data: &[u8]) -> String {
     use base64::Engine as _;
