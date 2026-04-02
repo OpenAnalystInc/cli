@@ -100,6 +100,9 @@ impl AgentOrchestrator {
                             // Mid-task skill injection: spawn a new agent for this command
                             self.handle_skill_injection(command).await;
                         }
+                        Some(Action::VoiceTranscribed { .. }) => {
+                            // Handled directly in the TUI event loop, not here
+                        }
                         Some(Action::Quit) | None => break,
                         Some(Action::SlashCommand(_)) => {}
                     }

@@ -40,14 +40,14 @@ impl Banner {
     #[must_use]
     pub fn to_lines(&self) -> Vec<Line<'static>> {
         // Brand colors
-        let brand = Style::default().fg(Color::Indexed(33));          // bright blue
-        let brand_bold = brand.add_modifier(Modifier::BOLD);
-        let accent = Style::default().fg(Color::Indexed(39));          // lighter blue
+        let brand = Style::default().fg(Color::Rgb(50, 130, 255)).add_modifier(Modifier::BOLD);
+        let brand_bold = brand;
+        let accent = Style::default().fg(Color::Rgb(80, 160, 255));    // lighter blue (RGB)
         let white_bold = Style::default().fg(Color::White).add_modifier(Modifier::BOLD);
         let white = Style::default().fg(Color::White);
         let dim = Style::default().fg(Color::Indexed(245));
         let green = Style::default().fg(Color::Indexed(40));
-        let logo_color = Style::default().fg(Color::Indexed(33));      // blue OA logo
+        let logo_color = Style::default().fg(Color::Rgb(50, 130, 255)); // vivid blue OA logo (RGB)
 
         // Column widths
         let left_w: usize = 40;
@@ -56,21 +56,16 @@ impl Banner {
 
         let mut lines = Vec::new();
 
-        // ── Header line: ── OpenAnalyst CLI v1.0.89 ──────────── ──
+        // ── Top border with version inline (like Claude Code) ──
+        // ╭─ OpenAnalyst CLI v1.0.89 ──────────────┬──────────────────╮
         let ver_text = format!(" OpenAnalyst CLI v{} ", self.info.version);
-        let header_pad = total_inner.saturating_sub(ver_text.chars().count() + 4);
+        let ver_len = ver_text.chars().count();
+        let left_pad = left_w.saturating_sub(ver_len + 1); // +1 for leading ─
+        let right_border = "─".repeat(right_w);
         lines.push(Line::from(vec![
-            Span::styled("── ", accent),
+            Span::styled("╭─", brand),
             Span::styled(ver_text, brand_bold),
-            Span::styled(format!("{} ──", "─".repeat(header_pad)), accent),
-        ]));
-
-        // ── Top border with rounded corners ──
-        lines.push(Line::from(vec![
-            Span::styled(
-                format!("╭{}┬{}╮", "─".repeat(left_w), "─".repeat(right_w)),
-                brand,
-            ),
+            Span::styled(format!("{}┬{}╮", "─".repeat(left_pad), right_border), brand),
         ]));
 
         // Helper: build a branded dual-column row
@@ -93,13 +88,14 @@ impl Banner {
         lines.push(brow(&welcome, white_bold, " Tips for getting started", green));
 
         // ── OA Logo rows | Tips content ──
+        // Each line must be exactly 21 chars for consistent column padding
         let logo: [&str; 6] = [
-            "   ████████    ████  ",
-            "   ██    ██   ██  ██ ",
-            "   ██    ██  ██    ██",
-            "   ██    ██  ████████",
-            "   ██    ██  ██    ██",
-            "   ████████  ██    ██",
+            "   ████████   ████  ",  // O      A
+            "   ██    ██  ██  ██ ",  // O      A
+            "   ██    ██  ██  ██ ",  // O      A
+            "   ██    ██  ██████ ",  // O      AAAAAA
+            "   ██    ██  ██  ██ ",  // O      A
+            "   ████████  ██  ██ ",  // OOOO   A
         ];
 
         let tip_lines: [(&str, Style); 6] = [

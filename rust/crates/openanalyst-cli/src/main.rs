@@ -1124,6 +1124,11 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
     terminal::enable_raw_mode()?;
     execute!(stdout, cursor::Hide)?;
 
+    // Drain any buffered key events (e.g. the Enter from typing the command)
+    while event::poll(Duration::from_millis(50))? {
+        let _ = event::read()?;
+    }
+
     let draw_menu = |sel: usize, out: &mut io::Stdout| -> io::Result<()> {
         for (i, provider) in LOGIN_PROVIDERS.iter().enumerate() {
             let prefix = if i == sel { "\x1b[38;5;45m  > " } else { "    " };
@@ -1204,6 +1209,11 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
             use crossterm::{cursor, event::{self, Event, KeyCode, KeyEvent, KeyModifiers}, execute, terminal};
             terminal::enable_raw_mode()?;
             execute!(stdout, cursor::Hide)?;
+
+            // Drain any buffered key events
+            while event::poll(Duration::from_millis(50))? {
+                let _ = event::read()?;
+            }
 
             let draw = |sel: usize, out: &mut io::Stdout| -> io::Result<()> {
                 for (i, (name, desc)) in auth_methods.iter().enumerate() {
@@ -1934,8 +1944,14 @@ fn run_uninstall() -> Result<(), Box<dyn std::error::Error>> {
     io::stdout().flush()?;
 
     terminal::enable_raw_mode()?;
+
+    // Drain any buffered key events (e.g. the Enter from typing the command)
+    while event::poll(Duration::from_millis(50))? {
+        let _ = event::read()?;
+    }
+
     let confirmed = loop {
-        if event::poll(Duration::from_millis(100))? {
+        if event::poll(Duration::from_millis(200))? {
             if let Event::Key(key) = event::read()? {
                 match key.code {
                     KeyCode::Char('y') | KeyCode::Char('Y') => break true,

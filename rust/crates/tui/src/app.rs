@@ -49,6 +49,8 @@ pub struct App {
     pub is_streaming: bool,
     /// Set after Ctrl+C cancel — prevents StreamEnd from draining pending queue.
     pub cancelled: bool,
+    /// Double Ctrl+C to quit (Claude Code behavior).
+    pub exit_pending: bool,
 
     // Channels
     pub ui_rx: UiEventRx,
@@ -100,6 +102,7 @@ impl App {
             turn_start: None,
             is_streaming: false,
             cancelled: false,
+            exit_pending: false,
             ui_rx,
             action_tx,
             banner_info: None,
@@ -296,15 +299,24 @@ impl App {
         }
     }
 
-    /// Initiate graceful exit.
+    /// Initiate graceful exit (Claude Code behavior: double Ctrl+C to quit).
     pub fn request_exit(&mut self) {
         if self.is_streaming {
             // First Ctrl+C cancels the running agent
             self.cancel_current_agent();
-        } else {
-            // Direct quit (session saving handled by the caller)
+        } else if self.exit_pending {
+            // Second Ctrl+C → actually quit
             self.should_quit = true;
+        } else {
+            // First Ctrl+C when idle → warn, require confirmation
+            self.exit_pending = true;
+            self.chat.push_system("Press Ctrl+C again to exit.".to_string());
         }
+    }
+
+    /// Reset exit confirmation (call on any non-Ctrl+C input).
+    pub fn clear_exit_pending(&mut self) {
+        self.exit_pending = false;
     }
 
     /// Run a prompt in the background — sends to orchestrator and tracks in sidebar.

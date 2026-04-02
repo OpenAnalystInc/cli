@@ -55,9 +55,10 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
     }
 
     match key.code {
-        // Ctrl+C → cancel running agent OR quit
+        // Ctrl+C → cancel running agent OR quit (double-press like Claude Code)
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.request_exit();
+            return; // Don't clear exit_pending below
         }
         // Ctrl+Shift+B → send prompt to run in background
         KeyCode::Char('B') if key.modifiers.contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) => {
@@ -90,19 +91,30 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
             app.chat.scroll_offset = 0;
             app.chat.focused_message = None;
         }
-        // Ctrl+Up → previous history entry
-        KeyCode::Up if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        // Up → previous history entry (when input is empty or single-line, like Claude Code)
+        KeyCode::Up if !app.scroll_mode => {
             let current = app.input_state.text();
-            if let Some(prev) = app.history.prev(&current) {
-                let prev_owned = prev.to_string();
-                app.input_state.set_text(&prev_owned);
+            // Only navigate history if input is empty or single-line (no newlines)
+            if !current.contains('\n') {
+                if let Some(prev) = app.history.prev(&current) {
+                    let prev_owned = prev.to_string();
+                    app.input_state.set_text(&prev_owned);
+                }
+            } else {
+                // Multi-line: let edtui handle cursor movement
+                app.input_state.event_handler.on_key_event(key, &mut app.input_state.editor);
             }
         }
-        // Ctrl+Down → next history entry
-        KeyCode::Down if key.modifiers.contains(KeyModifiers::CONTROL) => {
-            if let Some(next) = app.history.next() {
-                let next_owned = next.to_string();
-                app.input_state.set_text(&next_owned);
+        // Down → next history entry (when input is empty or single-line)
+        KeyCode::Down if !app.scroll_mode => {
+            let current = app.input_state.text();
+            if !current.contains('\n') {
+                if let Some(next) = app.history.next() {
+                    let next_owned = next.to_string();
+                    app.input_state.set_text(&next_owned);
+                }
+            } else {
+                app.input_state.event_handler.on_key_event(key, &mut app.input_state.editor);
             }
         }
         // Tab → cycle focus (only when autocomplete is NOT active)
@@ -152,6 +164,9 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
             }
         }
     }
+
+    // Any non-Ctrl+C key resets the exit confirmation
+    app.clear_exit_pending();
 }
 
 fn handle_scroll_mode_key(key: KeyEvent, app: &mut App) {
