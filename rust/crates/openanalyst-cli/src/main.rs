@@ -2330,6 +2330,7 @@ fn run_resume_command(
         | SlashCommand::Exit
         | SlashCommand::Sidebar
         | SlashCommand::Swarm { .. }
+        | SlashCommand::OpenAnalyst { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -2983,8 +2984,11 @@ impl LiveCli {
                 false
             }
             SlashCommand::Swarm { .. } => {
-                // Swarm is TUI-only
                 eprintln!("Swarm mode requires the TUI (remove --no-tui)");
+                false
+            }
+            SlashCommand::OpenAnalyst { .. } => {
+                eprintln!("Autonomous mode requires the TUI (remove --no-tui)");
                 false
             }
             SlashCommand::Unknown(name) => {

@@ -5,8 +5,10 @@
 //! orchestrator, multimedia to file output, state changes to app state.
 
 use commands::SlashCommand;
+use events::Action;
 
 use crate::app::App;
+use crate::panels::chat::ChatMessage;
 
 /// Handle a slash command. Returns true if the input was a slash command.
 pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
@@ -94,22 +96,62 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
 
         SlashCommand::Model { model } => {
             if let Some(new_model) = model {
+                // Update display
                 app.status_bar.model_name = new_model.clone();
-                app.chat.push_system(format!("Model switched to: {new_model}"));
+                // Update the router so future prompts use the new model
+                app.router = orchestrator::router::ModelRouter::from_default_model(&new_model);
+                // Notify orchestrator to update its config
+                let tx = app.action_tx.clone();
+                let m = new_model.clone();
+                tokio::spawn(async move {
+                    let _ = tx.send(Action::UpdateModel(m)).await;
+                });
+                let table = app.router.render_table();
+                app.chat.push_system(format!(
+                    "Model switched to: {new_model}\nRouting table updated:\n{table}"
+                ));
             } else {
                 let current = if app.status_bar.model_name.is_empty() {
                     "default"
                 } else {
                     &app.status_bar.model_name
                 };
-                app.chat.push_system(format!("Current model: {current}"));
+                let table = app.router.render_table();
+                app.chat.push_system(format!("Current model: {current}\n{table}"));
             }
         }
         SlashCommand::Permissions { mode } => {
             if let Some(new_mode) = mode {
-                app.chat.push_system(format!("Permission mode set to: {new_mode}"));
+                // Validate the mode before accepting
+                let valid = matches!(
+                    new_mode.as_str(),
+                    "read-only" | "readonly" | "ro"
+                        | "workspace" | "workspace-write" | "ws"
+                        | "full" | "danger-full-access" | "yolo"
+                        | "prompt" | "ask" | "default"
+                        | "allow" | "allow-all"
+                );
+                if valid {
+                    app.permission_mode = new_mode.clone();
+                    // Notify orchestrator
+                    let tx = app.action_tx.clone();
+                    let m = new_mode.clone();
+                    tokio::spawn(async move {
+                        let _ = tx.send(Action::UpdatePermissions(m)).await;
+                    });
+                    app.chat.push_system(format!("Permission mode set to: {new_mode}"));
+                } else {
+                    app.chat.push_system(format!(
+                        "Unknown mode: {new_mode}\n\
+                         Options: read-only, workspace, prompt (default), full, allow"
+                    ));
+                }
             } else {
-                app.chat.push_system("Current permission mode: danger-full-access".to_string());
+                app.chat.push_system(format!(
+                    "Current permission mode: {}\n\
+                     Options: /permissions <read-only|workspace|prompt|full|allow>",
+                    app.permission_mode
+                ));
             }
         }
 
@@ -122,7 +164,13 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system("Session cleared.".to_string());
         }
         SlashCommand::Compact => {
-            app.chat.push_system("Session compacted.".to_string());
+            let before = app.chat.messages.len();
+            compact_chat_messages(app);
+            let after = app.chat.messages.len();
+            let removed = before.saturating_sub(after);
+            app.chat.push_system(format!(
+                "Session compacted: {removed} messages removed, {after} kept."
+            ));
         }
         SlashCommand::Resume { session_path } => {
             if let Some(path) = session_path {
@@ -152,14 +200,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system(msg);
         }
         SlashCommand::Plugins { action, target } => {
-            let msg = match action.as_deref() {
-                Some("list") | None => "Plugins: (use /plugins install <path> to install)".to_string(),
-                Some("install") => format!("Installing plugin: {}", target.unwrap_or_default()),
-                Some("enable") => format!("Enabled plugin: {}", target.unwrap_or_default()),
-                Some("disable") => format!("Disabled plugin: {}", target.unwrap_or_default()),
-                Some("uninstall") => format!("Uninstalled plugin: {}", target.unwrap_or_default()),
-                Some(other) => format!("Unknown plugin action: {other}"),
-            };
+            let msg = handle_plugins_command(action.as_deref(), target.as_deref());
             app.chat.push_system(msg);
         }
 
@@ -373,7 +414,37 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
         // ── Misc ──
 
         SlashCommand::DebugToolCall => {
-            app.chat.push_system("Debug: no recent tool call to replay.".to_string());
+            // Find the most recent tool call in chat history
+            let last_tool = app.chat.messages.iter().rev().find_map(|msg| {
+                if let ChatMessage::ToolCall { card } = msg {
+                    Some(card.clone())
+                } else {
+                    None
+                }
+            });
+            if let Some(card) = last_tool {
+                let status = match &card.status {
+                    tui_widgets::ToolCallStatus::Running { elapsed } => format!("Running ({:.1}s)", elapsed.as_secs_f64()),
+                    tui_widgets::ToolCallStatus::Completed { duration } => format!("Completed ({:.1}s)", duration.as_secs_f64()),
+                    tui_widgets::ToolCallStatus::Failed { duration } => format!("Failed ({:.1}s)", duration.as_secs_f64()),
+                };
+                let output = card.output.as_deref().unwrap_or("(no output)");
+                let output_preview = if output.len() > 500 {
+                    format!("{}...\n({} bytes total)", &output[..500], output.len())
+                } else {
+                    output.to_string()
+                };
+                app.chat.push_system(format!(
+                    "── Last Tool Call ──\n\
+                     Tool: {}\n\
+                     Input: {}\n\
+                     Status: {status}\n\
+                     Output:\n{output_preview}",
+                    card.tool_name, card.input_preview
+                ));
+            } else {
+                app.chat.push_system("No tool calls in this session.".to_string());
+            }
         }
 
         SlashCommand::Mcp { action, args } => {
@@ -381,13 +452,17 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                 None | Some("list") => list_mcp_servers(),
                 Some("add") => {
                     if let Some(a) = args {
-                        format!("MCP server add requested: {a}\nRestart CLI to activate.")
+                        mcp_add_server(&a)
                     } else {
                         "Usage: /mcp add <name> <command> [args...]".to_string()
                     }
                 }
                 Some("remove") => {
-                    format!("MCP server remove: {}", args.unwrap_or_default())
+                    if let Some(name) = args {
+                        mcp_remove_server(&name)
+                    } else {
+                        "Usage: /mcp remove <server-name>".to_string()
+                    }
                 }
                 Some(other) => format!("Unknown /mcp action: {other}"),
             };
@@ -800,6 +875,65 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                 );
             } else {
                 app.chat.push_system("Usage: /swarm <task description>".to_string());
+            }
+        }
+
+        SlashCommand::OpenAnalyst { task, goal, criteria, schedule, max_turns } => {
+            if let Some(task_text) = task {
+                let config = orchestrator::autonomous::AutonomousConfig {
+                    task: task_text.clone(),
+                    goal: goal.clone(),
+                    criteria: criteria.clone(),
+                    schedule: schedule.clone(),
+                    max_turns: max_turns.unwrap_or(30),
+                };
+
+                // Show config in chat
+                app.chat.push_system(format!(
+                    "🤖 Autonomous agent started\n{}",
+                    config.status_summary()
+                ));
+
+                // Track in sidebar
+                app.sidebar_state.update_agent(
+                    "oa-auto".to_string(),
+                    events::AgentType::General,
+                    format!("Auto: {}", &task_text[..task_text.len().min(30)]),
+                    events::AgentStatus::Running,
+                );
+
+                // Build the autonomous prompt and send
+                let prompt = config.build_autonomous_prompt();
+
+                // If criteria provided, add verification reminder
+                if let Some(ref crit) = criteria {
+                    // After each turn completes, the user can check criteria via
+                    // the criteria check. For now, inject it into the prompt.
+                    let verify_prompt = format!(
+                        "{prompt}\n\n\
+                         IMPORTANT: After completing your changes, run `{crit}` to verify. \
+                         If it fails, analyze the output and fix the issue. \
+                         Repeat until the criteria passes or you've exhausted approaches."
+                    );
+                    app.submit_prompt_internal(verify_prompt);
+                } else {
+                    app.submit_prompt_internal(prompt);
+                }
+
+                if schedule.is_some() {
+                    app.chat.push_system(
+                        "Note: Schedule support requires the remote trigger system. \
+                         Use `openanalyst schedule` CLI to set up recurring runs.".to_string()
+                    );
+                }
+            } else {
+                app.chat.push_system(
+                    "Usage: /open-analyst <task> [--goal <text>] [--criteria <cmd>] [--max-turns N]\n\n\
+                     Examples:\n\
+                     /open-analyst fix all failing tests --criteria \"cargo test\"\n\
+                     /oa refactor auth to async --goal \"all auth fns are async\" --criteria \"cargo build\"\n\
+                     /auto add caching layer --max-turns 20".to_string()
+                );
             }
         }
 
@@ -1240,4 +1374,209 @@ async fn kb_fetch(endpoint: &str, api_key: &str, query: &str) -> Result<String, 
     } else {
         Err(format!("HTTP {status}: {body}"))
     }
+}
+
+/// Compact chat messages — remove tool call details, merge consecutive system messages,
+/// and trim old messages to keep the session manageable.
+fn compact_chat_messages(app: &mut App) {
+    let messages = &mut app.chat.messages;
+
+    // Phase 1: collapse tool calls into one-line summaries
+    for msg in messages.iter_mut() {
+        if let ChatMessage::ToolCall { card } = msg {
+            // Replace with a system summary
+            let status_str = match &card.status {
+                tui_widgets::ToolCallStatus::Completed { duration } => format!("ok {:.1}s", duration.as_secs_f64()),
+                tui_widgets::ToolCallStatus::Failed { duration } => format!("err {:.1}s", duration.as_secs_f64()),
+                tui_widgets::ToolCallStatus::Running { .. } => "running".to_string(),
+            };
+            let summary = format!("[{}] {} → {status_str}", card.tool_name, card.input_preview);
+            *msg = ChatMessage::System { text: summary };
+        }
+    }
+
+    // Phase 2: merge consecutive system messages
+    let mut merged = Vec::with_capacity(messages.len());
+    for msg in messages.drain(..) {
+        if let ChatMessage::System { text } = &msg {
+            if let Some(ChatMessage::System { text: prev }) = merged.last_mut() {
+                prev.push('\n');
+                prev.push_str(text);
+                continue;
+            }
+        }
+        merged.push(msg);
+    }
+
+    // Phase 3: if still too many messages, keep the last N
+    const MAX_AFTER_COMPACT: usize = 100;
+    if merged.len() > MAX_AFTER_COMPACT {
+        let removed = merged.len() - MAX_AFTER_COMPACT;
+        merged.drain(..removed);
+        merged.insert(
+            0,
+            ChatMessage::System {
+                text: format!("({removed} older messages compacted)"),
+            },
+        );
+    }
+
+    *messages = merged;
+}
+
+/// Handle /plugins commands using the PluginManager.
+fn handle_plugins_command(action: Option<&str>, target: Option<&str>) -> String {
+    let config_home = resolve_config_home();
+    let config = plugins::PluginManagerConfig::new(&config_home);
+    let mut manager = plugins::PluginManager::new(config);
+
+    match action {
+        Some("list") | None => {
+            match manager.list_plugins() {
+                Ok(plugins) if plugins.is_empty() => {
+                    "No plugins installed.\nUse /plugins install <path> to install.".to_string()
+                }
+                Ok(plugins) => {
+                    let mut lines = vec![format!("Plugins ({}):", plugins.len())];
+                    for p in &plugins {
+                        let status = if p.enabled { "\u{2713}" } else { "\u{2717}" };
+                        lines.push(format!(
+                            "  {status} {} v{} ({})",
+                            p.metadata.id, p.metadata.version, p.metadata.kind
+                        ));
+                    }
+                    lines.join("\n")
+                }
+                Err(e) => format!("Error listing plugins: {e}"),
+            }
+        }
+        Some("install") => {
+            let source = target.unwrap_or("");
+            if source.is_empty() {
+                return "Usage: /plugins install <path-to-plugin>".to_string();
+            }
+            match manager.install(source) {
+                Ok(outcome) => format!(
+                    "Plugin installed: {} v{}",
+                    outcome.plugin_id, outcome.version
+                ),
+                Err(e) => format!("Install failed: {e}"),
+            }
+        }
+        Some("enable") => {
+            let id = target.unwrap_or("");
+            if id.is_empty() {
+                return "Usage: /plugins enable <plugin-id>".to_string();
+            }
+            match manager.enable(id) {
+                Ok(()) => format!("Plugin enabled: {id}"),
+                Err(e) => format!("Enable failed: {e}"),
+            }
+        }
+        Some("disable") => {
+            let id = target.unwrap_or("");
+            if id.is_empty() {
+                return "Usage: /plugins disable <plugin-id>".to_string();
+            }
+            match manager.disable(id) {
+                Ok(()) => format!("Plugin disabled: {id}"),
+                Err(e) => format!("Disable failed: {e}"),
+            }
+        }
+        Some("uninstall") => {
+            let id = target.unwrap_or("");
+            if id.is_empty() {
+                return "Usage: /plugins uninstall <plugin-id>".to_string();
+            }
+            match manager.uninstall(id) {
+                Ok(()) => format!("Plugin uninstalled: {id}"),
+                Err(e) => format!("Uninstall failed: {e}"),
+            }
+        }
+        Some(other) => format!("Unknown plugin action: {other}\nOptions: list, install, enable, disable, uninstall"),
+    }
+}
+
+/// Add an MCP server to .openanalyst/settings.json.
+fn mcp_add_server(args: &str) -> String {
+    let mut parts = args.split_whitespace();
+    let name = match parts.next() {
+        Some(n) => n,
+        None => return "Usage: /mcp add <name> <command> [args...]".to_string(),
+    };
+    let command = match parts.next() {
+        Some(c) => c,
+        None => return "Usage: /mcp add <name> <command> [args...]".to_string(),
+    };
+    let extra_args: Vec<&str> = parts.collect();
+
+    let settings_path = std::path::Path::new(".openanalyst").join("settings.json");
+    let _ = std::fs::create_dir_all(".openanalyst");
+
+    let mut root = if let Ok(content) = std::fs::read_to_string(&settings_path) {
+        serde_json::from_str::<serde_json::Value>(&content).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    let mcp_servers = root
+        .as_object_mut()
+        .unwrap()
+        .entry("mcpServers")
+        .or_insert_with(|| serde_json::json!({}));
+
+    let server_config = if extra_args.is_empty() {
+        serde_json::json!({ "command": command })
+    } else {
+        serde_json::json!({ "command": command, "args": extra_args })
+    };
+
+    mcp_servers
+        .as_object_mut()
+        .unwrap()
+        .insert(name.to_string(), server_config);
+
+    match std::fs::write(&settings_path, serde_json::to_string_pretty(&root).unwrap_or_default()) {
+        Ok(()) => format!(
+            "MCP server '{name}' added → {command}\nSaved to {}\nRestart CLI to activate.",
+            settings_path.display()
+        ),
+        Err(e) => format!("Failed to write settings: {e}"),
+    }
+}
+
+/// Remove an MCP server from .openanalyst/settings.json.
+fn mcp_remove_server(name: &str) -> String {
+    let settings_path = std::path::Path::new(".openanalyst").join("settings.json");
+
+    let mut root = if let Ok(content) = std::fs::read_to_string(&settings_path) {
+        serde_json::from_str::<serde_json::Value>(&content).unwrap_or_else(|_| serde_json::json!({}))
+    } else {
+        return format!("No settings file found at {}", settings_path.display());
+    };
+
+    let removed = root
+        .as_object_mut()
+        .and_then(|obj| obj.get_mut("mcpServers"))
+        .and_then(|mcp| mcp.as_object_mut())
+        .and_then(|servers| servers.remove(name));
+
+    match removed {
+        Some(_) => {
+            match std::fs::write(&settings_path, serde_json::to_string_pretty(&root).unwrap_or_default()) {
+                Ok(()) => format!("MCP server '{name}' removed.\nRestart CLI to apply."),
+                Err(e) => format!("Failed to write settings: {e}"),
+            }
+        }
+        None => format!("MCP server '{name}' not found in settings."),
+    }
+}
+
+/// Resolve the OpenAnalyst config home directory.
+fn resolve_config_home() -> std::path::PathBuf {
+    std::env::var("OPENANALYST_CONFIG_HOME")
+        .map(std::path::PathBuf::from)
+        .or_else(|_| std::env::var("HOME").map(|h| std::path::PathBuf::from(h).join(".openanalyst")))
+        .or_else(|_| std::env::var("USERPROFILE").map(|h| std::path::PathBuf::from(h).join(".openanalyst")))
+        .unwrap_or_else(|_| std::path::PathBuf::from(".openanalyst"))
 }

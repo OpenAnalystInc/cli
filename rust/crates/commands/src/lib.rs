@@ -439,6 +439,13 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: Some("<task>"),
         resume_supported: false,
     },
+    SlashCommandSpec {
+        name: "open-analyst",
+        aliases: &["oa", "autonomous", "auto"],
+        summary: "Run autonomous agent — think→act→observe→verify loop",
+        argument_hint: Some("<task> [--goal X] [--criteria <cmd>] [--schedule <cron>] [--max-turns N]"),
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -592,6 +599,15 @@ pub enum SlashCommand {
     /// Spawn a swarm of agents for a complex task.
     Swarm {
         task: Option<String>,
+    },
+    /// Autonomous agent — Karpathy-style loop: think→act→observe→verify→repeat.
+    /// Only <task> is required. schedule, goal, criteria are optional.
+    OpenAnalyst {
+        task: Option<String>,
+        goal: Option<String>,
+        criteria: Option<String>,
+        schedule: Option<String>,
+        max_turns: Option<u32>,
     },
     Unknown(String),
 }
@@ -781,6 +797,12 @@ impl SlashCommand {
             "swarm" => Self::Swarm {
                 task: remainder_after_command(trimmed, command),
             },
+            "open-analyst" | "oa" | "autonomous" | "auto" => {
+                // Parse: /open-analyst <task> [--goal X] [--criteria X] [--schedule X] [--max-turns N]
+                let remainder = remainder_after_command(trimmed, command).unwrap_or_default();
+                let (task, goal, criteria, schedule, max_turns) = parse_open_analyst_args(&remainder);
+                Self::OpenAnalyst { task, goal, criteria, schedule, max_turns }
+            }
             other => Self::Unknown(other.to_string()),
         })
     }
@@ -793,6 +815,53 @@ fn remainder_after_command(input: &str, command: &str) -> Option<String> {
         .map(str::trim)
         .filter(|value| !value.is_empty())
         .map(ToOwned::to_owned)
+}
+
+/// Parse /open-analyst args: <task> [--goal X] [--criteria X] [--schedule X] [--max-turns N]
+fn parse_open_analyst_args(input: &str) -> (Option<String>, Option<String>, Option<String>, Option<String>, Option<u32>) {
+    let mut task_parts = Vec::new();
+    let mut goal = None;
+    let mut criteria = None;
+    let mut schedule = None;
+    let mut max_turns = None;
+
+    let mut iter = input.split_whitespace().peekable();
+    while let Some(word) = iter.next() {
+        match word {
+            "--goal" | "-g" => {
+                goal = collect_until_flag(&mut iter);
+            }
+            "--criteria" | "--check" | "-c" => {
+                criteria = collect_until_flag(&mut iter);
+            }
+            "--schedule" | "--cron" | "-s" => {
+                schedule = collect_until_flag(&mut iter);
+            }
+            "--max-turns" | "--turns" | "-n" => {
+                if let Some(n) = iter.peek() {
+                    max_turns = n.parse().ok();
+                    if max_turns.is_some() { iter.next(); }
+                }
+            }
+            _ => task_parts.push(word),
+        }
+    }
+
+    let task = if task_parts.is_empty() { None } else { Some(task_parts.join(" ")) };
+    (task, goal, criteria, schedule, max_turns)
+}
+
+/// Collect words until the next --flag or end of input.
+fn collect_until_flag(iter: &mut std::iter::Peekable<std::str::SplitWhitespace<'_>>) -> Option<String> {
+    let mut parts = Vec::new();
+    while let Some(word) = iter.peek() {
+        if word.starts_with("--") || word.starts_with('-') && word.len() == 2 {
+            break;
+        }
+        parts.push(*word);
+        iter.next();
+    }
+    if parts.is_empty() { None } else { Some(parts.join(" ")) }
 }
 
 #[must_use]
@@ -2042,6 +2111,7 @@ pub fn handle_slash_command(
         | SlashCommand::Exit
         | SlashCommand::Sidebar
         | SlashCommand::Swarm { .. }
+        | SlashCommand::OpenAnalyst { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2398,7 +2468,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 55);
+        assert_eq!(slash_command_specs().len(), 56);
         assert_eq!(resume_supported_slash_commands().len(), 14);
     }
 

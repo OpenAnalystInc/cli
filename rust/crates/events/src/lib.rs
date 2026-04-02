@@ -156,6 +156,10 @@ pub enum Action {
     CancelAgent(AgentId),
     /// User issued a slash command.
     SlashCommand(String),
+    /// User changed the default model — update orchestrator config + router.
+    UpdateModel(String),
+    /// User changed the permission mode.
+    UpdatePermissions(String),
     /// User requested to quit.
     Quit,
 }
