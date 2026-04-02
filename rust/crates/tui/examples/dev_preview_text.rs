@@ -54,7 +54,7 @@ fn main() {
             duration: Duration::from_millis(340),
         },
         output: Some("fn login() { ... }".to_string()),
-        expanded: false,
+        expanded: false, diff: None,
     });
 
     app.chat.push_tool_call(ToolCallCard {
@@ -64,7 +64,7 @@ fn main() {
             duration: Duration::from_millis(1250),
         },
         output: Some("Applied: added .await to send() call".to_string()),
-        expanded: true,
+        expanded: true, diff: None,
     });
 
     app.chat.start_assistant();
@@ -78,7 +78,7 @@ fn main() {
             elapsed: Duration::from_millis(4500),
         },
         output: None,
-        expanded: false,
+        expanded: false, diff: None,
     });
 
     // Sidebar mock data

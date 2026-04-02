@@ -1,6 +1,7 @@
-//! SQLite learning database for the /knowledge feedback loop.
+//! SQLite database for the OpenAnalyst CLI.
 //!
 //! Schema:
+//! - cli_credentials: provider API keys — 3rd persistence layer alongside .env + credentials.json
 //! - kb_queries: every query with intent, timestamp, session context
 //! - kb_feedback: user rating + correction for each query
 //! - kb_learnings: positive learnings extracted from feedback (reusable)
@@ -90,6 +91,18 @@ impl LearningDb {
     fn init_schema(&self) -> SqlResult<()> {
         self.conn.execute_batch(
             "
+            -- ── Credentials (3rd persistence layer) ──
+            CREATE TABLE IF NOT EXISTS cli_credentials (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                provider_name TEXT NOT NULL UNIQUE,
+                env_var       TEXT NOT NULL,
+                api_key       TEXT NOT NULL,
+                auth_method   TEXT NOT NULL DEFAULT 'api_key',
+                oauth_refresh TEXT DEFAULT '',
+                oauth_expires INTEGER DEFAULT 0,
+                updated_at    TEXT NOT NULL DEFAULT (datetime('now'))
+            );
+
             CREATE TABLE IF NOT EXISTS kb_queries (
                 id            INTEGER PRIMARY KEY AUTOINCREMENT,
                 query         TEXT NOT NULL,
@@ -130,7 +143,9 @@ impl LearningDb {
                 created_at    TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
-            -- Indexes for AI reading performance
+            -- Indexes
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_creds_provider ON cli_credentials(provider_name);
+            CREATE INDEX IF NOT EXISTS idx_creds_env_var ON cli_credentials(env_var);
             CREATE INDEX IF NOT EXISTS idx_queries_intent ON kb_queries(intent);
             CREATE INDEX IF NOT EXISTS idx_queries_created ON kb_queries(created_at);
             CREATE INDEX IF NOT EXISTS idx_queries_session ON kb_queries(session_id);
@@ -143,6 +158,78 @@ impl LearningDb {
             CREATE INDEX IF NOT EXISTS idx_wrong_category ON kb_wrong_learnings(category);
             "
         )
+    }
+
+    // ── Credential operations (3rd persistence layer) ──
+
+    /// Save or update a provider credential.
+    pub fn save_credential(
+        &self,
+        provider_name: &str,
+        env_var: &str,
+        api_key: &str,
+        auth_method: &str,
+        oauth_refresh: Option<&str>,
+        oauth_expires: Option<i64>,
+    ) -> SqlResult<()> {
+        self.conn.execute(
+            "INSERT INTO cli_credentials (provider_name, env_var, api_key, auth_method, oauth_refresh, oauth_expires, updated_at)
+             VALUES (?1, ?2, ?3, ?4, ?5, ?6, datetime('now'))
+             ON CONFLICT(provider_name) DO UPDATE SET
+               env_var = excluded.env_var,
+               api_key = excluded.api_key,
+               auth_method = excluded.auth_method,
+               oauth_refresh = excluded.oauth_refresh,
+               oauth_expires = excluded.oauth_expires,
+               updated_at = datetime('now')",
+            params![
+                provider_name,
+                env_var,
+                api_key,
+                auth_method,
+                oauth_refresh.unwrap_or(""),
+                oauth_expires.unwrap_or(0),
+            ],
+        )?;
+        Ok(())
+    }
+
+    /// Load a credential by provider name.
+    pub fn load_credential(&self, provider_name: &str) -> SqlResult<Option<(String, String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT env_var, api_key, auth_method FROM cli_credentials WHERE provider_name = ?1"
+        )?;
+        let mut rows = stmt.query_map(params![provider_name], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+        })?;
+        match rows.next() {
+            Some(Ok(row)) => Ok(Some(row)),
+            _ => Ok(None),
+        }
+    }
+
+    /// Load all credentials (for startup env loading).
+    pub fn load_all_credentials(&self) -> SqlResult<Vec<(String, String, String)>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT provider_name, env_var, api_key FROM cli_credentials ORDER BY updated_at DESC"
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, String>(1)?, row.get::<_, String>(2)?))
+        })?;
+        let mut results = Vec::new();
+        for row in rows {
+            results.push(row?);
+        }
+        Ok(results)
+    }
+
+    /// Delete a credential by provider name.
+    pub fn delete_credential(&self, provider_name: &str) -> SqlResult<bool> {
+        let count = self.conn.execute(
+            "DELETE FROM cli_credentials WHERE provider_name = ?1",
+            params![provider_name],
+        )?;
+        Ok(count > 0)
     }
 
     // ── Write operations ──
