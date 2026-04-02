@@ -34,10 +34,10 @@ impl Default for InputMode {
 impl InputMode {
     fn border_color(&self) -> Color {
         match self {
-            Self::Ready => Color::Indexed(240),         // dim gray
-            Self::AgentRunning { .. } => Color::Blue,   // blue for agents
-            Self::PlanRunning { .. } => Color::Yellow,  // yellow for plans
-            Self::Streaming => Color::Cyan,              // cyan while streaming
+            Self::Ready => Color::Rgb(50, 130, 255),     // blue border
+            Self::AgentRunning { .. } => Color::Rgb(50, 130, 255),
+            Self::PlanRunning { .. } => Color::Yellow,
+            Self::Streaming => Color::Cyan,
         }
     }
 
@@ -127,7 +127,7 @@ impl InputBox {
 
         let block = Block::default()
             .borders(Borders::ALL)
-            .border_type(BorderType::Rounded)
+            .border_type(BorderType::Thick)
             .border_style(Style::default().fg(border_color))
             .title(Line::from(title_spans));
 
@@ -138,13 +138,20 @@ impl InputBox {
             base: Style::default().fg(Color::Indexed(252)),
             cursor_style: Style::default().fg(Color::Black).bg(Color::White),
             selection_style: Style::default().bg(Color::Indexed(236)),
-            status_line: None, // No "Normal" / "Insert" label — keep it clean
+            status_line: None,
             block: None,
             line_numbers_style: Style::default().fg(Color::Indexed(238)),
         };
 
+        // Clip by 1 row to hide edtui's built-in vim status line
+        let clipped = if inner.height > 1 {
+            Rect { height: inner.height - 1, ..inner }
+        } else {
+            inner
+        };
+
         let editor = EditorView::new(&mut state.editor).theme(theme);
-        editor.render(inner, buf);
+        editor.render(clipped, buf);
     }
 }
 
@@ -158,12 +165,21 @@ impl Default for InputBoxState {
     fn default() -> Self {
         Self {
             editor: EditorState::default(),
-            event_handler: EditorEventHandler::vim_mode(),
+            event_handler: EditorEventHandler::default(),
         }
     }
 }
 
 impl InputBoxState {
+    /// Create with vim keybindings (Normal/Insert/Visual modes).
+    #[must_use]
+    pub fn with_vim_mode() -> Self {
+        Self {
+            editor: EditorState::default(),
+            event_handler: EditorEventHandler::vim_mode(),
+        }
+    }
+
     /// Get the current text content.
     #[must_use]
     pub fn text(&self) -> String {

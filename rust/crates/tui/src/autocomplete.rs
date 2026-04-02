@@ -112,7 +112,7 @@ impl SlashSuggestions {
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
-            .border_style(Style::default().fg(Color::Indexed(240)))
+            .border_style(Style::default().fg(Color::Rgb(50, 130, 255)))
             .title(Line::from(Span::styled(
                 " Commands ",
                 Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),

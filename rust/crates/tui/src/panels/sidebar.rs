@@ -243,7 +243,7 @@ pub fn render_sidebar(
     area: Rect,
     buf: &mut Buffer,
 ) {
-    let border_style = Style::default().fg(Color::Indexed(238));
+    let border_style = Style::default().fg(Color::Rgb(50, 130, 255));
 
     // Draw outer border
     let outer_block = Block::default()

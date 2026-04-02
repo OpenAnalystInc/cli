@@ -206,6 +206,8 @@ pub enum Action {
     },
     /// Mid-task skill injection — run a slash command while agents are working.
     InjectSkill(String),
+    /// Voice transcription completed — place text in input box for review.
+    VoiceTranscribed { text: String },
     /// User requested to quit.
     Quit,
 }

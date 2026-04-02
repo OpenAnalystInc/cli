@@ -7,8 +7,8 @@ use ratatui::layout::{Constraint, Layout, Rect};
 /// Width of the sidebar when visible.
 pub const SIDEBAR_WIDTH: u16 = 26;
 
-/// Minimum input box height.
-pub const INPUT_MIN_HEIGHT: u16 = 3;
+/// Minimum input box height (borders take 2 lines, so 5 = 3 lines for typing).
+pub const INPUT_MIN_HEIGHT: u16 = 5;
 
 /// Maximum input box height.
 pub const INPUT_MAX_HEIGHT: u16 = 10;
