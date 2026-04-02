@@ -20,12 +20,15 @@ OpenAnalyst CLI is an **independent, open-source AI coding agent** that connects
 | Capability | OpenAnalyst CLI | Other CLI Tools |
 |-----------|----------------|-----------------|
 | **Providers** | 7 (OpenAnalyst, Anthropic, OpenAI, xAI, Gemini, OpenRouter, Bedrock) | Typically 1-2 |
+| **OAuth login** | Browser login for Claude, Codex, Gemini — no API key needed | API key only |
 | **Mid-conversation model switching** | Session persists across providers | Not supported |
-| **TUI** | Full Ratatui-based terminal UI (default) | Most use basic REPL |
-| **Multi-agent orchestrator** | Built-in parallel agent spawning | Limited or none |
+| **TUI** | Full Ratatui-based terminal UI with blue-branded OA banner | Most use basic REPL |
+| **Multi-agent orchestrator** | Built-in parallel agents, swarms, autonomous loops, MOE | Limited or none |
 | **Multimedia** | /image, /voice, /speak, /vision, /diagram | Rarely supported |
-| **51+ slash commands** | Git, AI planning, multimedia, web scraping | 5-15 typical |
-| **Single binary** | Native Rust, no runtime dependencies | Often needs Node/Python |
+| **51+ slash commands** | Git, AI planning, multimedia, web scraping, Playwright | 5-15 typical |
+| **19 built-in tools** | Bash, file ops, search, web, agents, REPL, PowerShell | 5-10 typical |
+| **MCP support** | Full Model Context Protocol — unlimited external tools | Partial or none |
+| **Single binary** | Native Rust, no runtime dependencies (18 MB) | Often needs Node/Python |
 
 ---
 
@@ -54,7 +57,9 @@ cd rust && cargo build --release
 openanalyst login
 ```
 
-Interactive provider picker — select your LLM provider, authenticate via browser OAuth or API key, credentials saved automatically. For Claude, Codex, and Gemini you can login directly through your provider account.
+Interactive provider picker — select your LLM provider, authenticate via browser OAuth or API key, credentials saved automatically.
+
+**Direct provider login:** For **Claude** (Anthropic), **Codex** (OpenAI), and **Gemini** (Google) you can login directly with your provider account via browser OAuth — no API key needed. Credentials are stored securely with PKCE and auto-refresh.
 
 Alternatively, edit `~/.openanalyst/.env` (created during install) and add your API keys directly.
 
@@ -79,13 +84,13 @@ openanalyst --model grok "fix the bug"        # xAI Grok
 
 All providers are first-class citizens with live model discovery, streaming, and full tool support.
 
-| Provider | Auth Variable | Models |
-|----------|--------------|--------|
+| Provider | Auth | Models |
+|----------|------|--------|
 | **OpenAnalyst** (default) | `OPENANALYST_AUTH_TOKEN` | Fetched live from API |
-| **Anthropic / Claude** | `ANTHROPIC_API_KEY` | opus, sonnet, haiku — fetched live |
-| **OpenAI / Codex** | `OPENAI_API_KEY` | gpt-4o, o3, codex-mini — direct API |
-| **Google Gemini** | `GEMINI_API_KEY` | gemini-2.5-pro, gemini-2.5-flash — fetched live |
-| **xAI / Grok** | `XAI_API_KEY` | grok-3, grok-mini — fetched live |
+| **Anthropic / Claude** | `openanalyst login` (OAuth) or `ANTHROPIC_API_KEY` | opus, sonnet, haiku |
+| **OpenAI / Codex** | `openanalyst login` (OAuth) or `OPENAI_API_KEY` | gpt-4o, o3, codex-mini |
+| **Google Gemini** | `openanalyst login` (OAuth) or `GEMINI_API_KEY` | gemini-2.5-pro, flash |
+| **xAI / Grok** | `XAI_API_KEY` | grok-3, grok-mini |
 | **OpenRouter** | `OPENROUTER_API_KEY` | 350+ models from any provider |
 | **Amazon Bedrock** | `BEDROCK_API_KEY` | Fetched live from gateway |
 
@@ -96,32 +101,123 @@ All providers are first-class citizens with live model discovery, streaming, and
 ## Features
 
 ### Full Terminal UI (Ratatui-based)
-- Scrollable chat with inline tool call cards
-- Startup banner with account info and OA block letters
-- Status line with spinner, elapsed time, and token count
-- Vim-mode input (via edtui)
+- **Blue-branded OA banner** with version inline, rounded-corner box, account info, tips
+- Scrollable chat with inline tool call cards and rich diff rendering
+- **Type immediately** — no vim Normal mode gate, just start typing
+- Up/Down arrow keys for prompt history navigation
+- Status line with animated spinner, elapsed time, token count, and current model
+- Blue thick borders on input box, sidebar, and autocomplete popup
 - Permission dialogs as modal overlays
 - Mouse scroll and keyboard navigation
+- Vim mode available via `/vim` toggle
+- Shift+Enter for multi-line input
+- Double Ctrl+C to quit (first press cancels, second quits)
+
+### Authentication
+- **Browser OAuth** for Claude, Codex, and Gemini — sign in with your provider account
+- **API key** support for all 7 providers
+- **PKCE security** with automatic token refresh
+- Credentials stored in `~/.openanalyst/credentials.json`
+- Interactive provider picker with arrow-key navigation
 
 ### Multi-Agent Orchestrator
-- Spawn sub-agents for parallel tasks
+- Spawn sub-agents for parallel tasks (Explore, Plan, General)
+- **Agent Swarm** — `/swarm <task>` decomposes work across parallel agents
+- **Autonomous loops** — `/openanalyst <task>` runs think→act→observe→verify cycles
+- **Mixture of Experts (MOE)** — routes to specialized models per task type
+- **Smart model routing** — `/route` to view/edit per-category model assignments
+- **Effort budgets** — `/effort` to control thinking depth (low/medium/high/max)
 - Each agent has its own conversation runtime and tool permissions
-- Agent lifecycle events displayed in real-time
+- Agent lifecycle events displayed in real-time in TUI
 - Channel-based async bridge (sync runtime ↔ async TUI)
 
-### 49 Slash Commands
+### 51+ Slash Commands
 
-**Session:** /help, /status, /cost, /model, /clear, /compact, /session, /export, /resume, /version, /login, /logout, /context, /vim
+**Session & Config:** /help, /status, /cost, /model, /clear, /compact, /session, /export, /resume, /version, /login, /logout, /context, /vim, /config, /memory, /init, /exit, /sidebar, /permissions
+
 **Code & Git:** /diff, /commit, /commit-push-pr, /pr, /issue, /branch, /worktree, /teleport, /diff-review, /changelog
-**Analysis:** /bughunter, /ultraplan, /debug-tool-call, /think, /doctor
+
+**Analysis & Planning:** /bughunter, /ultraplan, /debug-tool-call, /think, /doctor
+
 **Multimedia:** /image, /voice, /speak, /vision, /diagram
-**Web:** /scrape, /json
-**AI:** /translate, /tokens
-**Config:** /config, /memory, /init, /permissions, /plugins, /agents, /skills, /mcp, /add-dir
-**Dev Tools:** /dev (install, open, screenshot, snap, click, type, test, codegen, stop, status)
+
+**Web & Data:** /scrape, /json
+
+**AI & Translation:** /translate, /tokens
+
+**Agent Control:** /swarm, /openanalyst, /ask, /user-prompt, /effort, /route, /agents, /skills
+
+**Dev Tools:** /dev (install, open, screenshot, snap, click, type, test, codegen, stop)
+
+**Advanced:** /mcp, /knowledge, /explore, /plugins, /hooks, /add-dir
 
 ### 19 Built-in Tools
-Bash, ReadFile, WriteFile, EditFile, GlobSearch, GrepSearch, WebSearch, WebFetch, Agent, TodoWrite, NotebookEdit, Skill, ToolSearch, Sleep, SendUserMessage, Config, StructuredOutput, REPL, PowerShell
+
+| Tool | Permission | Description |
+|------|-----------|-------------|
+| `bash` | Full Access | Execute shell commands with sandboxing |
+| `read_file` | Read Only | Read file contents with line numbers |
+| `write_file` | Workspace | Create or overwrite files |
+| `edit_file` | Workspace | Modify files with exact string replacement |
+| `glob_search` | Read Only | Find files by glob patterns |
+| `grep_search` | Read Only | Search file contents with regex |
+| `web_search` | Read Only | Search the internet |
+| `web_fetch` | Read Only | Fetch and parse URL content |
+| `agent` | Varies | Spawn sub-agents for parallel tasks |
+| `todo_write` | Workspace | Create and manage task lists |
+| `notebook_edit` | Workspace | Edit Jupyter notebook cells |
+| `skill` | Varies | Invoke custom skills |
+| `tool_search` | Read Only | Discover available tools |
+| `config` | Read Only | Read configuration and settings |
+| `repl` | Varies | Run code in Python or Node REPL |
+| `structured_output` | Read Only | Validate output against JSON schema |
+| `sleep` | Read Only | Pause execution |
+| `send_user_message` | Read Only | Send notification to user |
+| `powershell` | Varies | Execute PowerShell commands (Windows) |
+
+Additional tools can be registered via **MCP servers** (unlimited).
+
+### MCP (Model Context Protocol)
+
+Full MCP client with 6 transport types:
+- **stdio** — Local processes, npm packages
+- **SSE** — Remote servers over HTTP
+- **WebSocket** — Bidirectional real-time
+- **HTTP** — REST API wrappers
+- **SDK** — Direct in-process integration
+- **Managed proxy** — Enterprise environments
+
+```bash
+/mcp                        # List connected servers
+/mcp add my-server stdio npx -y @my/mcp-server
+/mcp remove my-server
+```
+
+### Permission System
+
+| Mode | Bash | Write | Edit | Install | Delete |
+|------|------|-------|------|---------|--------|
+| `read-only` | ✗ | ✗ | ✗ | ✗ | ✗ |
+| `workspace-write` | ✓ | ✓ | ✓ | ✗ | ✗ |
+| `danger-full-access` | ✓ | ✓ | ✓ | ✓ | ✓ |
+
+Modal permission dialogs appear when a tool requires elevated access.
+
+### Hooks System
+
+| Event | Fires When |
+|-------|-----------|
+| `PreToolUse` | Before a tool is executed |
+| `PostToolUse` | After a tool completes |
+| `SessionStart` | When a new session begins |
+| `SessionEnd` | When a session ends |
+| `CwdChanged` | When the working directory changes |
+| `FileChanged` | When a file is modified |
+| `TaskCreated` | When a new task is created |
+
+### Plugin System
+- Install, enable, disable plugins from `~/.openanalyst/plugins/`
+- Full lifecycle management with `/plugins` command
 
 ---
 
@@ -134,7 +230,7 @@ rust/crates/
 ├── api/                   # Multi-provider API client (7 providers)
 ├── commands/              # 51+ slash commands
 ├── events/                # Shared TUI ↔ backend event types
-├── orchestrator/          # Multi-agent lifecycle + channel bridge
+├── orchestrator/          # Multi-agent lifecycle, MOE, model routing
 ├── tui/                   # Ratatui full-screen TUI application
 ├── tui-widgets/           # Widgets (markdown, tool cards, input, spinner)
 ├── runtime/               # Conversation engine, session, permissions, MCP
@@ -146,6 +242,17 @@ rust/crates/
 ├── lsp/                   # Language Server Protocol integration
 └── compat-harness/        # Upstream manifest extraction
 ```
+
+### Key Technologies
+- **Ratatui 0.30** — Terminal UI framework
+- **Tokio 1.x** — Async runtime (multi-threaded)
+- **Crossterm 0.29** — Terminal backend
+- **Reqwest 0.12** — HTTP client
+- **Syntect 5.x** — Syntax highlighting
+- **Tiktoken-rs** — Token counting
+- **edtui** — Text editor widget (vim mode optional)
+- **tui-markdown** — Markdown rendering (Ratatui team)
+- **Axum** — HTTP/SSE server
 
 ### Ecosystem Crates Used (not reinvented)
 - **tui-markdown** — Markdown rendering (by Ratatui core team)
@@ -162,9 +269,47 @@ rust/crates/
 |------|---------|
 | `OPENANALYST.md` | Project-specific AI instructions (auto-detected) |
 | `.openanalyst.json` | Shared project defaults |
-| `.openanalyst/settings.json` | Project settings |
+| `.openanalyst/settings.json` | Project settings (hooks, plugins, MCP, model, permissions) |
 | `.openanalyst/settings.local.json` | Machine-local overrides (gitignored) |
-| `~/.openanalyst/credentials.json` | Saved provider API keys |
+| `~/.openanalyst/.env` | API keys and base URLs |
+| `~/.openanalyst/credentials.json` | Saved OAuth tokens (auto-managed) |
+
+### Environment Variables
+
+**Authentication:**
+| Variable | Provider |
+|----------|----------|
+| `OPENANALYST_AUTH_TOKEN` | OpenAnalyst (default) |
+| `ANTHROPIC_API_KEY` | Anthropic / Claude |
+| `OPENAI_API_KEY` | OpenAI / Codex |
+| `GEMINI_API_KEY` | Google Gemini |
+| `XAI_API_KEY` | xAI / Grok |
+| `OPENROUTER_API_KEY` | OpenRouter |
+| `BEDROCK_API_KEY` | Amazon Bedrock |
+
+**Runtime:**
+| Variable | Description |
+|----------|-------------|
+| `OPENANALYST_CONFIG_HOME` | Override config directory |
+| `OPENANALYST_MODEL` | Override default model |
+| `OPENANALYST_PERMISSION_MODE` | Set permission mode |
+
+---
+
+## Documentation
+
+Full Mintlify-style documentation is included at [`docs/Documentation/index.html`](docs/Documentation/index.html) — 12 pages covering:
+
+- Installation & Quick Start
+- Authentication (OAuth + API keys)
+- LLM Providers & model switching
+- Terminal UI layout & keybindings
+- All 51+ slash commands
+- 19 built-in tools with permissions
+- Multi-agent system (swarms, autonomous, MOE)
+- Configuration & hooks
+- MCP integration
+- Architecture & building
 
 ---
 
@@ -211,6 +356,6 @@ THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. OpenAnalyst Inc
 ---
 
 <p align="center">
-  <strong>OpenAnalyst CLI v1.0.89</strong> — Built by OpenAnalyst Inc<br>
+  <strong>OpenAnalyst CLI v1.0.91</strong> — Built by OpenAnalyst Inc<br>
   <em>An independent, open-source AI agent for the terminal.</em>
 </p>
