@@ -13,7 +13,9 @@ body{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;background:var
 
 /* ── Navbar ── */
 .nav{position:sticky;top:0;z-index:100;background:rgba(10,14,23,0.85);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto}
-.nav-logo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;color:var(--accent);letter-spacing:4px;border:1.5px solid var(--accent);padding:3px 10px;border-radius:8px;text-decoration:none;box-shadow:0 0 16px var(--glow)}
+.nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none}
+.nav-logo img{width:28px;height:28px;filter:drop-shadow(0 0 8px rgba(255,107,0,0.3))}
+.nav-logo span{font-family:'Plus Jakarta Sans',sans-serif;font-weight:700;font-size:15px;color:var(--accent);letter-spacing:1px}
 .nav-links{display:flex;gap:24px;list-style:none}.nav-links a{color:var(--dim);text-decoration:none;font-size:13px;font-weight:500;transition:color .2s}.nav-links a:hover{color:var(--accent)}
 @media(max-width:640px){.nav-links{display:none}}
 
@@ -25,14 +27,16 @@ section{padding:64px 0}
 .section-sub{color:var(--muted);font-size:15px;margin-bottom:32px;max-width:640px}
 
 /* ── Hero ── */
-.hero{text-align:center;padding:100px 24px 80px;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(255,107,0,0.08),transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(139,92,246,0.05),transparent 50%);pointer-events:none}
-.hero-badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;padding:6px 16px;border:2px solid var(--accent);border-radius:12px;color:var(--accent);letter-spacing:6px;box-shadow:0 0 30px var(--glow),inset 0 0 20px var(--glow2);margin-bottom:24px;position:relative}
-.hero h1{font-size:clamp(36px,6vw,56px);font-weight:800;letter-spacing:-2px;background:linear-gradient(135deg,var(--accent),var(--purple),var(--green),var(--blue),var(--accent));background-size:300% 300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradient-shift 6s ease-in-out infinite;margin-bottom:16px;position:relative}
-@keyframes gradient-shift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
-.hero-sub{color:var(--muted);font-size:18px;margin-bottom:8px;position:relative}
-.hero-cycle{color:var(--accent2);font-weight:600;display:inline-block;min-width:180px;text-align:left}
-.hero-status{margin:28px auto 32px;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--dim);position:relative}
+.hero{text-align:center;padding:120px 24px 100px;position:relative;overflow:hidden}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% -10%,rgba(255,107,0,0.1),transparent 55%),radial-gradient(ellipse at 80% 100%,rgba(139,92,246,0.05),transparent 50%);pointer-events:none}
+.hero-logo{width:80px;height:80px;margin-bottom:28px;filter:drop-shadow(0 0 20px rgba(255,107,0,0.3));position:relative}
+.hero h1{font-size:clamp(48px,8vw,72px);font-weight:800;letter-spacing:-3px;color:var(--accent);margin-bottom:12px;position:relative;line-height:1.1}
+.hero-sub{color:var(--muted);font-size:clamp(18px,3vw,22px);margin-bottom:8px;position:relative}
+.hero-cycle-wrap{font-size:clamp(28px,5vw,44px);font-weight:700;height:clamp(36px,6vw,56px);margin:16px auto;position:relative;overflow:hidden;display:flex;justify-content:center;align-items:center}
+.hero-cycle{color:var(--accent2);font-family:'JetBrains Mono',monospace;display:inline-block;white-space:nowrap}
+.hero-cursor{display:inline-block;width:3px;height:1em;background:var(--accent);margin-left:2px;animation:blink .6s step-end infinite;vertical-align:text-bottom}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:0}}
+.hero-status{margin:32px auto 36px;font-family:'JetBrains Mono',monospace;font-size:14px;color:var(--dim);position:relative}
 .hero-status .dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:8px;animation:pulse 2s ease-in-out infinite}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 .cta-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative}
@@ -97,7 +101,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 .credits{background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:32px}
 
 /* ── Responsive ── */
-@media(max-width:640px){section{padding:40px 0}.hero{padding:60px 16px 48px}.hero h1{font-size:32px}.pgrid,.tgrid{grid-template-columns:1fr}.cta-row{flex-direction:column;align-items:center}.card{padding:20px}}
+@media(max-width:640px){section{padding:40px 0}.hero{padding:80px 16px 60px}.hero-logo{width:64px;height:64px}.hero h1{font-size:42px;letter-spacing:-2px}.hero-sub{font-size:18px}.hero-cycle-wrap{font-size:28px;height:38px}.pgrid,.tgrid{grid-template-columns:1fr}.cta-row{flex-direction:column;align-items:center}.card{padding:20px}.nav-logo span{display:none}}
 </style>
 </head>
 <body>
@@ -105,7 +109,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <!-- ═══ 1. NAVBAR ═══ -->
 <nav style="position:sticky;top:0;z-index:100;background:rgba(10,10,15,0.9);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06)">
 <div class="nav">
-  <a href="#" class="nav-logo">O A</a>
+  <a href="#" class="nav-logo"><img src="https://openanalyst.com/images/new-logo.png" alt="OA"><span>OpenAnalyst</span></a>
   <ul class="nav-links">
     <li><a href="#install">Install</a></li>
     <li><a href="#providers">Providers</a></li>
@@ -120,9 +124,10 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 <!-- ═══ 2. HERO ═══ -->
 <div class="hero">
-  <div class="hero-badge">O A</div>
+  <img src="https://openanalyst.com/images/new-logo.png" alt="OpenAnalyst" class="hero-logo">
   <h1>OpenAnalyst CLI</h1>
-  <p class="hero-sub">The universal AI agent <span class="hero-cycle" id="cycle">for your terminal</span></p>
+  <p class="hero-sub">The universal AI agent</p>
+  <div class="hero-cycle-wrap"><span class="hero-cycle" id="cycle"></span><span class="hero-cursor"></span></div>
   <div class="hero-status"><span class="dot"></span><span id="status-text">Ready</span></div>
   <div class="cta-row">
     <a href="#install" class="btn btn-primary">Get Started</a>
@@ -478,11 +483,38 @@ function cc(b){const c=b.closest('.cb').querySelector('.code').innerText;navigat
 // Accordion toggle
 function toggleAcc(el){el.classList.toggle('open')}
 
-// Hero typewriter cycling
-const phrases=["for your terminal","for developers","for every LLM","for teams","for code review","for debugging"];
-let pi=0;const cyc=document.getElementById('cycle');
-setInterval(()=>{cyc.style.opacity=0;setTimeout(()=>{pi=(pi+1)%phrases.length;cyc.textContent=phrases[pi];cyc.style.opacity=1},400)},3e3);
-cyc.style.transition='opacity 0.4s';
+// Hero typewriter — letter-by-letter typing + deleting
+(function(){
+  const el=document.getElementById('cycle');
+  const phrases=["for your terminal","for developers","for every LLM","for teams","for code review","for debugging","for startups","for enterprise"];
+  let pi=0,ci=0,deleting=false;
+  const typeSpeed=65,deleteSpeed=35,pauseAfterType=2000,pauseAfterDelete=400;
+
+  function tick(){
+    const current=phrases[pi];
+    if(!deleting){
+      el.textContent=current.substring(0,ci+1);
+      ci++;
+      if(ci>=current.length){
+        setTimeout(()=>{deleting=true;tick()},pauseAfterType);
+        return;
+      }
+      setTimeout(tick,typeSpeed);
+    }else{
+      el.textContent=current.substring(0,ci);
+      ci--;
+      if(ci<0){
+        deleting=false;
+        ci=0;
+        pi=(pi+1)%phrases.length;
+        setTimeout(tick,pauseAfterDelete);
+        return;
+      }
+      setTimeout(tick,deleteSpeed);
+    }
+  }
+  tick();
+})();
 
 // Hero status cycling
 const statuses=["Ready","Thinking...","Reading file...","Editing...","Searching...","Running bash...","Streaming...","Done"];
