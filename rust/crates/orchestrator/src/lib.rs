@@ -153,6 +153,7 @@ impl AgentOrchestrator {
 
         let agent_id_clone = agent_id.clone();
         let registry_for_handle = self.registry.clone();
+        let registry_for_worker = self.registry.clone();
 
         let handle = tokio::spawn(async move {
             let result = worker::run_agent_turn(
@@ -161,6 +162,7 @@ impl AgentOrchestrator {
                 effective_config,
                 ui_tx.clone(),
                 effective_effort,
+                registry_for_worker,
             )
             .await;
 
@@ -227,6 +229,7 @@ impl AgentOrchestrator {
         }
 
         let agent_id_for_handle = agent_id.clone();
+        let registry_for_worker = self.registry.clone();
         let handle = tokio::spawn(async move {
             let _ = ui_tx
                 .send(UiEvent::AgentStatusChanged {
@@ -236,7 +239,7 @@ impl AgentOrchestrator {
                 .await;
 
             let result =
-                worker::run_agent_turn(agent_id.clone(), task, config, ui_tx.clone(), effort_budget).await;
+                worker::run_agent_turn(agent_id.clone(), task, config, ui_tx.clone(), effort_budget, registry_for_worker).await;
 
             match result {
                 Ok(()) => {

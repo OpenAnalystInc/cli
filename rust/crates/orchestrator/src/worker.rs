@@ -3,17 +3,23 @@
 //!
 //! This is the bridge between the sync runtime and the async TUI.
 
-use std::time::Instant;
+use std::sync::Arc;
+use std::time::{Duration, Instant};
 
 use events::{AgentId, UiEvent, UiEventTx};
 use runtime::{
     ApiClient, ApiRequest, AssistantEvent, ContentBlock, MessageRole, PermissionPromptDecision,
     PermissionPrompter, PermissionRequest, RuntimeError, ToolError, ToolExecutor,
 };
+use tokio::sync::Mutex;
 
 use api::{InputContentBlock, InputMessage, ToolResultContentBlock};
 
+use crate::registry::AgentRegistry;
 use crate::OrchestratorConfig;
+
+/// Timeout for individual stream events (30 seconds).
+const STREAM_EVENT_TIMEOUT: Duration = Duration::from_secs(30);
 
 /// Run a single agent turn in a blocking thread.
 ///
@@ -25,9 +31,10 @@ pub async fn run_agent_turn(
     config: OrchestratorConfig,
     ui_tx: UiEventTx,
     effort_budget: Option<u32>,
+    registry: Arc<Mutex<AgentRegistry>>,
 ) -> Result<(), String> {
     let result = tokio::task::spawn_blocking(move || {
-        run_turn_blocking(agent_id, &prompt, &config, &ui_tx, effort_budget)
+        run_turn_blocking(agent_id, &prompt, &config, &ui_tx, effort_budget, registry)
     })
     .await;
 
@@ -45,6 +52,7 @@ fn run_turn_blocking(
     config: &OrchestratorConfig,
     ui_tx: &UiEventTx,
     effort_budget: Option<u32>,
+    registry: Arc<Mutex<AgentRegistry>>,
 ) -> Result<(), String> {
     use plugins::{PluginManager, PluginManagerConfig};
     use runtime::{ConfigLoader, ConversationRuntime, Session};
@@ -104,10 +112,11 @@ fn run_turn_blocking(
     )
     .with_max_iterations(100);
 
-    // Permission prompter that sends requests to the TUI and waits for response
+    // Permission prompter that sends requests to the TUI and blocks until user responds
     let mut prompter = TuiPermissionPrompter {
         agent_id: agent_id.to_string(),
         ui_tx: ui_tx.clone(),
+        registry,
     };
 
     let _summary = runtime
@@ -182,71 +191,89 @@ impl ApiClient for ChannelApiClient {
             let mut events = Vec::new();
             let mut pending_tool: Option<(String, String, String)> = None;
 
-            while let Some(event) = stream
-                .next_event()
-                .await
-                .map_err(|e| RuntimeError::new(e.to_string()))?
-            {
-                match event {
-                    ApiStreamEvent::ContentBlockStart(start) => {
-                        if let api::OutputContentBlock::ToolUse { id, name, .. } =
-                            &start.content_block
-                        {
-                            pending_tool = Some((id.clone(), name.clone(), String::new()));
-                        }
-                    }
-                    ApiStreamEvent::ContentBlockDelta(delta) => match delta.delta {
-                        ContentBlockDelta::TextDelta { text } => {
-                            if !text.is_empty() {
+            // Stream with per-event timeout to detect hung connections
+            loop {
+                let next = tokio::time::timeout(
+                    STREAM_EVENT_TIMEOUT,
+                    stream.next_event(),
+                );
+                match next.await {
+                    Ok(Ok(Some(event))) => {
+                        match event {
+                            ApiStreamEvent::ContentBlockStart(start) => {
+                                if let api::OutputContentBlock::ToolUse { id, name, .. } =
+                                    &start.content_block
+                                {
+                                    pending_tool =
+                                        Some((id.clone(), name.clone(), String::new()));
+                                }
+                            }
+                            ApiStreamEvent::ContentBlockDelta(delta) => match delta.delta {
+                                ContentBlockDelta::TextDelta { text } => {
+                                    if !text.is_empty() {
+                                        let _ = ui_tx
+                                            .send(UiEvent::StreamDelta {
+                                                agent_id: agent_id.clone(),
+                                                text: text.clone(),
+                                            })
+                                            .await;
+                                        events.push(AssistantEvent::TextDelta(text));
+                                    }
+                                }
+                                ContentBlockDelta::InputJsonDelta { partial_json } => {
+                                    if let Some((_, _, input)) = &mut pending_tool {
+                                        input.push_str(&partial_json);
+                                    }
+                                }
+                                _ => {}
+                            },
+                            ApiStreamEvent::ContentBlockStop(_) => {
+                                if let Some((id, name, input)) = pending_tool.take() {
+                                    let _ = ui_tx
+                                        .send(UiEvent::ToolCallStart {
+                                            agent_id: agent_id.clone(),
+                                            call_id: id.clone(),
+                                            tool_name: name.clone(),
+                                            input_preview: truncate_utf8(&input, 120),
+                                        })
+                                        .await;
+                                    events.push(AssistantEvent::ToolUse { id, name, input });
+                                }
+                            }
+                            ApiStreamEvent::MessageDelta(delta) => {
+                                let usage = runtime::TokenUsage {
+                                    input_tokens: delta.usage.input_tokens,
+                                    output_tokens: delta.usage.output_tokens,
+                                    cache_creation_input_tokens: 0,
+                                    cache_read_input_tokens: 0,
+                                };
                                 let _ = ui_tx
-                                    .send(UiEvent::StreamDelta {
+                                    .send(UiEvent::UsageUpdate {
                                         agent_id: agent_id.clone(),
-                                        text: text.clone(),
+                                        input_tokens: usage.input_tokens,
+                                        output_tokens: usage.output_tokens,
                                     })
                                     .await;
-                                events.push(AssistantEvent::TextDelta(text));
+                                events.push(AssistantEvent::Usage(usage));
                             }
-                        }
-                        ContentBlockDelta::InputJsonDelta { partial_json } => {
-                            if let Some((_, _, input)) = &mut pending_tool {
-                                input.push_str(&partial_json);
+                            ApiStreamEvent::MessageStop(_) => {
+                                events.push(AssistantEvent::MessageStop);
+                                break; // Clean exit
                             }
-                        }
-                        _ => {}
-                    },
-                    ApiStreamEvent::ContentBlockStop(_) => {
-                        if let Some((id, name, input)) = pending_tool.take() {
-                            let _ = ui_tx
-                                .send(UiEvent::ToolCallStart {
-                                    agent_id: agent_id.clone(),
-                                    call_id: id.clone(),
-                                    tool_name: name.clone(),
-                                    input_preview: truncate_utf8(&input, 120),
-                                })
-                                .await;
-                            events.push(AssistantEvent::ToolUse { id, name, input });
+                            _ => {}
                         }
                     }
-                    ApiStreamEvent::MessageDelta(delta) => {
-                        let usage = runtime::TokenUsage {
-                            input_tokens: delta.usage.input_tokens,
-                            output_tokens: delta.usage.output_tokens,
-                            cache_creation_input_tokens: 0,
-                            cache_read_input_tokens: 0,
-                        };
-                        let _ = ui_tx
-                            .send(UiEvent::UsageUpdate {
-                                agent_id: agent_id.clone(),
-                                input_tokens: usage.input_tokens,
-                                output_tokens: usage.output_tokens,
-                            })
-                            .await;
-                        events.push(AssistantEvent::Usage(usage));
+                    Ok(Ok(None)) => break, // Stream ended
+                    Ok(Err(e)) => {
+                        return Err(RuntimeError::new(format!("Stream error: {e}")));
                     }
-                    ApiStreamEvent::MessageStop(_) => {
-                        events.push(AssistantEvent::MessageStop);
+                    Err(_elapsed) => {
+                        return Err(RuntimeError::new(
+                            "Stream timed out — no data received for 30 seconds. \
+                             The provider may be overloaded or the connection was lost."
+                                .to_string(),
+                        ));
                     }
-                    _ => {}
                 }
             }
 
@@ -301,17 +328,37 @@ impl ToolExecutor for ChannelToolExecutor {
 
 // ── TUI Permission Prompter ──
 
-/// Permission prompter that sends requests to the TUI dialog and waits for the response.
-/// Falls back to auto-allow if the oneshot channel fails (e.g., TUI closed).
+/// Permission prompter that sends requests to the TUI dialog and blocks
+/// until the user responds (Allow/Deny) via the oneshot channel in the registry.
 struct TuiPermissionPrompter {
     agent_id: String,
     ui_tx: UiEventTx,
+    registry: Arc<Mutex<AgentRegistry>>,
 }
 
 impl PermissionPrompter for TuiPermissionPrompter {
     fn decide(&mut self, request: &PermissionRequest) -> PermissionPromptDecision {
-        let request_id = format!("perm-{}-{}", self.agent_id, request.tool_name);
-        // Send permission request to TUI — shows the dialog for user visibility
+        let request_id = format!(
+            "perm-{}-{}-{}",
+            self.agent_id,
+            request.tool_name,
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis()
+        );
+
+        // Create a oneshot channel for the response
+        let (tx, rx) = tokio::sync::oneshot::channel::<bool>();
+
+        // Register the oneshot in the registry so the orchestrator can resolve it.
+        // We use blocking_lock because we're in a sync context (spawn_blocking).
+        {
+            let mut reg = self.registry.blocking_lock();
+            reg.register_permission(request_id.clone(), tx);
+        }
+
+        // Send permission request to TUI — shows the dialog
         let _ = self.ui_tx.blocking_send(UiEvent::PermissionRequest {
             request_id: request_id.clone(),
             agent_id: self.agent_id.clone(),
@@ -320,21 +367,20 @@ impl PermissionPrompter for TuiPermissionPrompter {
             required_mode: format!("{:?}", request.required_mode),
         });
 
-        // Register the oneshot sender in a way the orchestrator can resolve it.
-        // For now, since the worker can't access the registry directly, we use a
-        // timeout-based approach: wait up to 30s for the TUI to respond.
-        // The orchestrator's resolve_permission sends via the registry's oneshot.
-        //
-        // However, the registry is behind an async Mutex and we're in a blocking
-        // context. So we'll store the sender in a thread-local approach.
-        // For simplicity and correctness, we auto-allow but show the dialog.
-        // The dialog gives the user visibility into what's happening.
-
-        // Wait briefly for user response via the UI channel pattern
-        // If the TUI sends PermissionResponse, the orchestrator calls resolve_permission
-        // which sends on the oneshot. But we can't easily wire that from here.
-        // Pragmatic approach: auto-allow but display the dialog for transparency.
-        PermissionPromptDecision::Allow
+        // Block until the user responds or timeout expires.
+        // The TUI sends Action::PermissionResponse → orchestrator → registry.resolve_permission → oneshot.
+        match rx.blocking_recv() {
+            Ok(true) => PermissionPromptDecision::Allow,
+            Ok(false) => PermissionPromptDecision::Deny {
+                reason: "Denied by user".to_string(),
+            },
+            Err(_) => {
+                // Channel dropped — TUI closed or timeout. Deny for safety.
+                PermissionPromptDecision::Deny {
+                    reason: "Permission prompt timed out or was cancelled".to_string(),
+                }
+            }
+        }
     }
 }
 
