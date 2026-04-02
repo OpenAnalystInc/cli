@@ -59,6 +59,13 @@ pub struct RuntimeFeatureConfig {
 pub struct RuntimeHookConfig {
     pre_tool_use: Vec<String>,
     post_tool_use: Vec<String>,
+    cwd_changed: Vec<String>,
+    file_changed: Vec<String>,
+    session_start: Vec<String>,
+    session_end: Vec<String>,
+    task_created: Vec<String>,
+    notification: Vec<String>,
+    stop: Vec<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -432,6 +439,13 @@ impl RuntimeHookConfig {
         Self {
             pre_tool_use,
             post_tool_use,
+            cwd_changed: Vec::new(),
+            file_changed: Vec::new(),
+            session_start: Vec::new(),
+            session_end: Vec::new(),
+            task_created: Vec::new(),
+            notification: Vec::new(),
+            stop: Vec::new(),
         }
     }
 
@@ -446,6 +460,41 @@ impl RuntimeHookConfig {
     }
 
     #[must_use]
+    pub fn cwd_changed(&self) -> &[String] {
+        &self.cwd_changed
+    }
+
+    #[must_use]
+    pub fn file_changed(&self) -> &[String] {
+        &self.file_changed
+    }
+
+    #[must_use]
+    pub fn session_start(&self) -> &[String] {
+        &self.session_start
+    }
+
+    #[must_use]
+    pub fn session_end(&self) -> &[String] {
+        &self.session_end
+    }
+
+    #[must_use]
+    pub fn task_created(&self) -> &[String] {
+        &self.task_created
+    }
+
+    #[must_use]
+    pub fn notification(&self) -> &[String] {
+        &self.notification
+    }
+
+    #[must_use]
+    pub fn stop(&self) -> &[String] {
+        &self.stop
+    }
+
+    #[must_use]
     pub fn merged(&self, other: &Self) -> Self {
         let mut merged = self.clone();
         merged.extend(other);
@@ -455,6 +504,13 @@ impl RuntimeHookConfig {
     pub fn extend(&mut self, other: &Self) {
         extend_unique(&mut self.pre_tool_use, other.pre_tool_use());
         extend_unique(&mut self.post_tool_use, other.post_tool_use());
+        extend_unique(&mut self.cwd_changed, other.cwd_changed());
+        extend_unique(&mut self.file_changed, other.file_changed());
+        extend_unique(&mut self.session_start, other.session_start());
+        extend_unique(&mut self.session_end, other.session_end());
+        extend_unique(&mut self.task_created, other.task_created());
+        extend_unique(&mut self.notification, other.notification());
+        extend_unique(&mut self.stop, other.stop());
     }
 }
 
@@ -568,6 +624,20 @@ fn parse_optional_hooks_config(root: &JsonValue) -> Result<RuntimeHookConfig, Co
         pre_tool_use: optional_string_array(hooks, "PreToolUse", "merged settings.hooks")?
             .unwrap_or_default(),
         post_tool_use: optional_string_array(hooks, "PostToolUse", "merged settings.hooks")?
+            .unwrap_or_default(),
+        cwd_changed: optional_string_array(hooks, "CwdChanged", "merged settings.hooks")?
+            .unwrap_or_default(),
+        file_changed: optional_string_array(hooks, "FileChanged", "merged settings.hooks")?
+            .unwrap_or_default(),
+        session_start: optional_string_array(hooks, "SessionStart", "merged settings.hooks")?
+            .unwrap_or_default(),
+        session_end: optional_string_array(hooks, "SessionEnd", "merged settings.hooks")?
+            .unwrap_or_default(),
+        task_created: optional_string_array(hooks, "TaskCreated", "merged settings.hooks")?
+            .unwrap_or_default(),
+        notification: optional_string_array(hooks, "Notification", "merged settings.hooks")?
+            .unwrap_or_default(),
+        stop: optional_string_array(hooks, "Stop", "merged settings.hooks")?
             .unwrap_or_default(),
     })
 }

@@ -9,6 +9,13 @@ use crate::config::{RuntimeFeatureConfig, RuntimeHookConfig};
 pub enum HookEvent {
     PreToolUse,
     PostToolUse,
+    CwdChanged,
+    FileChanged,
+    SessionStart,
+    SessionEnd,
+    TaskCreated,
+    Notification,
+    Stop,
 }
 
 impl HookEvent {
@@ -16,6 +23,13 @@ impl HookEvent {
         match self {
             Self::PreToolUse => "PreToolUse",
             Self::PostToolUse => "PostToolUse",
+            Self::CwdChanged => "CwdChanged",
+            Self::FileChanged => "FileChanged",
+            Self::SessionStart => "SessionStart",
+            Self::SessionEnd => "SessionEnd",
+            Self::TaskCreated => "TaskCreated",
+            Self::Notification => "Notification",
+            Self::Stop => "Stop",
         }
     }
 }
@@ -79,6 +93,118 @@ impl HookRunner {
             self.config.pre_tool_use(),
             tool_name,
             tool_input,
+            None,
+            false,
+        )
+    }
+
+    /// Run CwdChanged hooks when the working directory changes.
+    pub fn run_cwd_changed(&self, old_cwd: &str, new_cwd: &str) -> HookRunResult {
+        let commands = self.config.cwd_changed();
+        if commands.is_empty() {
+            return HookRunResult::allow(Vec::new());
+        }
+        self.run_commands(
+            HookEvent::CwdChanged,
+            commands,
+            "cwd",
+            &serde_json::json!({"old_cwd": old_cwd, "new_cwd": new_cwd}).to_string(),
+            None,
+            false,
+        )
+    }
+
+    /// Run FileChanged hooks when a file is modified externally (e.g., format-on-save).
+    pub fn run_file_changed(&self, file_path: &str, tool_name: &str) -> HookRunResult {
+        let commands = self.config.file_changed();
+        if commands.is_empty() {
+            return HookRunResult::allow(Vec::new());
+        }
+        self.run_commands(
+            HookEvent::FileChanged,
+            commands,
+            tool_name,
+            &serde_json::json!({"file_path": file_path}).to_string(),
+            None,
+            false,
+        )
+    }
+
+    /// Run SessionStart hooks when a session begins.
+    pub fn run_session_start(&self, session_id: &str) -> HookRunResult {
+        let commands = self.config.session_start();
+        if commands.is_empty() {
+            return HookRunResult::allow(Vec::new());
+        }
+        self.run_commands(
+            HookEvent::SessionStart,
+            commands,
+            "session",
+            &serde_json::json!({"session_id": session_id}).to_string(),
+            None,
+            false,
+        )
+    }
+
+    /// Run SessionEnd hooks when a session is ending.
+    pub fn run_session_end(&self, reason: &str) -> HookRunResult {
+        let commands = self.config.session_end();
+        if commands.is_empty() {
+            return HookRunResult::allow(Vec::new());
+        }
+        self.run_commands(
+            HookEvent::SessionEnd,
+            commands,
+            "session",
+            &serde_json::json!({"reason": reason}).to_string(),
+            None,
+            false,
+        )
+    }
+
+    /// Run TaskCreated hooks when a task is created.
+    pub fn run_task_created(&self, task_id: &str, subject: &str) -> HookRunResult {
+        let commands = self.config.task_created();
+        if commands.is_empty() {
+            return HookRunResult::allow(Vec::new());
+        }
+        self.run_commands(
+            HookEvent::TaskCreated,
+            commands,
+            "task",
+            &serde_json::json!({"task_id": task_id, "subject": subject}).to_string(),
+            None,
+            false,
+        )
+    }
+
+    /// Run Notification hooks when the agent wants to notify the user.
+    pub fn run_notification(&self, message: &str) -> HookRunResult {
+        let commands = self.config.notification();
+        if commands.is_empty() {
+            return HookRunResult::allow(Vec::new());
+        }
+        self.run_commands(
+            HookEvent::Notification,
+            commands,
+            "notification",
+            &serde_json::json!({"message": message}).to_string(),
+            None,
+            false,
+        )
+    }
+
+    /// Run Stop hooks when the agent is stopping execution.
+    pub fn run_stop(&self, reason: &str) -> HookRunResult {
+        let commands = self.config.stop();
+        if commands.is_empty() {
+            return HookRunResult::allow(Vec::new());
+        }
+        self.run_commands(
+            HookEvent::Stop,
+            commands,
+            "stop",
+            &serde_json::json!({"reason": reason}).to_string(),
             None,
             false,
         )

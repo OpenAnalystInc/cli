@@ -6,7 +6,7 @@
 use std::sync::Arc;
 use std::time::{Duration, Instant};
 
-use events::{AgentId, UiEvent, UiEventTx};
+use events::{AgentId, DiffHunk, DiffInfo, DiffLine, UiEvent, UiEventTx};
 use runtime::{
     ApiClient, ApiRequest, AssistantEvent, ContentBlock, MessageRole, PermissionPromptDecision,
     PermissionPrompter, PermissionRequest, RuntimeError, ToolError, ToolExecutor,
@@ -339,6 +339,20 @@ impl ToolExecutor for ChannelToolExecutor {
         let input_value: serde_json::Value =
             serde_json::from_str(input).unwrap_or(serde_json::Value::String(input.to_string()));
 
+        // Format-on-save resilience: capture file mtime before edit/write tools
+        let is_file_tool = matches!(tool_name, "edit_file" | "Edit" | "write_file" | "Write");
+        let file_path = if is_file_tool {
+            input_value.get("file_path")
+                .or_else(|| input_value.get("path"))
+                .and_then(|v| v.as_str())
+                .map(String::from)
+        } else {
+            None
+        };
+        let mtime_before = file_path.as_deref().and_then(|p| {
+            std::fs::metadata(p).ok().and_then(|m| m.modified().ok())
+        });
+
         // Route MCP tools to their server connection
         let result = if tool_name.starts_with("mcp__") {
             self.execute_mcp_tool(tool_name, &input_value)
@@ -347,23 +361,52 @@ impl ToolExecutor for ChannelToolExecutor {
         };
         let duration = start.elapsed();
 
-        let (output, is_error) = match &result {
+        // Format-on-save resilience: if a PostToolUse hook (formatter) changed the file
+        // between our write and now, don't treat it as an error on the next edit.
+        // Instead, note the external modification for the AI to re-read.
+        let (mut output, is_error) = match &result {
             Ok(output) => (output.clone(), false),
             Err(err) => (err.clone(), true),
         };
 
-        // Send tool completion event to TUI (blocking_send is safe from spawn_blocking)
+        if is_file_tool && !is_error {
+            if let (Some(path), Some(before)) = (&file_path, mtime_before) {
+                // Brief pause to let formatters run
+                std::thread::sleep(std::time::Duration::from_millis(50));
+                let mtime_after = std::fs::metadata(path).ok().and_then(|m| m.modified().ok());
+                if let Some(after) = mtime_after {
+                    if after > before {
+                        // File was modified externally (likely format-on-save)
+                        output.push_str("\n[Note: file was reformatted by an external tool after write]");
+                    }
+                }
+            }
+        }
+
+        // Extract structured diff info for edit/write tools
+        let diff = if is_file_tool && !is_error {
+            parse_diff_info(&output)
+        } else {
+            None
+        };
+
+        // Send tool completion event to TUI
         if self.ui_tx.blocking_send(UiEvent::ToolCallEnd {
             agent_id: self.agent_id.clone(),
             call_id: String::new(),
             output: truncate_utf8(&output, 500),
             is_error,
             duration,
+            diff,
         }).is_err() {
             eprintln!("[worker] TUI channel closed — event dropped");
         }
 
-        result.map_err(ToolError::new)
+        if is_error {
+            Err(ToolError::new(output))
+        } else {
+            Ok(output)
+        }
     }
 }
 
@@ -496,6 +539,64 @@ fn convert_messages(messages: &[runtime::ConversationMessage]) -> Vec<InputMessa
             })
         })
         .collect()
+}
+
+/// Parse structured diff info from Edit/Write tool JSON output.
+fn parse_diff_info(output: &str) -> Option<DiffInfo> {
+    let val: serde_json::Value = serde_json::from_str(output).ok()?;
+
+    let file_path = val
+        .get("filePath")
+        .and_then(|v| v.as_str())
+        .unwrap_or("")
+        .to_string();
+
+    let patches = val.get("structuredPatch")?.as_array()?;
+    let mut total_added = 0usize;
+    let mut total_removed = 0usize;
+    let mut hunks = Vec::new();
+
+    for patch in patches {
+        let old_start = patch
+            .get("oldStart")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1) as usize;
+        let new_start = patch
+            .get("newStart")
+            .and_then(|v| v.as_u64())
+            .unwrap_or(1) as usize;
+
+        let patch_lines = patch.get("lines")?.as_array()?;
+        let mut diff_lines = Vec::new();
+
+        for line in patch_lines {
+            let s = line.as_str().unwrap_or("");
+            if let Some(text) = s.strip_prefix('+') {
+                diff_lines.push(DiffLine::Added(text.to_string()));
+                total_added += 1;
+            } else if let Some(text) = s.strip_prefix('-') {
+                diff_lines.push(DiffLine::Removed(text.to_string()));
+                total_removed += 1;
+            } else if let Some(text) = s.strip_prefix(' ') {
+                diff_lines.push(DiffLine::Context(text.to_string()));
+            } else {
+                diff_lines.push(DiffLine::Context(s.to_string()));
+            }
+        }
+
+        hunks.push(DiffHunk {
+            old_start,
+            new_start,
+            lines: diff_lines,
+        });
+    }
+
+    Some(DiffInfo {
+        file_path,
+        added: total_added,
+        removed: total_removed,
+        hunks,
+    })
 }
 
 /// UTF-8 safe string truncation. Never panics on multi-byte characters.

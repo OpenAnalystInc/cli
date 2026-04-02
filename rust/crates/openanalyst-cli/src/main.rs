@@ -2333,6 +2333,7 @@ fn run_resume_command(
         | SlashCommand::OpenAnalyst { .. }
         | SlashCommand::Ask { .. }
         | SlashCommand::UserPrompt { .. }
+        | SlashCommand::Hooks { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -3010,6 +3011,10 @@ impl LiveCli {
                 } else {
                     eprintln!("Usage: /user-prompt <message>");
                 }
+                false
+            }
+            SlashCommand::Hooks { .. } => {
+                eprintln!("Use /hooks in the TUI mode for interactive hook management.");
                 false
             }
             SlashCommand::Unknown(name) => {

@@ -8,6 +8,7 @@
 
 use std::time::Duration;
 
+use events::DiffInfo;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
@@ -58,6 +59,8 @@ pub struct ToolCallCard {
     pub status: ToolCallStatus,
     /// Tool output (populated after completion).
     pub output: Option<String>,
+    /// Structured diff data for Edit/Write tools.
+    pub diff: Option<DiffInfo>,
     /// Whether the output section is expanded.
     pub expanded: bool,
 }

@@ -428,21 +428,64 @@ fn apply_limit<T>(
 }
 
 fn make_patch(original: &str, updated: &str) -> Vec<StructuredPatchHunk> {
-    let mut lines = Vec::new();
-    for line in original.lines() {
-        lines.push(format!("-{line}"));
-    }
-    for line in updated.lines() {
-        lines.push(format!("+{line}"));
+    use similar::{ChangeTag, TextDiff};
+
+    let diff = TextDiff::from_lines(original, updated);
+    let mut hunks = Vec::new();
+    let context_radius = 3;
+
+    for group in diff.grouped_ops(context_radius) {
+        let mut lines = Vec::new();
+        let mut old_start = usize::MAX;
+        let mut old_count = 0usize;
+        let mut new_start = usize::MAX;
+        let mut new_count = 0usize;
+
+        for op in &group {
+            for change in diff.iter_changes(op) {
+                let text = change.value().trim_end_matches('\n');
+                match change.tag() {
+                    ChangeTag::Equal => {
+                        lines.push(format!(" {text}"));
+                        old_count += 1;
+                        new_count += 1;
+                        if old_start == usize::MAX {
+                            old_start = change.old_index().unwrap_or(0) + 1;
+                            new_start = change.new_index().unwrap_or(0) + 1;
+                        }
+                    }
+                    ChangeTag::Delete => {
+                        lines.push(format!("-{text}"));
+                        old_count += 1;
+                        if old_start == usize::MAX {
+                            old_start = change.old_index().unwrap_or(0) + 1;
+                            new_start = change.new_index().unwrap_or(0) + 1;
+                        }
+                    }
+                    ChangeTag::Insert => {
+                        lines.push(format!("+{text}"));
+                        new_count += 1;
+                        if old_start == usize::MAX {
+                            old_start = change.old_index().unwrap_or(0) + 1;
+                            new_start = change.new_index().unwrap_or(0) + 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        if !lines.is_empty() {
+            hunks.push(StructuredPatchHunk {
+                old_start: old_start.max(1),
+                old_lines: old_count,
+                new_start: new_start.max(1),
+                new_lines: new_count,
+                lines,
+            });
+        }
     }
 
-    vec![StructuredPatchHunk {
-        old_start: 1,
-        old_lines: original.lines().count(),
-        new_start: 1,
-        new_lines: updated.lines().count(),
-        lines,
-    }]
+    hunks
 }
 
 fn normalize_path(path: &str) -> io::Result<PathBuf> {

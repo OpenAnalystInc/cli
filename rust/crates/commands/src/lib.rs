@@ -460,6 +460,13 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: Some("<prompt>"),
         resume_supported: false,
     },
+    SlashCommandSpec {
+        name: "hooks",
+        aliases: &["hook"],
+        summary: "List, add, remove, or test hooks",
+        argument_hint: Some("[list|add <event> <command>|remove <event> <index>|test <event>]"),
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -630,6 +637,12 @@ pub enum SlashCommand {
     /// Inject a user message into the conversation with full tool access.
     UserPrompt {
         prompt: Option<String>,
+    },
+    /// List, add, remove, or test hooks.
+    Hooks {
+        action: Option<String>,
+        event: Option<String>,
+        command_or_index: Option<String>,
     },
     Unknown(String),
 }
@@ -827,6 +840,14 @@ impl SlashCommand {
             }
             "ask" | "btw" => Self::Ask {
                 question: remainder_after_command(trimmed, command),
+            },
+            "hooks" | "hook" => Self::Hooks {
+                action: parts.next().map(ToOwned::to_owned),
+                event: parts.next().map(ToOwned::to_owned),
+                command_or_index: {
+                    let rest = parts.collect::<Vec<_>>().join(" ");
+                    (!rest.is_empty()).then_some(rest)
+                },
             },
             "user-prompt" | "up" => Self::UserPrompt {
                 prompt: remainder_after_command(trimmed, command),
@@ -2142,6 +2163,7 @@ pub fn handle_slash_command(
         | SlashCommand::OpenAnalyst { .. }
         | SlashCommand::Ask { .. }
         | SlashCommand::UserPrompt { .. }
+        | SlashCommand::Hooks { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2498,7 +2520,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 58);
+        assert_eq!(slash_command_specs().len(), 59);
         assert_eq!(resume_supported_slash_commands().len(), 14);
     }
 

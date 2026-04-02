@@ -1009,6 +1009,11 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             }
         }
 
+        SlashCommand::Hooks { action, event, command_or_index } => {
+            let output = handle_hooks_command(action.as_deref(), event.as_deref(), command_or_index.as_deref());
+            app.chat.push_system(output);
+        }
+
         SlashCommand::Unknown(name) => {
             app.chat.push_system(format!("Unknown command: /{name}. Type /help for available commands."));
         }
@@ -1857,4 +1862,336 @@ fn resolve_config_home() -> std::path::PathBuf {
         .or_else(|_| std::env::var("HOME").map(|h| std::path::PathBuf::from(h).join(".openanalyst")))
         .or_else(|_| std::env::var("USERPROFILE").map(|h| std::path::PathBuf::from(h).join(".openanalyst")))
         .unwrap_or_else(|_| std::path::PathBuf::from(".openanalyst"))
+}
+
+// ═══════════════════════════════════════════════════════════════════
+//  /hooks — interactive hook management
+// ═══════════════════════════════════════════════════════════════════
+
+/// All supported hook event names.
+const HOOK_EVENTS: &[&str] = &[
+    "PreToolUse",
+    "PostToolUse",
+    "CwdChanged",
+    "FileChanged",
+    "SessionStart",
+    "SessionEnd",
+    "TaskCreated",
+    "Notification",
+    "Stop",
+];
+
+/// Handle `/hooks [list|add|remove|test]` command.
+fn handle_hooks_command(action: Option<&str>, event: Option<&str>, command_or_index: Option<&str>) -> String {
+    match action {
+        None | Some("list") | Some("ls") => hooks_list(event),
+        Some("add") => hooks_add(event, command_or_index),
+        Some("remove") | Some("rm") | Some("delete") => hooks_remove(event, command_or_index),
+        Some("test") | Some("run") => hooks_test(event),
+        Some(other) => format!(
+            "Unknown /hooks action: {other}\n\n\
+             Usage:\n\
+             /hooks                         — list all hooks\n\
+             /hooks list [event]            — list hooks (optionally filter by event)\n\
+             /hooks add <event> <command>   — add a hook\n\
+             /hooks remove <event> <index>  — remove a hook by index\n\
+             /hooks test <event>            — test-fire an event\n\n\
+             Events: {}", HOOK_EVENTS.join(", ")
+        ),
+    }
+}
+
+/// Read the user settings.json and return the parsed JSON + file path.
+fn read_user_settings() -> (std::path::PathBuf, serde_json::Value) {
+    let config_home = resolve_config_home();
+    let settings_path = config_home.join("settings.json");
+    let value = std::fs::read_to_string(&settings_path)
+        .ok()
+        .and_then(|s| serde_json::from_str::<serde_json::Value>(&s).ok())
+        .unwrap_or_else(|| serde_json::json!({}));
+    (settings_path, value)
+}
+
+/// Write the settings JSON back to disk.
+fn write_user_settings(path: &std::path::Path, value: &serde_json::Value) -> Result<(), String> {
+    let content = serde_json::to_string_pretty(value).map_err(|e| e.to_string())?;
+    if let Some(parent) = path.parent() {
+        std::fs::create_dir_all(parent).map_err(|e| e.to_string())?;
+    }
+    std::fs::write(path, content).map_err(|e| e.to_string())
+}
+
+/// `/hooks list [event]` — list active hooks from settings.json
+fn hooks_list(filter_event: Option<&str>) -> String {
+    let (settings_path, value) = read_user_settings();
+    let hooks = value.get("hooks").and_then(|v| v.as_object());
+
+    let mut out = String::new();
+    out.push_str("── Hooks ──\n\n");
+    out.push_str(&format!("Source: {}\n\n", settings_path.display()));
+
+    let Some(hooks) = hooks else {
+        out.push_str("No hooks configured.\n\n");
+        out.push_str(&format!("Events: {}\n", HOOK_EVENTS.join(", ")));
+        out.push_str("Add one: /hooks add <event> <command>\n");
+        return out;
+    };
+
+    let mut found_any = false;
+    for &event_name in HOOK_EVENTS {
+        if let Some(filter) = filter_event {
+            if !event_name.eq_ignore_ascii_case(filter) {
+                continue;
+            }
+        }
+        if let Some(commands) = hooks.get(event_name).and_then(|v| v.as_array()) {
+            if commands.is_empty() {
+                continue;
+            }
+            found_any = true;
+            out.push_str(&format!("  {event_name}:\n"));
+            for (i, cmd) in commands.iter().enumerate() {
+                let cmd_str = cmd.as_str().unwrap_or("(invalid)");
+                out.push_str(&format!("    [{i}] {cmd_str}\n"));
+            }
+            out.push('\n');
+        }
+    }
+
+    if !found_any {
+        if filter_event.is_some() {
+            out.push_str(&format!("No hooks for event: {}\n", filter_event.unwrap()));
+        } else {
+            out.push_str("No hooks configured.\n");
+        }
+    }
+
+    // Also check project-level hooks
+    let project_settings = std::path::Path::new(".openanalyst").join("settings.json");
+    if let Ok(content) = std::fs::read_to_string(&project_settings) {
+        if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+            if let Some(hooks) = val.get("hooks").and_then(|v| v.as_object()) {
+                let mut project_hooks = false;
+                for (event_name, commands) in hooks {
+                    if let Some(cmds) = commands.as_array() {
+                        if !cmds.is_empty() {
+                            if !project_hooks {
+                                out.push_str(&format!("── Project Hooks ({}) ──\n\n", project_settings.display()));
+                                project_hooks = true;
+                            }
+                            out.push_str(&format!("  {event_name}:\n"));
+                            for (i, cmd) in cmds.iter().enumerate() {
+                                let cmd_str = cmd.as_str().unwrap_or("(invalid)");
+                                out.push_str(&format!("    [{i}] {cmd_str}\n"));
+                            }
+                            out.push('\n');
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    out
+}
+
+/// `/hooks add <event> <command>` — add a hook to settings.json
+fn hooks_add(event: Option<&str>, command: Option<&str>) -> String {
+    let Some(event_name) = event else {
+        return format!(
+            "Usage: /hooks add <event> <command>\n\nEvents: {}",
+            HOOK_EVENTS.join(", ")
+        );
+    };
+
+    // Validate event name (case-insensitive match)
+    let canonical_event = HOOK_EVENTS
+        .iter()
+        .find(|e| e.eq_ignore_ascii_case(event_name));
+    let Some(&canonical) = canonical_event else {
+        return format!(
+            "Unknown hook event: {event_name}\n\nValid events: {}",
+            HOOK_EVENTS.join(", ")
+        );
+    };
+
+    let Some(cmd) = command else {
+        return format!("Usage: /hooks add {canonical} <command>\n\nExample: /hooks add {canonical} \"echo hook fired\"");
+    };
+
+    let (settings_path, mut value) = read_user_settings();
+
+    // Ensure hooks object exists
+    if !value.is_object() {
+        value = serde_json::json!({});
+    }
+    let obj = value.as_object_mut().unwrap();
+    let hooks = obj
+        .entry("hooks")
+        .or_insert_with(|| serde_json::json!({}))
+        .as_object_mut();
+
+    let Some(hooks) = hooks else {
+        return "Error: hooks key in settings.json is not an object".to_string();
+    };
+
+    let arr = hooks
+        .entry(canonical)
+        .or_insert_with(|| serde_json::json!([]))
+        .as_array_mut();
+
+    let Some(arr) = arr else {
+        return format!("Error: hooks.{canonical} is not an array");
+    };
+
+    // Check for duplicates
+    if arr.iter().any(|v| v.as_str() == Some(cmd)) {
+        return format!("Hook already exists for {canonical}: {cmd}");
+    }
+
+    arr.push(serde_json::Value::String(cmd.to_string()));
+
+    match write_user_settings(&settings_path, &value) {
+        Ok(()) => format!("Added hook for {canonical}:\n  {cmd}\n\nSaved to: {}", settings_path.display()),
+        Err(e) => format!("Failed to write settings: {e}"),
+    }
+}
+
+/// `/hooks remove <event> <index>` — remove a hook by event and index
+fn hooks_remove(event: Option<&str>, index_str: Option<&str>) -> String {
+    let Some(event_name) = event else {
+        return "Usage: /hooks remove <event> <index>\n\nRun /hooks list to see indices.".to_string();
+    };
+
+    let canonical_event = HOOK_EVENTS
+        .iter()
+        .find(|e| e.eq_ignore_ascii_case(event_name));
+    let Some(&canonical) = canonical_event else {
+        return format!(
+            "Unknown hook event: {event_name}\n\nValid events: {}",
+            HOOK_EVENTS.join(", ")
+        );
+    };
+
+    let Some(idx_str) = index_str else {
+        return format!("Usage: /hooks remove {canonical} <index>\n\nRun /hooks list {canonical} to see indices.");
+    };
+
+    let idx: usize = match idx_str.trim().parse() {
+        Ok(i) => i,
+        Err(_) => return format!("Invalid index: {idx_str}. Must be a number."),
+    };
+
+    let (settings_path, mut value) = read_user_settings();
+
+    let removed_cmd = {
+        let hooks = value
+            .as_object_mut()
+            .and_then(|o| o.get_mut("hooks"))
+            .and_then(|h| h.as_object_mut())
+            .and_then(|h| h.get_mut(canonical))
+            .and_then(|a| a.as_array_mut());
+
+        let Some(arr) = hooks else {
+            return format!("No hooks found for event: {canonical}");
+        };
+
+        if idx >= arr.len() {
+            return format!(
+                "Index {idx} out of range. {canonical} has {} hook(s) (0..{}).",
+                arr.len(),
+                arr.len().saturating_sub(1)
+            );
+        }
+
+        let removed = arr.remove(idx);
+        removed.as_str().unwrap_or("(unknown)").to_string()
+    };
+
+    match write_user_settings(&settings_path, &value) {
+        Ok(()) => format!("Removed hook [{idx}] from {canonical}:\n  {removed_cmd}\n\nSaved to: {}", settings_path.display()),
+        Err(e) => format!("Failed to write settings: {e}"),
+    }
+}
+
+/// `/hooks test <event>` — fire a test event through the hook runner
+fn hooks_test(event: Option<&str>) -> String {
+    let Some(event_name) = event else {
+        return format!(
+            "Usage: /hooks test <event>\n\nEvents: {}",
+            HOOK_EVENTS.join(", ")
+        );
+    };
+
+    let canonical_event = HOOK_EVENTS
+        .iter()
+        .find(|e| e.eq_ignore_ascii_case(event_name));
+    let Some(&canonical) = canonical_event else {
+        return format!(
+            "Unknown hook event: {event_name}\n\nValid events: {}",
+            HOOK_EVENTS.join(", ")
+        );
+    };
+
+    // Read config and build a hook runner
+    let (_, value) = read_user_settings();
+    let hooks = value.get("hooks").and_then(|v| v.as_object());
+
+    let commands: Vec<String> = hooks
+        .and_then(|h| h.get(canonical))
+        .and_then(|v| v.as_array())
+        .map(|arr| {
+            arr.iter()
+                .filter_map(|v| v.as_str().map(String::from))
+                .collect()
+        })
+        .unwrap_or_default();
+
+    if commands.is_empty() {
+        return format!("No hooks configured for {canonical}. Nothing to test.\n\nAdd one: /hooks add {canonical} <command>");
+    }
+
+    let mut out = format!("Testing {canonical} hooks ({} command(s)):\n\n", commands.len());
+
+    for (i, cmd) in commands.iter().enumerate() {
+        out.push_str(&format!("  [{i}] {cmd}\n"));
+
+        // Run the command with test payload
+        let result = std::process::Command::new("sh")
+            .args(["-lc", cmd])
+            .env("HOOK_EVENT", canonical)
+            .env("HOOK_TOOL_NAME", "__test__")
+            .env("HOOK_TOOL_INPUT", "{}")
+            .env("HOOK_TOOL_IS_ERROR", "0")
+            .stdin(std::process::Stdio::piped())
+            .stdout(std::process::Stdio::piped())
+            .stderr(std::process::Stdio::piped())
+            .output();
+
+        match result {
+            Ok(output) => {
+                let code = output.status.code().unwrap_or(-1);
+                let stdout = String::from_utf8_lossy(&output.stdout);
+                let stderr = String::from_utf8_lossy(&output.stderr);
+                let status = match code {
+                    0 => "ALLOW",
+                    2 => "DENY",
+                    _ => "WARN",
+                };
+                out.push_str(&format!("      → exit {code} ({status})"));
+                if !stdout.trim().is_empty() {
+                    out.push_str(&format!("\n      stdout: {}", stdout.trim()));
+                }
+                if !stderr.trim().is_empty() {
+                    out.push_str(&format!("\n      stderr: {}", stderr.trim()));
+                }
+                out.push('\n');
+            }
+            Err(e) => {
+                out.push_str(&format!("      → FAILED: {e}\n"));
+            }
+        }
+    }
+
+    out
 }
