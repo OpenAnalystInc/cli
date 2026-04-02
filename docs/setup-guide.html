@@ -237,7 +237,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
     <div class="acc-body"><div class="acc-content">Spawn parallel sub-agents for complex tasks. Each agent has its own conversation runtime, tool permissions, and lifecycle. The orchestrator bridges sync execution to the async TUI via channels. Watch agents work in real-time.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
-    <div class="acc-header"><div class="acc-icon" style="background:rgba(244,114,182,0.15);color:var(--pink)">&#9998;</div><div class="acc-title">38 Slash Commands</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(244,114,182,0.15);color:var(--pink)">&#9998;</div><div class="acc-title">49 Slash Commands</div><div class="acc-arrow">&#9654;</div></div>
     <div class="acc-body"><div class="acc-content">Session management, git integration, AI planning, multimedia generation, web scraping, code analysis, plugin management, and more. Every command works with every provider. Type <code style="color:var(--cyan)">/help</code> to see them all.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
@@ -263,7 +263,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <section id="commands" style="background:var(--bg2)">
 <div class="wrap">
   <div class="section-label">Reference</div>
-  <div class="section-title">38 slash commands</div>
+  <div class="section-title">49 slash commands</div>
   <div class="section-sub">All commands work identically regardless of which LLM provider you use.</div>
 
   <div class="tabs">
@@ -272,6 +272,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
     <button class="tab" onclick="sw(event,'cmd-3')">Multimedia</button>
     <button class="tab" onclick="sw(event,'cmd-4')">Analysis</button>
     <button class="tab" onclick="sw(event,'cmd-5')">Config</button>
+    <button class="tab" onclick="sw(event,'cmd-6')">Dev Tools</button>
   </div>
 
   <div id="cmd-1" class="tc on" style="background:var(--card);border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;padding:20px">
@@ -287,6 +288,10 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/export [file]</td><td>Export conversation transcript</td></tr>
       <tr><td>/version</td><td>Show CLI version and build info</td></tr>
       <tr><td>/resume &lt;path&gt;</td><td>Load a saved session</td></tr>
+      <tr><td>/login <span class="tag tag-n">NEW</span></td><td>Add or switch provider API keys from REPL</td></tr>
+      <tr><td>/logout <span class="tag tag-n">NEW</span></td><td>Clear all saved credentials</td></tr>
+      <tr><td>/context <span class="tag tag-n">NEW</span></td><td>Show context window usage, token counts, model</td></tr>
+      <tr><td>/vim <span class="tag tag-n">NEW</span></td><td>Toggle vim keybinding mode</td></tr>
     </table>
   </div>
 
@@ -326,6 +331,9 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/bughunter [scope]</td><td>Scan codebase for likely bugs</td></tr>
       <tr><td>/ultraplan [task]</td><td>Deep multi-step planning with reasoning</td></tr>
       <tr><td>/debug-tool-call</td><td>Replay last tool call with debug output</td></tr>
+      <tr><td>/think [prompt] <span class="tag tag-n">NEW</span></td><td>Force extended thinking for next response</td></tr>
+      <tr><td>/changelog [since] <span class="tag tag-n">NEW</span></td><td>Generate changelog from git log via AI</td></tr>
+      <tr><td>/doctor <span class="tag tag-n">NEW</span></td><td>Diagnose installation, provider keys, MCP, workspace</td></tr>
     </table>
   </div>
 
@@ -339,6 +347,24 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/agents</td><td>List configured agents</td></tr>
       <tr><td>/skills</td><td>List available skills</td></tr>
       <tr><td>/plugin [list|install|enable|disable]</td><td>Manage plugins</td></tr>
+      <tr><td>/mcp [list|restart|add] <span class="tag tag-n">NEW</span></td><td>Manage MCP servers</td></tr>
+      <tr><td>/add-dir &lt;path&gt; <span class="tag tag-n">NEW</span></td><td>Add directory tree to conversation context</td></tr>
+    </table>
+  </div>
+
+  <div id="cmd-6" class="tc" style="background:var(--card);border:1px solid var(--border);border-top:0;border-radius:0 0 12px 12px;padding:20px">
+    <table class="cmd-table">
+      <tr><th>Command</th><th>Description</th></tr>
+      <tr><td>/dev install <span class="tag tag-n">NEW</span></td><td>Install Playwright for browser automation</td></tr>
+      <tr><td>/dev open &lt;url&gt;</td><td>Navigate browser to URL</td></tr>
+      <tr><td>/dev screenshot</td><td>Capture screenshot of current page</td></tr>
+      <tr><td>/dev snap</td><td>Snapshot accessibility tree</td></tr>
+      <tr><td>/dev click &lt;ref&gt;</td><td>Click element by a11y reference</td></tr>
+      <tr><td>/dev type &lt;ref&gt; &lt;text&gt;</td><td>Type text into element</td></tr>
+      <tr><td>/dev test &lt;desc&gt;</td><td>Generate Playwright test via AI</td></tr>
+      <tr><td>/dev codegen</td><td>Record browser actions as test code</td></tr>
+      <tr><td>/dev stop</td><td>Close browser session</td></tr>
+      <tr><td>/dev status</td><td>Show Playwright version and state</td></tr>
     </table>
   </div>
 </div>
@@ -384,7 +410,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">rust/crates/</span></div></div>
 <pre class="code"><span class="c-c">api/</span>                 <span class="c-d"># Multi-provider API client (7 providers)</span>
-<span class="c-c">commands/</span>            <span class="c-d"># 38 slash commands</span>
+<span class="c-c">commands/</span>            <span class="c-d"># 49 slash commands</span>
 <span class="c-c">events/</span>              <span class="c-d"># Shared TUI &harr; backend event types</span>
 <span class="c-c">orchestrator/</span>        <span class="c-d"># Multi-agent lifecycle + channel bridge</span>
 <span class="c-c">tui/</span>                 <span class="c-d"># Ratatui full-screen TUI application</span>
@@ -414,7 +440,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <div style="font-size:13px;color:var(--muted);line-height:1.8">
         <strong style="color:var(--text)">14</strong> crates in workspace<br>
         <strong style="color:var(--text)">7</strong> LLM providers<br>
-        <strong style="color:var(--text)">38</strong> slash commands<br>
+        <strong style="color:var(--text)">49</strong> slash commands<br>
         <strong style="color:var(--text)">19</strong> built-in tools<br>
         <strong style="color:var(--text)">MIT</strong> license
       </div>
