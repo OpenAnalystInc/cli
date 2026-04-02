@@ -6,7 +6,7 @@ use events::{Action, ActionTx, AgentStatus, PanelId, UiEvent, UiEventRx};
 use orchestrator::router::ModelRouter;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::widgets::Widget;
+use ratatui::widgets::{Paragraph, Widget};
 
 use tui_widgets::status_bar::AgentPhase;
 use tui_widgets::{InputBox, InputBoxState, PermissionDialog, StatusBar, ToolCallCard, ToolCallStatus};
@@ -76,6 +76,9 @@ pub struct App {
 
     // Input history
     pub history: InputHistory,
+
+    // Voice input state
+    pub voice: crate::voice::VoiceState,
 }
 
 impl App {
@@ -105,6 +108,7 @@ impl App {
             permission_mode: "danger-full-access".to_string(),
             suggestions: SlashSuggestions::default(),
             history: InputHistory::default(),
+            voice: crate::voice::VoiceState::default(),
         }
     }
 
@@ -622,10 +626,24 @@ impl App {
         status.hints = hints;
         status.render(layout.status, buf);
 
-        // Input box with mode-aware styling
-        let input_mode = self.current_input_mode();
-        let input = InputBox::default().mode(input_mode);
-        input.render_with_state(layout.input, buf, &mut self.input_state);
+        // Input box — voice mode or normal
+        if self.voice.is_recording.load(std::sync::atomic::Ordering::SeqCst) {
+            // Voice recording mode — show VU meter instead of input box
+            let voice_lines = crate::voice::render_voice_indicator(&self.voice, layout.input.width);
+            let voice_block = ratatui::widgets::Block::default()
+                .borders(ratatui::widgets::Borders::ALL)
+                .border_type(ratatui::widgets::BorderType::Rounded)
+                .border_style(ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(50, 130, 255)))
+                .title(" Voice Input ")
+                .title_style(ratatui::style::Style::default().fg(ratatui::style::Color::Rgb(50, 130, 255)).add_modifier(ratatui::style::Modifier::BOLD));
+            let inner = voice_block.inner(layout.input);
+            voice_block.render(layout.input, buf);
+            Paragraph::new(voice_lines).render(inner, buf);
+        } else {
+            let input_mode = self.current_input_mode();
+            let input = InputBox::default().mode(input_mode);
+            input.render_with_state(layout.input, buf, &mut self.input_state);
+        }
 
         // Slash command autocomplete overlay (above input)
         if self.suggestions.active {

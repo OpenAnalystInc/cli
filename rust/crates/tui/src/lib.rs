@@ -12,6 +12,7 @@ pub mod layout;
 pub mod panels;
 pub mod slash_commands;
 pub mod theme;
+pub mod voice;
 
 use std::io;
 

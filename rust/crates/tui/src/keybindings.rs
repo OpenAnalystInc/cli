@@ -44,6 +44,16 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
         }
     }
 
+    // Voice recording active — Space or Esc stops it
+    if app.voice.is_recording.load(std::sync::atomic::Ordering::SeqCst) {
+        if matches!(key.code, KeyCode::Char(' ') | KeyCode::Esc | KeyCode::Enter) {
+            stop_voice_and_transcribe(app);
+            return;
+        }
+        // Ignore all other keys while recording
+        return;
+    }
+
     match key.code {
         // Ctrl+C → cancel running agent OR quit
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -55,6 +65,15 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
             if !text.trim().is_empty() {
                 app.input_state.clear();
                 app.run_in_background(text);
+            }
+        }
+        // Space (empty input, not streaming) → start voice recording
+        KeyCode::Char(' ') if app.input_state.text().is_empty() && !app.is_streaming && !app.scroll_mode => {
+            match app.voice.start_recording() {
+                Ok(()) => {}
+                Err(e) => {
+                    app.chat.push_system(format!("Voice input error: {e}"));
+                }
             }
         }
         // Ctrl+B → toggle sidebar
@@ -182,6 +201,35 @@ fn handle_scroll_mode_key(key: KeyEvent, app: &mut App) {
             app.chat.focused_message = None;
         }
         _ => {}
+    }
+}
+
+fn stop_voice_and_transcribe(app: &mut App) {
+    if let Some(wav_data) = app.voice.stop_recording() {
+        app.chat.push_system("Transcribing...".to_string());
+        let tx = app.action_tx.clone();
+        std::thread::spawn(move || {
+            match crate::voice::transcribe_audio(&wav_data) {
+                Ok(text) => {
+                    if let Ok(rt) = tokio::runtime::Runtime::new() {
+                        rt.block_on(async {
+                            let _ = tx
+                                .send(events::Action::SubmitPrompt {
+                                    text,
+                                    effort_budget: None,
+                                    model_override: None,
+                                })
+                                .await;
+                        });
+                    }
+                }
+                Err(e) => {
+                    eprintln!("[voice] Transcription failed: {e}");
+                }
+            }
+        });
+    } else {
+        app.chat.push_system("No audio recorded.".to_string());
     }
 }
 
