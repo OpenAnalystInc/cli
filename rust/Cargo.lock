@@ -3228,6 +3228,7 @@ name = "tui"
 version = "1.0.1"
 dependencies = [
  "api",
+ "commands",
  "crossterm 0.29.0",
  "events",
  "orchestrator",
