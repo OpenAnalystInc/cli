@@ -24,9 +24,10 @@ pub async fn run_agent_turn(
     prompt: String,
     config: OrchestratorConfig,
     ui_tx: UiEventTx,
+    effort_budget: Option<u32>,
 ) -> Result<(), String> {
     let result = tokio::task::spawn_blocking(move || {
-        run_turn_blocking(agent_id, &prompt, &config, &ui_tx)
+        run_turn_blocking(agent_id, &prompt, &config, &ui_tx, effort_budget)
     })
     .await;
 
@@ -43,6 +44,7 @@ fn run_turn_blocking(
     prompt: &str,
     config: &OrchestratorConfig,
     ui_tx: &UiEventTx,
+    effort_budget: Option<u32>,
 ) -> Result<(), String> {
     use plugins::{PluginManager, PluginManagerConfig};
     use runtime::{ConfigLoader, ConversationRuntime, Session};
@@ -79,6 +81,7 @@ fn run_turn_blocking(
         allowed_tools: config.allowed_tools.clone(),
         tool_registry: tool_registry.clone(),
         ui_tx: ui_tx.clone(),
+        effort_budget,
     };
 
     let tool_executor = ChannelToolExecutor {
@@ -126,6 +129,7 @@ struct ChannelApiClient {
     allowed_tools: Option<std::collections::BTreeSet<String>>,
     tool_registry: tools::GlobalToolRegistry,
     ui_tx: UiEventTx,
+    effort_budget: Option<u32>,
 }
 
 impl ApiClient for ChannelApiClient {
@@ -159,7 +163,10 @@ impl ApiClient for ChannelApiClient {
             },
             tool_choice: None,
             stream: true,
-            thinking: None,
+            thinking: self.effort_budget.map(|budget| api::ThinkingConfig {
+                thinking_type: "enabled".to_string(),
+                budget_tokens: budget,
+            }),
         };
 
         let ui_tx = self.ui_tx.clone();

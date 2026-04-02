@@ -64,8 +64,8 @@ impl AgentOrchestrator {
                 // Handle user actions from the TUI
                 action = self.action_rx.recv() => {
                     match action {
-                        Some(Action::SubmitPrompt { text, .. }) => {
-                            self.submit_to_primary(text).await;
+                        Some(Action::SubmitPrompt { text, effort_budget, model_override }) => {
+                            self.submit_to_primary(text, effort_budget, model_override).await;
                         }
                         Some(Action::PermissionResponse { request_id, allow }) => {
                             self.resolve_permission(&request_id, allow).await;
@@ -96,7 +96,12 @@ impl AgentOrchestrator {
     }
 
     /// Submit a prompt to the primary agent. Spawns one if it doesn't exist.
-    async fn submit_to_primary(&self, prompt: String) {
+    async fn submit_to_primary(
+        &self,
+        prompt: String,
+        effort_budget: Option<u32>,
+        model_override: Option<String>,
+    ) {
         let agent_id = {
             let mut registry = self.registry.lock().await;
             if let Some(id) = registry.primary_agent_id() {
@@ -121,12 +126,18 @@ impl AgentOrchestrator {
 
         let agent_id_clone = agent_id.clone();
         let registry_for_handle = self.registry.clone();
+        // Apply model override if provided
+        let mut effective_config = config;
+        if let Some(model) = model_override {
+            effective_config.model = model;
+        }
         let handle = tokio::spawn(async move {
             let result = worker::run_agent_turn(
                 agent_id_clone.clone(),
                 prompt,
-                config,
+                effective_config,
                 ui_tx.clone(),
+                effort_budget,
             )
             .await;
 
@@ -189,7 +200,7 @@ impl AgentOrchestrator {
                 .await;
 
             let result =
-                worker::run_agent_turn(agent_id.clone(), task, config, ui_tx.clone()).await;
+                worker::run_agent_turn(agent_id.clone(), task, config, ui_tx.clone(), None).await;
 
             match result {
                 Ok(()) => {
