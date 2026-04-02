@@ -7,6 +7,7 @@ mod file_ops;
 mod hooks;
 mod json;
 mod mcp;
+pub mod mcp_bridge;
 mod mcp_client;
 mod mcp_stdio;
 mod oauth;

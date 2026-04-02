@@ -2,9 +2,14 @@
 //!
 //! Manages agent lifecycle, bridges the sync `ConversationRuntime` to the async TUI
 //! via channel-based `ApiClient`, `ToolExecutor`, and `PermissionPrompter` implementations.
+//!
+//! Smart model routing: automatically selects the optimal model per agent type —
+//! cheap/fast models for exploration, balanced for planning, capable for coding.
 
 pub mod agent;
+pub mod context;
 pub mod registry;
+pub mod router;
 pub mod worker;
 
 use std::collections::BTreeSet;
@@ -19,6 +24,7 @@ use runtime::PermissionMode;
 use tokio::sync::Mutex;
 
 use crate::registry::AgentRegistry;
+use crate::router::ModelRouter;
 
 /// Configuration for the orchestrator.
 #[derive(Debug, Clone)]
@@ -34,13 +40,14 @@ pub struct OrchestratorConfig {
 pub struct AgentOrchestrator {
     config: OrchestratorConfig,
     registry: Arc<Mutex<AgentRegistry>>,
+    router: ModelRouter,
     ui_tx: UiEventTx,
     action_rx: ActionRx,
     agent_spawn_rx: Option<AgentSpawnRx>,
 }
 
 impl AgentOrchestrator {
-    /// Create a new orchestrator.
+    /// Create a new orchestrator with smart model routing.
     #[must_use]
     pub fn new(
         config: OrchestratorConfig,
@@ -48,9 +55,11 @@ impl AgentOrchestrator {
         action_rx: ActionRx,
         agent_spawn_rx: Option<AgentSpawnRx>,
     ) -> Self {
+        let router = ModelRouter::from_default_model(&config.model);
         Self {
             config,
             registry: Arc::new(Mutex::new(AgentRegistry::new())),
+            router,
             ui_tx,
             action_rx,
             agent_spawn_rx,
@@ -61,7 +70,6 @@ impl AgentOrchestrator {
     pub async fn run(mut self) {
         loop {
             tokio::select! {
-                // Handle user actions from the TUI
                 action = self.action_rx.recv() => {
                     match action {
                         Some(Action::SubmitPrompt { text, effort_budget, model_override }) => {
@@ -74,12 +82,9 @@ impl AgentOrchestrator {
                             self.cancel_agent(&id).await;
                         }
                         Some(Action::Quit) | None => break,
-                        Some(Action::SlashCommand(_)) => {
-                            // TODO: handle slash commands
-                        }
+                        Some(Action::SlashCommand(_)) => {}
                     }
                 }
-                // Handle agent spawn requests from the Agent tool
                 spawn_req = async {
                     if let Some(rx) = &mut self.agent_spawn_rx {
                         rx.recv().await
@@ -95,7 +100,7 @@ impl AgentOrchestrator {
         }
     }
 
-    /// Submit a prompt to the primary agent. Spawns one if it doesn't exist.
+    /// Submit a prompt to the primary agent with smart model routing.
     async fn submit_to_primary(
         &self,
         prompt: String,
@@ -107,16 +112,13 @@ impl AgentOrchestrator {
             if let Some(id) = registry.primary_agent_id() {
                 id.clone()
             } else {
-                let id = registry.create_agent(AgentType::Primary, "primary".to_string(), None);
-                id
+                registry.create_agent(AgentType::Primary, "primary".to_string(), None)
             }
         };
 
         let ui_tx = self.ui_tx.clone();
-        let config = self.config.clone();
         let registry = self.registry.clone();
 
-        // Notify TUI that agent is running
         let _ = ui_tx
             .send(UiEvent::AgentStatusChanged {
                 agent_id: agent_id.clone(),
@@ -124,20 +126,31 @@ impl AgentOrchestrator {
             })
             .await;
 
-        let agent_id_clone = agent_id.clone();
-        let registry_for_handle = self.registry.clone();
-        // Apply model override if provided
-        let mut effective_config = config;
+        // Smart model selection:
+        // 1. User override takes priority
+        // 2. Otherwise, router picks based on task complexity
+        let mut effective_config = self.config.clone();
+        let effective_effort;
         if let Some(model) = model_override {
             effective_config.model = model;
+            effective_effort = effort_budget;
+        } else {
+            // Smart routing: classify prompt → pick model + effort
+            let route = self.router.route_prompt(&prompt);
+            effective_config.model = route.model;
+            effective_effort = effort_budget.or(Some(route.effort_budget));
         }
+
+        let agent_id_clone = agent_id.clone();
+        let registry_for_handle = self.registry.clone();
+
         let handle = tokio::spawn(async move {
             let result = worker::run_agent_turn(
                 agent_id_clone.clone(),
                 prompt,
                 effective_config,
                 ui_tx.clone(),
-                effort_budget,
+                effective_effort,
             )
             .await;
 
@@ -164,12 +177,11 @@ impl AgentOrchestrator {
             }
         });
 
-        // Store handle so we can abort on cancel
         let mut reg = registry_for_handle.lock().await;
         reg.set_handle(&agent_id, handle);
     }
 
-    /// Handle a spawn request from the Agent tool.
+    /// Handle a spawn request from the Agent tool — routes model by agent type.
     async fn handle_spawn_request(&self, req: AgentSpawnRequest) {
         let agent_id = {
             let mut registry = self.registry.lock().await;
@@ -181,17 +193,31 @@ impl AgentOrchestrator {
             .send(UiEvent::AgentSpawned {
                 agent_id: agent_id.clone(),
                 parent_id: Some(req.parent_id),
-                agent_type: req.agent_type,
+                agent_type: req.agent_type.clone(),
                 task: req.task.clone(),
             })
             .await;
 
         let ui_tx = self.ui_tx.clone();
-        let config = self.config.clone();
         let registry = self.registry.clone();
         let task = req.task;
 
-        tokio::spawn(async move {
+        // Smart model routing for sub-agents:
+        // 1. Explicit model in spawn request takes priority
+        // 2. Otherwise, router picks by agent type
+        let mut config = self.config.clone();
+        let effort_budget;
+        if let Some(model) = req.model {
+            config.model = model;
+            effort_budget = None;
+        } else {
+            let route = self.router.route_agent_task(&req.agent_type, &task);
+            config.model = route.model;
+            effort_budget = Some(route.effort_budget);
+        }
+
+        let agent_id_for_handle = agent_id.clone();
+        let handle = tokio::spawn(async move {
             let _ = ui_tx
                 .send(UiEvent::AgentStatusChanged {
                     agent_id: agent_id.clone(),
@@ -200,7 +226,7 @@ impl AgentOrchestrator {
                 .await;
 
             let result =
-                worker::run_agent_turn(agent_id.clone(), task, config, ui_tx.clone(), None).await;
+                worker::run_agent_turn(agent_id.clone(), task, config, ui_tx.clone(), effort_budget).await;
 
             match result {
                 Ok(()) => {
@@ -225,6 +251,10 @@ impl AgentOrchestrator {
                 }
             }
         });
+
+        // Store handle for cancellation
+        let mut reg = self.registry.lock().await;
+        reg.set_handle(&agent_id_for_handle, handle);
     }
 
     /// Resolve a permission prompt by notifying the blocked worker thread.

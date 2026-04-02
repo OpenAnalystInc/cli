@@ -386,8 +386,15 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
     SlashCommandSpec {
         name: "effort",
         aliases: &["budget"],
-        summary: "Set thinking effort level (low, medium, high, max)",
-        argument_hint: Some("[low|medium|high|max]"),
+        summary: "Set thinking effort — global or per-action category",
+        argument_hint: Some("[category] [low|medium|high|max]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "route",
+        aliases: &["routing", "router"],
+        summary: "View or edit the per-action model routing table",
+        argument_hint: Some("[category] [tier]"),
         resume_supported: false,
     },
     SlashCommandSpec {
@@ -423,6 +430,13 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         aliases: &[],
         summary: "Toggle the sidebar panel",
         argument_hint: None,
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "swarm",
+        aliases: &[],
+        summary: "Spawn parallel agents to tackle a complex task",
+        argument_hint: Some("<task>"),
         resume_supported: false,
     },
 ];
@@ -556,7 +570,14 @@ pub enum SlashCommand {
         prompt: Option<String>,
     },
     Effort {
+        /// Optional category (explore, research, code, write) — if None, applies globally.
+        category: Option<String>,
+        /// Effort level (low, medium, high, max).
         level: Option<String>,
+    },
+    Route {
+        /// Optional sub-command: category to edit, or "reset".
+        args: Option<String>,
     },
     Context,
     Changelog {
@@ -568,6 +589,10 @@ pub enum SlashCommand {
     // ── TUI control ──
     Exit,
     Sidebar,
+    /// Spawn a swarm of agents for a complex task.
+    Swarm {
+        task: Option<String>,
+    },
     Unknown(String),
 }
 
@@ -724,8 +749,25 @@ impl SlashCommand {
             "think" => Self::Think {
                 prompt: remainder_after_command(trimmed, command),
             },
-            "effort" | "budget" => Self::Effort {
-                level: parts.next().map(ToOwned::to_owned),
+            "effort" | "budget" => {
+                let first = parts.next().map(ToOwned::to_owned);
+                let second = parts.next().map(ToOwned::to_owned);
+                // If two args: /effort <category> <level>
+                // If one arg: could be a level (global) or a category (show that category)
+                if second.is_some() {
+                    Self::Effort { category: first, level: second }
+                } else {
+                    // Single arg — determine if it's a category or a level
+                    match first.as_deref() {
+                        Some("explore" | "exp" | "e" | "research" | "res" | "r" | "code" | "c" | "write" | "w" | "doc") => {
+                            Self::Effort { category: first, level: None }
+                        }
+                        _ => Self::Effort { category: None, level: first }
+                    }
+                }
+            }
+            "route" | "routing" | "router" => Self::Route {
+                args: remainder_after_command(trimmed, command),
             },
             "context" | "ctx" => Self::Context,
             "changelog" | "release-notes" => Self::Changelog {
@@ -736,6 +778,9 @@ impl SlashCommand {
             },
             "exit" | "quit" | "q" => Self::Exit,
             "sidebar" => Self::Sidebar,
+            "swarm" => Self::Swarm {
+                task: remainder_after_command(trimmed, command),
+            },
             other => Self::Unknown(other.to_string()),
         })
     }
@@ -1990,11 +2035,13 @@ pub fn handle_slash_command(
         | SlashCommand::Vim
         | SlashCommand::Think { .. }
         | SlashCommand::Effort { .. }
+        | SlashCommand::Route { .. }
         | SlashCommand::Context
         | SlashCommand::Changelog { .. }
         | SlashCommand::AddDir { .. }
         | SlashCommand::Exit
         | SlashCommand::Sidebar
+        | SlashCommand::Swarm { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2351,7 +2398,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 53);
+        assert_eq!(slash_command_specs().len(), 55);
         assert_eq!(resume_supported_slash_commands().len(), 14);
     }
 

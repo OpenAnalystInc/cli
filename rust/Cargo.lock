@@ -3232,6 +3232,7 @@ dependencies = [
  "api",
  "commands",
  "crossterm 0.29.0",
+ "edtui",
  "events",
  "orchestrator",
  "plugins",
