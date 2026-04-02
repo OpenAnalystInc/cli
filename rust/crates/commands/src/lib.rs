@@ -440,10 +440,10 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         resume_supported: false,
     },
     SlashCommandSpec {
-        name: "open-analyst",
-        aliases: &["oa", "autonomous", "auto"],
+        name: "openanalyst",
+        aliases: &["oa"],
         summary: "Run autonomous agent — think→act→observe→verify loop",
-        argument_hint: Some("<task> [--goal X] [--criteria <cmd>] [--schedule <cron>] [--max-turns N]"),
+        argument_hint: Some("<task> [--goal X] [--criteria <cmd>] [--max-turns N]"),
         resume_supported: false,
     },
 ];
@@ -797,7 +797,7 @@ impl SlashCommand {
             "swarm" => Self::Swarm {
                 task: remainder_after_command(trimmed, command),
             },
-            "open-analyst" | "oa" | "autonomous" | "auto" => {
+            "openanalyst" | "oa" => {
                 // Parse: /open-analyst <task> [--goal X] [--criteria X] [--schedule X] [--max-turns N]
                 let remainder = remainder_after_command(trimmed, command).unwrap_or_default();
                 let (task, goal, criteria, schedule, max_turns) = parse_open_analyst_args(&remainder);
