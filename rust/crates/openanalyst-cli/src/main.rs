@@ -2695,18 +2695,16 @@ impl LiveCli {
             println!("  File not found: {file_path}");
             return Ok(());
         }
-        let api_key = env::var("OPENAI_API_KEY")
-            .or_else(|_| env::var("GEMINI_API_KEY"))
-            .map(|k| k.trim().to_string())
-            .ok()
-            .filter(|k| !k.is_empty());
+        let openai_key = env::var("OPENAI_API_KEY").ok().filter(|k| !k.trim().is_empty());
+        let gemini_key = env::var("GEMINI_API_KEY").ok().filter(|k| !k.trim().is_empty());
+        let api_key = openai_key.clone().or(gemini_key.clone());
         let Some(api_key) = api_key else {
             println!("No transcription API key found.\n  Set OPENAI_API_KEY (Whisper) or GEMINI_API_KEY.");
             return Ok(());
         };
 
-        let is_openai = env::var("OPENAI_API_KEY").is_ok();
-        let provider = if is_openai { "OpenAI Whisper" } else { "Gemini" };
+        let use_openai = openai_key.is_some();
+        let provider = if use_openai { "OpenAI Whisper" } else { "Gemini" };
         println!("  Transcribing via {provider}...");
 
         let file_bytes = fs::read(file_path)?;
@@ -2715,14 +2713,15 @@ impl LiveCli {
             .unwrap_or_default()
             .to_string_lossy()
             .to_string();
+        let mime = mime_from_extension(file_path);
 
         let rt = tokio::runtime::Runtime::new()?;
         let result: Result<String, Box<dyn std::error::Error>> = rt.block_on(async {
             let client = reqwest::Client::builder().timeout(Duration::from_secs(120)).build()?;
-            if is_openai {
+            if use_openai {
                 let part = reqwest::multipart::Part::bytes(file_bytes)
                     .file_name(file_name)
-                    .mime_str("audio/mpeg")?;
+                    .mime_str(mime)?;
                 let form = reqwest::multipart::Form::new()
                     .text("model", "whisper-1")
                     .text("response_format", "text")
@@ -2738,12 +2737,10 @@ impl LiveCli {
                 }
                 Ok(text)
             } else {
-                // Gemini: upload file inline as base64
-                use base64::Engine as _;
-                let b64 = base64::engine::general_purpose::STANDARD.encode(&file_bytes);
+                let b64 = base64_encode(&file_bytes);
                 let body = json!({
                     "contents": [{"parts": [
-                        {"inlineData": {"mimeType": "audio/mpeg", "data": b64}},
+                        {"inlineData": {"mimeType": mime, "data": b64}},
                         {"text": "Transcribe this audio accurately. Return only the transcription text."}
                     ]}]
                 });
@@ -2833,9 +2830,7 @@ impl LiveCli {
         let prompt = prompt.unwrap_or("Describe this image in detail.");
         let file_bytes = fs::read(image_path)?;
         let b64 = base64_encode(&file_bytes);
-        let mime = if image_path.ends_with(".png") { "image/png" }
-            else if image_path.ends_with(".webp") { "image/webp" }
-            else { "image/jpeg" };
+        let mime = mime_from_extension(image_path);
 
         // Try providers: Gemini, OpenAI, Anthropic
         let (provider, api_key) =
@@ -2845,8 +2840,10 @@ impl LiveCli {
                 ("GPT-4o", key)
             } else if let Some(key) = env::var("ANTHROPIC_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
                 ("Claude", key)
+            } else if let Some(key) = env::var("XAI_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
+                ("Grok", key)
             } else {
-                println!("No vision API key found.\n  Set GEMINI_API_KEY, OPENAI_API_KEY, or ANTHROPIC_API_KEY.");
+                println!("No vision API key found.\n  Set GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or XAI_API_KEY.");
                 return Ok(());
             };
 
@@ -2884,7 +2881,24 @@ impl LiveCli {
                     Ok(result.pointer("/choices/0/message/content")
                         .and_then(|v| v.as_str()).unwrap_or("(no response)").to_string())
                 }
+                "Grok" => {
+                    // xAI Grok uses OpenAI-compatible vision format
+                    let body = json!({
+                        "model": "grok-3",
+                        "messages": [{"role": "user", "content": [
+                            {"type": "image_url", "image_url": {"url": format!("data:{mime};base64,{b64}")}},
+                            {"type": "text", "text": prompt}
+                        ]}],
+                        "max_tokens": 1024
+                    });
+                    let resp = client.post("https://api.x.ai/v1/chat/completions")
+                        .bearer_auth(&api_key).json(&body).send().await?;
+                    let result: serde_json::Value = resp.json().await?;
+                    Ok(result.pointer("/choices/0/message/content")
+                        .and_then(|v| v.as_str()).unwrap_or("(no response)").to_string())
+                }
                 _ => {
+                    // Anthropic Claude
                     let body = json!({
                         "model": "claude-sonnet-4-6",
                         "max_tokens": 1024,
@@ -2969,21 +2983,27 @@ impl LiveCli {
     }
 
     fn run_tokens(&self, target: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
-        let content = match target {
-            Some(path) if Path::new(path).exists() => fs::read_to_string(path)?,
-            Some(text) => text.to_string(),
+        let (content, source) = match target {
+            Some(path) if Path::new(path).exists() => {
+                (fs::read_to_string(path)?, path.to_string())
+            }
+            Some(text) => (text.to_string(), "(inline text)".to_string()),
             None => {
                 println!("Usage: /tokens <file-path or text>\n  Example: /tokens src/main.rs\n  Example: /tokens \"Hello world\"");
                 return Ok(());
             }
         };
-        // Rough estimation: ~4 chars per token for English, ~2 for code
         let char_count = content.len();
         let word_count = content.split_whitespace().count();
         let line_count = content.lines().count();
-        let estimated_tokens = char_count / 4; // conservative estimate
+        // Heuristic: code ~3.5 chars/token, prose ~4.5 chars/token
+        let code_ratio = content.chars().filter(|c| matches!(c, '{' | '}' | '(' | ')' | ';' | ':' | '.' | '#')).count();
+        let is_code = code_ratio > char_count / 40;
+        let chars_per_token = if is_code { 3.5_f64 } else { 4.5 };
+        let estimated_tokens = (char_count as f64 / chars_per_token).ceil() as usize;
         println!(
-            "Token estimate\n  Characters       {char_count}\n  Words            {word_count}\n  Lines            {line_count}\n  Est. tokens      ~{estimated_tokens}\n  Model            {model}",
+            "Token estimate\n  Source           {source}\n  Characters       {char_count}\n  Words            {word_count}\n  Lines            {line_count}\n  Content type     {content_type}\n  Est. tokens      ~{estimated_tokens}\n  Model            {model}",
+            content_type = if is_code { "code" } else { "prose" },
             model = self.model
         );
         Ok(())
@@ -3114,6 +3134,22 @@ fn base64_encode(data: &[u8]) -> String {
 fn base64_decode(input: &str) -> Vec<u8> {
     use base64::Engine as _;
     base64::engine::general_purpose::STANDARD.decode(input).unwrap_or_default()
+}
+
+fn mime_from_extension(path: &str) -> &'static str {
+    let lower = path.to_ascii_lowercase();
+    if lower.ends_with(".mp3") { "audio/mpeg" }
+    else if lower.ends_with(".wav") { "audio/wav" }
+    else if lower.ends_with(".m4a") { "audio/mp4" }
+    else if lower.ends_with(".ogg") { "audio/ogg" }
+    else if lower.ends_with(".flac") { "audio/flac" }
+    else if lower.ends_with(".webm") { "audio/webm" }
+    else if lower.ends_with(".mp4") { "video/mp4" }
+    else if lower.ends_with(".png") { "image/png" }
+    else if lower.ends_with(".jpg") || lower.ends_with(".jpeg") { "image/jpeg" }
+    else if lower.ends_with(".webp") { "image/webp" }
+    else if lower.ends_with(".gif") { "image/gif" }
+    else { "application/octet-stream" }
 }
 
 fn strip_html_tags(html: &str) -> String {

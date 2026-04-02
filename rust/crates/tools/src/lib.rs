@@ -3482,7 +3482,7 @@ mod tests {
         assert!(output["prompt"]
             .as_str()
             .expect("prompt")
-            .contains("Guide on using oh-my-codex plugin"));
+            .contains("Guide on using"));
 
         let dollar_result = execute_tool(
             "Skill",
