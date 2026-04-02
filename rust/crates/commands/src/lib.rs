@@ -332,6 +332,63 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: Some("[list|add <name> <command> [args...]|remove <name>]"),
         resume_supported: false,
     },
+    // ── Claude Code parity commands ──
+    SlashCommandSpec {
+        name: "doctor",
+        aliases: &[],
+        summary: "Diagnose CLI installation, config, and provider connectivity",
+        argument_hint: None,
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "login",
+        aliases: &[],
+        summary: "Add or switch provider API keys",
+        argument_hint: None,
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "logout",
+        aliases: &[],
+        summary: "Clear all saved credentials",
+        argument_hint: None,
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "vim",
+        aliases: &[],
+        summary: "Toggle vim keybinding mode for the input editor",
+        argument_hint: None,
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "think",
+        aliases: &[],
+        summary: "Force extended thinking for the next prompt",
+        argument_hint: Some("[prompt]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "context",
+        aliases: &["ctx"],
+        summary: "Show current context window usage and token budget",
+        argument_hint: None,
+        resume_supported: true,
+    },
+    SlashCommandSpec {
+        name: "changelog",
+        aliases: &["release-notes"],
+        summary: "Generate changelog from git commits since a tag or date",
+        argument_hint: Some("[since-tag-or-date]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "add-dir",
+        aliases: &["add-directory"],
+        summary: "Add a directory to the conversation context",
+        argument_hint: Some("<directory-path>"),
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -446,6 +503,21 @@ pub enum SlashCommand {
     Mcp {
         action: Option<String>,
         args: Option<String>,
+    },
+    // ── Claude Code parity ──
+    Doctor,
+    Login,
+    Logout,
+    Vim,
+    Think {
+        prompt: Option<String>,
+    },
+    Context,
+    Changelog {
+        since: Option<String>,
+    },
+    AddDir {
+        path: Option<String>,
     },
     Unknown(String),
 }
@@ -589,6 +661,20 @@ impl SlashCommand {
                     let rest = parts.collect::<Vec<_>>().join(" ");
                     (!rest.is_empty()).then_some(rest)
                 },
+            },
+            "doctor" => Self::Doctor,
+            "login" => Self::Login,
+            "logout" => Self::Logout,
+            "vim" => Self::Vim,
+            "think" => Self::Think {
+                prompt: remainder_after_command(trimmed, command),
+            },
+            "context" | "ctx" => Self::Context,
+            "changelog" | "release-notes" => Self::Changelog {
+                since: parts.next().map(ToOwned::to_owned),
+            },
+            "add-dir" | "add-directory" => Self::AddDir {
+                path: remainder_after_command(trimmed, command),
             },
             other => Self::Unknown(other.to_string()),
         })
@@ -1836,6 +1922,14 @@ pub fn handle_slash_command(
         | SlashCommand::Json { .. }
         | SlashCommand::Dev { .. }
         | SlashCommand::Mcp { .. }
+        | SlashCommand::Doctor
+        | SlashCommand::Login
+        | SlashCommand::Logout
+        | SlashCommand::Vim
+        | SlashCommand::Think { .. }
+        | SlashCommand::Context
+        | SlashCommand::Changelog { .. }
+        | SlashCommand::AddDir { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2192,8 +2286,8 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 40);
-        assert_eq!(resume_supported_slash_commands().len(), 13);
+        assert_eq!(slash_command_specs().len(), 48);
+        assert_eq!(resume_supported_slash_commands().len(), 14);
     }
 
     #[test]

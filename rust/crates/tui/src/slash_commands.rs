@@ -390,6 +390,44 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system(msg);
         }
 
+        // ── Claude Code parity ──
+        SlashCommand::Doctor => {
+            app.chat.push_system("Run /doctor in the REPL for full diagnostics.".to_string());
+        }
+        SlashCommand::Login => {
+            app.chat.push_system("Run `openanalyst login` from the terminal to add provider keys.".to_string());
+        }
+        SlashCommand::Logout => {
+            app.chat.push_system("Run `openanalyst logout` from the terminal to clear credentials.".to_string());
+        }
+        SlashCommand::Vim => {
+            app.chat.push_system("Vim mode: toggle with Ctrl+V in the input editor.".to_string());
+        }
+        SlashCommand::Think { prompt } => {
+            let text = prompt.unwrap_or_else(|| "the next question".to_string());
+            let p = format!("Think deeply and step-by-step about this before answering:\n\n{text}");
+            app.submit_prompt_internal(p);
+        }
+        SlashCommand::Context => {
+            let tokens = app.status_bar.total_tokens;
+            app.chat.push_system(format!("Context: ~{tokens} tokens used"));
+        }
+        SlashCommand::Changelog { since } => {
+            let tag = since.unwrap_or_else(|| "HEAD~20".to_string());
+            let log = capture_command_output("git", &["log", "--oneline", "--no-merges", "-20"]);
+            let prompt = format!("Generate a changelog from these commits since {tag}:\n```\n{log}\n```");
+            app.submit_prompt_internal(prompt);
+        }
+        SlashCommand::AddDir { path } => {
+            if let Some(dir) = path {
+                app.chat.push_system(format!("Adding directory to context: {dir}"));
+                let prompt = format!("I'm adding the directory `{dir}` to our conversation context. List its key files.");
+                app.submit_prompt_internal(prompt);
+            } else {
+                app.chat.push_system("Usage: /add-dir <directory-path>".to_string());
+            }
+        }
+
         SlashCommand::Unknown(name) => {
             app.chat.push_system(format!("Unknown command: /{name}. Type /help for available commands."));
         }
