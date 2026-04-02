@@ -4,6 +4,7 @@
 //! startup banner, inline tool cards, status line, and multi-agent support.
 
 pub mod app;
+pub mod autocomplete;
 pub mod banner;
 pub mod event_loop;
 pub mod keybindings;

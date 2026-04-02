@@ -170,6 +170,11 @@ impl InputBoxState {
         String::from(self.editor.lines.clone())
     }
 
+    /// Set the input text (replaces current content).
+    pub fn set_text(&mut self, text: &str) {
+        self.editor = EditorState::new(Lines::from(text));
+    }
+
     /// Clear the input.
     pub fn clear(&mut self) {
         self.editor = EditorState::new(Lines::default());
