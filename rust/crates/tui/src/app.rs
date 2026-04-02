@@ -419,6 +419,10 @@ impl App {
                 if let Some(bt) = self.sidebar_state.background_tasks.iter_mut().find(|bt| bt.id == agent_id && bt.status == BackgroundTaskStatus::Running) {
                     bt.status = BackgroundTaskStatus::Completed;
                 }
+                // Auto-compact if session is getting very large (>500 messages)
+                if self.chat.messages.len() > 500 {
+                    crate::slash_commands::auto_compact_if_needed(self);
+                }
                 // Auto-send next queued prompt
                 self.drain_pending_queue();
             }
@@ -556,6 +560,11 @@ impl App {
                 self.spinner_state.calc_next();
                 if let Some(start) = &self.turn_start {
                     self.status_bar.elapsed = start.elapsed();
+                }
+                // Auto-stop voice recording if max duration exceeded
+                if self.voice.should_auto_stop() {
+                    self.voice.is_recording.store(false, std::sync::atomic::Ordering::SeqCst);
+                    self.chat.push_system("Voice recording auto-stopped (60s limit).".to_string());
                 }
             }
         }

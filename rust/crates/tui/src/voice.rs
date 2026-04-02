@@ -7,6 +7,9 @@ use std::sync::atomic::{AtomicBool, AtomicU16, Ordering};
 use std::sync::Arc;
 use std::time::Instant;
 
+/// Maximum recording duration (60 seconds).
+const MAX_RECORDING_SECS: f64 = 60.0;
+
 /// Voice recording state shared between the audio thread and TUI.
 #[derive(Clone)]
 pub struct VoiceState {
@@ -102,6 +105,17 @@ impl VoiceState {
             .ok()
             .and_then(|t| t.map(|start| start.elapsed().as_secs_f64()))
             .unwrap_or(0.0)
+    }
+
+    /// Check if recording should auto-stop (exceeded max duration).
+    pub fn should_auto_stop(&self) -> bool {
+        self.is_recording.load(Ordering::SeqCst) && self.recording_duration() >= MAX_RECORDING_SECS
+    }
+
+    /// Check if a microphone is available without starting recording.
+    pub fn has_microphone() -> bool {
+        use cpal::traits::HostTrait;
+        cpal::default_host().default_input_device().is_some()
     }
 
     /// Get the current audio level (0-100).

@@ -69,10 +69,14 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
         }
         // Space (empty input, not streaming) → start voice recording
         KeyCode::Char(' ') if app.input_state.text().is_empty() && !app.is_streaming && !app.scroll_mode => {
-            match app.voice.start_recording() {
-                Ok(()) => {}
-                Err(e) => {
-                    app.chat.push_system(format!("Voice input error: {e}"));
+            if !crate::voice::VoiceState::has_microphone() {
+                app.chat.push_system("No microphone detected. Voice input unavailable.".to_string());
+            } else {
+                match app.voice.start_recording() {
+                    Ok(()) => {}
+                    Err(e) => {
+                        app.chat.push_system(format!("Voice input error: {e}"));
+                    }
                 }
             }
         }
