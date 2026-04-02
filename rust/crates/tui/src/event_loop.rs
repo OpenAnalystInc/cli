@@ -32,7 +32,7 @@ pub async fn run_event_loop(
 
     // Crossterm event reader in a dedicated thread
     let (cx_tx, mut cx_rx) = mpsc::channel::<ct_event::Event>(64);
-    std::thread::spawn(move || loop {
+    let crossterm_thread = std::thread::spawn(move || loop {
         if ct_event::poll(Duration::from_millis(50)).unwrap_or(false) {
             if let Ok(event) = ct_event::read() {
                 if cx_tx.blocking_send(event).is_err() {
@@ -98,6 +98,11 @@ pub async fn run_event_loop(
             break;
         }
     }
+
+    // Drop the receiver so the crossterm thread's blocking_send returns Err and it exits.
+    drop(cx_rx);
+    // Join the crossterm event thread for clean shutdown.
+    let _ = crossterm_thread.join();
 
     Ok(())
 }

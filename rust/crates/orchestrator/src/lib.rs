@@ -138,12 +138,16 @@ impl AgentOrchestrator {
         let ui_tx = self.ui_tx.clone();
         let registry = self.registry.clone();
 
-        let _ = ui_tx
+        if ui_tx
             .send(UiEvent::AgentStatusChanged {
                 agent_id: agent_id.clone(),
                 status: AgentStatus::Running,
             })
-            .await;
+            .await
+            .is_err()
+        {
+            eprintln!("[orchestrator] TUI channel closed — event dropped");
+        }
 
         // Smart model selection:
         // 1. User override takes priority
@@ -177,21 +181,29 @@ impl AgentOrchestrator {
 
             match result {
                 Ok(()) => {
-                    let _ = ui_tx
+                    if ui_tx
                         .send(UiEvent::StreamEnd {
                             agent_id: agent_id_clone.clone(),
                         })
-                        .await;
+                        .await
+                        .is_err()
+                    {
+                        eprintln!("[orchestrator] TUI channel closed — event dropped");
+                    }
                     let mut reg = registry.lock().await;
                     reg.set_status(&agent_id_clone, AgentStatus::Completed);
                 }
                 Err(err) => {
-                    let _ = ui_tx
+                    if ui_tx
                         .send(UiEvent::AgentFailed {
                             agent_id: agent_id_clone.clone(),
                             error: err,
                         })
-                        .await;
+                        .await
+                        .is_err()
+                    {
+                        eprintln!("[orchestrator] TUI channel closed — event dropped");
+                    }
                     let mut reg = registry.lock().await;
                     reg.set_status(&agent_id_clone, AgentStatus::Failed);
                 }
@@ -209,7 +221,7 @@ impl AgentOrchestrator {
             registry.create_agent(req.agent_type.clone(), req.task.clone(), Some(req.parent_id.clone()))
         };
 
-        let _ = self
+        if self
             .ui_tx
             .send(UiEvent::AgentSpawned {
                 agent_id: agent_id.clone(),
@@ -217,7 +229,11 @@ impl AgentOrchestrator {
                 agent_type: req.agent_type.clone(),
                 task: req.task.clone(),
             })
-            .await;
+            .await
+            .is_err()
+        {
+            eprintln!("[orchestrator] TUI channel closed — event dropped");
+        }
 
         let ui_tx = self.ui_tx.clone();
         let registry = self.registry.clone();
@@ -240,34 +256,46 @@ impl AgentOrchestrator {
         let agent_id_for_handle = agent_id.clone();
         let registry_for_worker = self.registry.clone();
         let handle = tokio::spawn(async move {
-            let _ = ui_tx
+            if ui_tx
                 .send(UiEvent::AgentStatusChanged {
                     agent_id: agent_id.clone(),
                     status: AgentStatus::Running,
                 })
-                .await;
+                .await
+                .is_err()
+            {
+                eprintln!("[orchestrator] TUI channel closed — event dropped");
+            }
 
             let result =
                 worker::run_agent_turn(agent_id.clone(), task, config, ui_tx.clone(), effort_budget, registry_for_worker).await;
 
             match result {
                 Ok(()) => {
-                    let _ = ui_tx
+                    if ui_tx
                         .send(UiEvent::AgentCompleted {
                             agent_id: agent_id.clone(),
                             result: "completed".to_string(),
                         })
-                        .await;
+                        .await
+                        .is_err()
+                    {
+                        eprintln!("[orchestrator] TUI channel closed — event dropped");
+                    }
                     let mut reg = registry.lock().await;
                     reg.set_status(&agent_id, AgentStatus::Completed);
                 }
                 Err(err) => {
-                    let _ = ui_tx
+                    if ui_tx
                         .send(UiEvent::AgentFailed {
                             agent_id: agent_id.clone(),
                             error: err,
                         })
-                        .await;
+                        .await
+                        .is_err()
+                    {
+                        eprintln!("[orchestrator] TUI channel closed — event dropped");
+                    }
                     let mut reg = registry.lock().await;
                     reg.set_status(&agent_id, AgentStatus::Failed);
                 }
@@ -291,13 +319,17 @@ impl AgentOrchestrator {
         registry.abort_agent(agent_id);
         registry.set_status(agent_id, AgentStatus::Failed);
         drop(registry);
-        let _ = self
+        if self
             .ui_tx
             .send(UiEvent::AgentFailed {
                 agent_id: agent_id.to_string(),
                 error: "Cancelled by user".to_string(),
             })
-            .await;
+            .await
+            .is_err()
+        {
+            eprintln!("[orchestrator] TUI channel closed — event dropped");
+        }
     }
 
     /// Handle MOE dispatch — parse chained commands, build execution plan, spawn agents.
@@ -322,17 +354,21 @@ impl AgentOrchestrator {
         let total = plan.commands.len();
 
         // Announce MOE dispatch
-        let _ = self.ui_tx.send(UiEvent::StreamDelta {
+        if self.ui_tx.send(UiEvent::StreamDelta {
             agent_id: "moe".to_string(),
             text: format!("\n[MOE] Dispatching {total} agents across {} waves\n", plan.waves.len()),
-        }).await;
+        }).await.is_err() {
+            eprintln!("[orchestrator] TUI channel closed — event dropped");
+        }
 
         // Execute waves sequentially (agents within each wave run in parallel)
         for (wave_idx, wave) in plan.waves.iter().enumerate() {
-            let _ = self.ui_tx.send(UiEvent::StreamDelta {
+            if self.ui_tx.send(UiEvent::StreamDelta {
                 agent_id: "moe".to_string(),
                 text: format!("[MOE] Wave {}/{} — {} agent(s)\n", wave_idx + 1, plan.waves.len(), wave.len()),
-            }).await;
+            }).await.is_err() {
+                eprintln!("[orchestrator] TUI channel closed — event dropped");
+            }
 
             let mut handles = Vec::new();
 
@@ -350,12 +386,14 @@ impl AgentOrchestrator {
                     )
                 };
 
-                let _ = self.ui_tx.send(UiEvent::AgentSpawned {
+                if self.ui_tx.send(UiEvent::AgentSpawned {
                     agent_id: agent_id.clone(),
                     parent_id: None,
                     agent_type: cmd.agent_type.clone(),
                     task: format!("/{} {}", cmd.name, cmd.args),
-                }).await;
+                }).await.is_err() {
+                    eprintln!("[orchestrator] TUI channel closed — event dropped");
+                }
 
                 // Route to optimal model via the routing table
                 let route = self.router.route_prompt(&prompt);
@@ -367,10 +405,12 @@ impl AgentOrchestrator {
                 let effort = Some(route.effort_budget);
 
                 let handle = tokio::spawn(async move {
-                    let _ = ui_tx.send(UiEvent::AgentStatusChanged {
+                    if ui_tx.send(UiEvent::AgentStatusChanged {
                         agent_id: agent_id.clone(),
                         status: AgentStatus::Running,
-                    }).await;
+                    }).await.is_err() {
+                        eprintln!("[orchestrator] TUI channel closed — event dropped");
+                    }
 
                     let result = worker::run_agent_turn(
                         agent_id.clone(),
@@ -383,18 +423,22 @@ impl AgentOrchestrator {
 
                     match result {
                         Ok(()) => {
-                            let _ = ui_tx.send(UiEvent::AgentCompleted {
+                            if ui_tx.send(UiEvent::AgentCompleted {
                                 agent_id: agent_id.clone(),
                                 result: "completed".to_string(),
-                            }).await;
+                            }).await.is_err() {
+                                eprintln!("[orchestrator] TUI channel closed — event dropped");
+                            }
                             let mut reg = registry.lock().await;
                             reg.set_status(&agent_id, AgentStatus::Completed);
                         }
                         Err(err) => {
-                            let _ = ui_tx.send(UiEvent::AgentFailed {
+                            if ui_tx.send(UiEvent::AgentFailed {
                                 agent_id: agent_id.clone(),
                                 error: err,
-                            }).await;
+                            }).await.is_err() {
+                                eprintln!("[orchestrator] TUI channel closed — event dropped");
+                            }
                             let mut reg = registry.lock().await;
                             reg.set_status(&agent_id, AgentStatus::Failed);
                         }
@@ -411,13 +455,17 @@ impl AgentOrchestrator {
         }
 
         // Signal MOE completion
-        let _ = self.ui_tx.send(UiEvent::StreamDelta {
+        if self.ui_tx.send(UiEvent::StreamDelta {
             agent_id: "moe".to_string(),
             text: format!("\n[MOE] All {total} agents completed.\n"),
-        }).await;
-        let _ = self.ui_tx.send(UiEvent::StreamEnd {
+        }).await.is_err() {
+            eprintln!("[orchestrator] TUI channel closed — event dropped");
+        }
+        if self.ui_tx.send(UiEvent::StreamEnd {
             agent_id: "moe".to_string(),
-        }).await;
+        }).await.is_err() {
+            eprintln!("[orchestrator] TUI channel closed — event dropped");
+        }
     }
 
     /// Handle mid-task skill injection — spawn a new agent for a command while others are running.
@@ -449,12 +497,14 @@ impl AgentOrchestrator {
             registry.create_agent(agent_type.clone(), format!("[injected] /{name}"), None)
         };
 
-        let _ = self.ui_tx.send(UiEvent::AgentSpawned {
+        if self.ui_tx.send(UiEvent::AgentSpawned {
             agent_id: agent_id.clone(),
             parent_id: None,
             agent_type,
             task: format!("[skill injection] /{name}"),
-        }).await;
+        }).await.is_err() {
+            eprintln!("[orchestrator] TUI channel closed — event dropped");
+        }
 
         let route = self.router.route_prompt(&prompt);
         let mut config = self.config.clone();
@@ -465,10 +515,12 @@ impl AgentOrchestrator {
         let agent_id_for_handle = agent_id.clone();
 
         let handle = tokio::spawn(async move {
-            let _ = ui_tx.send(UiEvent::AgentStatusChanged {
+            if ui_tx.send(UiEvent::AgentStatusChanged {
                 agent_id: agent_id.clone(),
                 status: AgentStatus::Running,
-            }).await;
+            }).await.is_err() {
+                eprintln!("[orchestrator] TUI channel closed — event dropped");
+            }
 
             let result = worker::run_agent_turn(
                 agent_id.clone(), prompt, config, ui_tx.clone(),
@@ -477,18 +529,22 @@ impl AgentOrchestrator {
 
             match result {
                 Ok(()) => {
-                    let _ = ui_tx.send(UiEvent::AgentCompleted {
+                    if ui_tx.send(UiEvent::AgentCompleted {
                         agent_id: agent_id.clone(),
                         result: "completed".to_string(),
-                    }).await;
+                    }).await.is_err() {
+                        eprintln!("[orchestrator] TUI channel closed — event dropped");
+                    }
                     let mut reg = registry.lock().await;
                     reg.set_status(&agent_id, AgentStatus::Completed);
                 }
                 Err(err) => {
-                    let _ = ui_tx.send(UiEvent::AgentFailed {
+                    if ui_tx.send(UiEvent::AgentFailed {
                         agent_id: agent_id.clone(),
                         error: err,
-                    }).await;
+                    }).await.is_err() {
+                        eprintln!("[orchestrator] TUI channel closed — event dropped");
+                    }
                     let mut reg = registry.lock().await;
                     reg.set_status(&agent_id, AgentStatus::Failed);
                 }
