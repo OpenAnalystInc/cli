@@ -1432,6 +1432,14 @@ fn run_resume_command(
         | SlashCommand::Json { .. }
         | SlashCommand::Dev { .. }
         | SlashCommand::Mcp { .. }
+        | SlashCommand::Doctor
+        | SlashCommand::Login
+        | SlashCommand::Logout
+        | SlashCommand::Vim
+        | SlashCommand::Think { .. }
+        | SlashCommand::Context
+        | SlashCommand::Changelog { .. }
+        | SlashCommand::AddDir { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -1990,6 +1998,48 @@ impl LiveCli {
             }
             SlashCommand::Mcp { action, args } => {
                 Self::run_mcp(action.as_deref(), args.as_deref())?;
+                false
+            }
+            // ── Claude Code parity commands ──
+            SlashCommand::Doctor => {
+                self.run_doctor()?;
+                false
+            }
+            SlashCommand::Login => {
+                println!("  Launching provider login...\n");
+                drop(crossterm::terminal::disable_raw_mode());
+                run_login()?;
+                println!("\n  \x1b[2mRestart the CLI to use the new credentials.\x1b[0m");
+                false
+            }
+            SlashCommand::Logout => {
+                run_logout()?;
+                println!("  \x1b[2mRestart the CLI for changes to take effect.\x1b[0m");
+                false
+            }
+            SlashCommand::Vim => {
+                println!("  Vim mode: toggle with Ctrl+V in the input editor.");
+                false
+            }
+            SlashCommand::Think { prompt } => {
+                let think_prompt = if let Some(p) = prompt {
+                    format!("Think deeply and step-by-step about this before answering:\n\n{p}")
+                } else {
+                    "For the next prompt, use extended thinking — reason step-by-step before answering.".to_string()
+                };
+                self.run_turn(&think_prompt)?;
+                true
+            }
+            SlashCommand::Context => {
+                self.print_context();
+                false
+            }
+            SlashCommand::Changelog { since } => {
+                self.run_changelog(since.as_deref())?;
+                false
+            }
+            SlashCommand::AddDir { path } => {
+                self.run_add_dir(path.as_deref())?;
                 false
             }
             SlashCommand::Unknown(name) => {
@@ -3392,6 +3442,156 @@ impl LiveCli {
     // ════════════════════════════════════════════════════════════════════
     //  /mcp — MCP Server Management
     // ════════════════════════════════════════════════════════════════════
+
+    // ════════════════════════════════════════════════════════════════════
+    //  Claude Code Parity Commands
+    // ════════════════════════════════════════════════════════════════════
+
+    fn run_doctor(&self) -> Result<(), Box<dyn std::error::Error>> {
+        println!("  \x1b[1mOpenAnalyst CLI Doctor\x1b[0m\n");
+        // Check Node.js
+        let node_ver = Command::new("node").arg("--version").output();
+        println!(
+            "  Node.js:       {}",
+            node_ver.ok().filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                .unwrap_or_else(|| "\x1b[38;5;196mnot found\x1b[0m".to_string())
+        );
+        // Check git
+        let git_ver = Command::new("git").arg("--version").output();
+        println!(
+            "  Git:           {}",
+            git_ver.ok().filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+                .unwrap_or_else(|| "\x1b[38;5;196mnot found\x1b[0m".to_string())
+        );
+        // Check shell
+        let sh_ver = Command::new("sh").arg("--version").output();
+        println!(
+            "  Shell (sh):    {}",
+            sh_ver.ok().filter(|o| o.status.success())
+                .map(|o| String::from_utf8_lossy(&o.stdout).lines().next().unwrap_or("ok").to_string())
+                .unwrap_or_else(|| "\x1b[38;5;196mnot found\x1b[0m".to_string())
+        );
+        // Check providers
+        println!("\n  \x1b[1mProvider credentials:\x1b[0m");
+        let providers: &[(&str, &[&str])] = &[
+            ("OpenAnalyst", &["OPENANALYST_AUTH_TOKEN", "OPENANALYST_API_KEY"]),
+            ("Anthropic", &["ANTHROPIC_API_KEY"]),
+            ("OpenAI", &["OPENAI_API_KEY"]),
+            ("Google Gemini", &["GEMINI_API_KEY"]),
+            ("xAI (Grok)", &["XAI_API_KEY"]),
+            ("OpenRouter", &["OPENROUTER_API_KEY"]),
+            ("Stability AI", &["STABILITY_API_KEY"]),
+        ];
+        for (name, keys) in providers {
+            let has_key = keys.iter().any(|k| env::var(k).ok().filter(|v| !v.is_empty()).is_some());
+            let icon = if has_key { "\x1b[38;5;46m+\x1b[0m" } else { "\x1b[38;5;240m-\x1b[0m" };
+            println!("  {icon} {name}");
+        }
+        // Check MCP servers
+        let cwd = env::current_dir()?;
+        let loader = ConfigLoader::default_for(&cwd);
+        let config = loader.load()?;
+        let mcp_count = config.mcp().servers().len();
+        println!("\n  MCP servers:   {mcp_count} configured");
+        // Check model
+        println!("  Active model:  {}", self.model);
+        println!("  Permission:    {}", self.permission_mode.as_str());
+        // Check workspace
+        let has_oa_md = cwd.join("OPENANALYST.md").exists();
+        let has_settings = cwd.join(".openanalyst").join("settings.json").exists();
+        println!("\n  \x1b[1mWorkspace:\x1b[0m");
+        println!(
+            "  OPENANALYST.md {}",
+            if has_oa_md { "\x1b[38;5;46mfound\x1b[0m" } else { "\x1b[38;5;240mmissing (run /init)\x1b[0m" }
+        );
+        println!(
+            "  settings.json  {}",
+            if has_settings { "\x1b[38;5;46mfound\x1b[0m" } else { "\x1b[38;5;240mmissing\x1b[0m" }
+        );
+        Ok(())
+    }
+
+    fn print_context(&self) {
+        let estimated = self.runtime.estimated_tokens();
+        let cumulative = self.runtime.usage().cumulative_usage();
+        let turns = self.runtime.usage().turns();
+        let messages = self.runtime.session().messages.len();
+        println!(
+            "Context\n\
+             \x1b[2m  Messages\x1b[0m        {messages}\n\
+             \x1b[2m  Turns\x1b[0m           {turns}\n\
+             \x1b[2m  Est. tokens\x1b[0m     ~{estimated}\n\
+             \x1b[2m  Input tokens\x1b[0m    {}\n\
+             \x1b[2m  Output tokens\x1b[0m   {}\n\
+             \x1b[2m  Model\x1b[0m           {}",
+            cumulative.input_tokens,
+            cumulative.output_tokens,
+            self.model,
+        );
+    }
+
+    fn run_changelog(&mut self, since: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let since_arg = since.unwrap_or("HEAD~20");
+        let output = Command::new("git")
+            .args(["log", "--oneline", "--no-merges", &format!("{since_arg}..HEAD")])
+            .output()?;
+        let log = String::from_utf8_lossy(&output.stdout).to_string();
+        if log.trim().is_empty() {
+            let output2 = Command::new("git")
+                .args(["log", "--oneline", "--no-merges", "-20"])
+                .output()?;
+            let log2 = String::from_utf8_lossy(&output2.stdout).to_string();
+            if log2.trim().is_empty() {
+                println!("  No commits found.");
+                return Ok(());
+            }
+            let prompt = format!(
+                "Generate a changelog from these git commits. Group by category (Features, Fixes, Improvements). Be concise.\n\n```\n{log2}\n```"
+            );
+            self.run_turn(&prompt)?;
+        } else {
+            let prompt = format!(
+                "Generate a changelog from these git commits since {since_arg}. Group by category (Features, Fixes, Improvements). Be concise.\n\n```\n{log}\n```"
+            );
+            self.run_turn(&prompt)?;
+        }
+        Ok(())
+    }
+
+    fn run_add_dir(&mut self, path: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(dir_path) = path else {
+            println!("Usage: /add-dir <directory-path>");
+            return Ok(());
+        };
+        let dir = Path::new(dir_path);
+        if !dir.is_dir() {
+            println!("  Not a directory: {dir_path}");
+            return Ok(());
+        }
+        // Collect file listing
+        let mut files = Vec::new();
+        let mut total_size = 0_u64;
+        for entry in walkdir::WalkDir::new(dir).max_depth(3).into_iter().flatten() {
+            if entry.file_type().is_file() {
+                let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
+                total_size += size;
+                files.push(entry.path().display().to_string().replace('\\', "/"));
+            }
+        }
+        let prompt = format!(
+            "I'm adding the directory `{dir_path}` to our conversation context.\n\
+             It contains {} files ({} bytes total).\n\n\
+             Files:\n{}\n\n\
+             Acknowledge this directory has been added to context.",
+            files.len(),
+            total_size,
+            files.iter().take(100).map(|f| format!("- {f}")).collect::<Vec<_>>().join("\n"),
+        );
+        self.run_turn(&prompt)?;
+        Ok(())
+    }
 
     fn run_mcp(action: Option<&str>, args: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
         match action {
@@ -6239,7 +6439,7 @@ mod tests {
             names,
             vec![
                 "help", "status", "compact", "clear", "cost", "config", "memory", "init", "diff",
-                "version", "export", "agents", "skills",
+                "version", "export", "agents", "skills", "context",
             ]
         );
     }
