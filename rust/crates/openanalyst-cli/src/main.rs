@@ -1456,6 +1456,7 @@ fn save_provider_credential(provider: &ProviderOption, api_key: &str) -> Result<
         });
     fs::create_dir_all(&config_dir)?;
 
+    // ── Save to credentials.json (structured provider map) ──
     let creds_path = config_dir.join("credentials.json");
     let mut creds: serde_json::Value = if creds_path.exists() {
         let content = fs::read_to_string(&creds_path)?;
@@ -1472,6 +1473,44 @@ fn save_provider_credential(provider: &ProviderOption, api_key: &str) -> Result<
     });
 
     fs::write(&creds_path, serde_json::to_string_pretty(&creds)?)?;
+
+    // ── Also persist to .env (single source of truth for all env-based auth) ──
+    upsert_dotenv_key(&config_dir.join(".env"), provider.env_var, api_key)?;
+
+    Ok(())
+}
+
+/// Insert or update a key=value pair in a .env file.
+/// If the key exists (commented or uncommented), replaces the line.
+/// If it doesn't exist, appends it at the end.
+fn upsert_dotenv_key(env_path: &Path, key: &str, value: &str) -> Result<(), Box<dyn std::error::Error>> {
+    let content = fs::read_to_string(env_path).unwrap_or_default();
+    let new_line = format!("{key}={value}");
+    let mut found = false;
+    let mut lines: Vec<String> = content
+        .lines()
+        .map(|line| {
+            let trimmed = line.trim();
+            // Match: KEY=..., # KEY=..., or #KEY=...
+            let bare = trimmed.trim_start_matches('#').trim();
+            if bare.starts_with(key) && bare[key.len()..].starts_with('=') {
+                found = true;
+                new_line.clone()
+            } else {
+                line.to_string()
+            }
+        })
+        .collect();
+
+    if !found {
+        // Append under a blank line at the end
+        if !lines.last().map_or(true, |l| l.trim().is_empty()) {
+            lines.push(String::new());
+        }
+        lines.push(new_line);
+    }
+
+    fs::write(env_path, lines.join("\n"))?;
     Ok(())
 }
 
