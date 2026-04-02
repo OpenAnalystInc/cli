@@ -384,6 +384,13 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         resume_supported: false,
     },
     SlashCommandSpec {
+        name: "effort",
+        aliases: &["budget"],
+        summary: "Set thinking effort level (low, medium, high, max)",
+        argument_hint: Some("[low|medium|high|max]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
         name: "context",
         aliases: &["ctx"],
         summary: "Show current context window usage and token budget",
@@ -402,6 +409,20 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         aliases: &["add-directory"],
         summary: "Add a directory to the conversation context",
         argument_hint: Some("<directory-path>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "exit",
+        aliases: &["quit", "q"],
+        summary: "Save session and exit",
+        argument_hint: None,
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "sidebar",
+        aliases: &[],
+        summary: "Toggle the sidebar panel",
+        argument_hint: None,
         resume_supported: false,
     },
 ];
@@ -534,6 +555,9 @@ pub enum SlashCommand {
     Think {
         prompt: Option<String>,
     },
+    Effort {
+        level: Option<String>,
+    },
     Context,
     Changelog {
         since: Option<String>,
@@ -541,6 +565,9 @@ pub enum SlashCommand {
     AddDir {
         path: Option<String>,
     },
+    // ── TUI control ──
+    Exit,
+    Sidebar,
     Unknown(String),
 }
 
@@ -697,6 +724,9 @@ impl SlashCommand {
             "think" => Self::Think {
                 prompt: remainder_after_command(trimmed, command),
             },
+            "effort" | "budget" => Self::Effort {
+                level: parts.next().map(ToOwned::to_owned),
+            },
             "context" | "ctx" => Self::Context,
             "changelog" | "release-notes" => Self::Changelog {
                 since: parts.next().map(ToOwned::to_owned),
@@ -704,6 +734,8 @@ impl SlashCommand {
             "add-dir" | "add-directory" => Self::AddDir {
                 path: remainder_after_command(trimmed, command),
             },
+            "exit" | "quit" | "q" => Self::Exit,
+            "sidebar" => Self::Sidebar,
             other => Self::Unknown(other.to_string()),
         })
     }
@@ -1957,9 +1989,12 @@ pub fn handle_slash_command(
         | SlashCommand::Logout
         | SlashCommand::Vim
         | SlashCommand::Think { .. }
+        | SlashCommand::Effort { .. }
         | SlashCommand::Context
         | SlashCommand::Changelog { .. }
         | SlashCommand::AddDir { .. }
+        | SlashCommand::Exit
+        | SlashCommand::Sidebar
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2316,7 +2351,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 50);
+        assert_eq!(slash_command_specs().len(), 53);
         assert_eq!(resume_supported_slash_commands().len(), 14);
     }
 

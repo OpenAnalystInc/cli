@@ -227,6 +227,7 @@ impl OpenAnalystApiClient {
     ) -> Result<MessageResponse, ApiError> {
         let request = MessageRequest {
             stream: false,
+            thinking: None,
             ..request.clone()
         };
         let response = self.send_with_retry(&request).await?;
@@ -988,6 +989,7 @@ mod tests {
             tools: None,
             tool_choice: None,
             stream: false,
+            thinking: None,
         };
 
         assert!(request.with_streaming().stream);

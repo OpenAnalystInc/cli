@@ -134,10 +134,14 @@ impl InputBox {
         let inner = block.inner(area);
         block.render(area, buf);
 
-        let theme = EditorTheme::default()
-            .base(Style::default().fg(Color::Indexed(252)))
-            .cursor_style(Style::default().fg(Color::Black).bg(Color::White))
-            .selection_style(Style::default().bg(Color::Indexed(236)));
+        let theme = EditorTheme {
+            base: Style::default().fg(Color::Indexed(252)),
+            cursor_style: Style::default().fg(Color::Black).bg(Color::White),
+            selection_style: Style::default().bg(Color::Indexed(236)),
+            status_line: None, // No "Normal" / "Insert" label — keep it clean
+            block: None,
+            line_numbers_style: Style::default().fg(Color::Indexed(238)),
+        };
 
         let editor = EditorView::new(&mut state.editor).theme(theme);
         editor.render(inner, buf);

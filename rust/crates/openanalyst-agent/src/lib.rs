@@ -261,6 +261,7 @@ impl ApiClient for HeadlessApiClient {
             tools: Some(tools),
             tool_choice: Some(ToolChoice::Auto),
             stream: true,
+            thinking: None,
         };
 
         self.runtime.block_on(async {
@@ -356,6 +357,7 @@ impl ApiClient for HeadlessApiClient {
                 .client
                 .send_message(&MessageRequest {
                     stream: false,
+            thinking: None,
                     ..message_request
                 })
                 .await

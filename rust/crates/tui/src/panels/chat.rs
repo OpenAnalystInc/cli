@@ -1,4 +1,4 @@
-//! Chat panel — scrollable message list with tool cards.
+//! Chat panel — scrollable message list with tool cards and focus tracking.
 
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
@@ -67,6 +67,8 @@ pub struct ChatPanel {
     pub messages: Vec<ChatMessage>,
     pub scroll_offset: u16,
     pub auto_scroll: bool,
+    /// Index of the currently focused message (for scroll mode navigation).
+    pub focused_message: Option<usize>,
 }
 
 impl Default for ChatPanel {
@@ -75,6 +77,7 @@ impl Default for ChatPanel {
             messages: Vec::new(),
             scroll_offset: 0,
             auto_scroll: true,
+            focused_message: None,
         }
     }
 }
@@ -140,7 +143,7 @@ impl ChatPanel {
 
     /// Scroll to the bottom.
     pub fn scroll_to_bottom(&mut self) {
-        self.scroll_offset = u16::MAX; // Will be clamped during render
+        self.scroll_offset = u16::MAX;
     }
 
     /// Scroll up by `n` lines.
@@ -158,7 +161,9 @@ impl ChatPanel {
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
         let mut all_lines: Vec<Line<'_>> = Vec::new();
 
-        for msg in &self.messages {
+        for (msg_idx, msg) in self.messages.iter().enumerate() {
+            let is_focused = self.focused_message == Some(msg_idx);
+
             match msg {
                 ChatMessage::User { text } => {
                     all_lines.push(Line::from(""));
@@ -174,34 +179,7 @@ impl ChatPanel {
                     all_lines.push(Line::from(""));
                 }
                 ChatMessage::ToolCall { card } => {
-                    // Render tool card as text lines
-                    let status_icon = match &card.status {
-                        tui_widgets::ToolCallStatus::Running { .. } => "⠋",
-                        tui_widgets::ToolCallStatus::Completed { .. } => "✓",
-                        tui_widgets::ToolCallStatus::Failed { .. } => "✗",
-                    };
-                    let status_color = match &card.status {
-                        tui_widgets::ToolCallStatus::Running { .. } => Color::Blue,
-                        tui_widgets::ToolCallStatus::Completed { .. } => Color::Green,
-                        tui_widgets::ToolCallStatus::Failed { .. } => Color::Red,
-                    };
-                    let duration = card.status.duration_label();
-                    all_lines.push(Line::from(vec![
-                        Span::styled("  ╭─ ", Style::default().fg(Color::Indexed(245))),
-                        Span::styled(status_icon, Style::default().fg(status_color)),
-                        Span::raw(" "),
-                        Span::styled(&card.tool_name, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                        Span::styled(format!(" ── {duration} "), Style::default().fg(Color::Indexed(245))),
-                        Span::styled("─╮", Style::default().fg(Color::Indexed(245))),
-                    ]));
-                    all_lines.push(Line::from(vec![
-                        Span::styled("  │ ", Style::default().fg(Color::Indexed(245))),
-                        Span::styled(&card.input_preview, Style::default().fg(Color::Indexed(252))),
-                    ]));
-                    all_lines.push(Line::from(Span::styled(
-                        "  ╰──────────────────────╯",
-                        Style::default().fg(Color::Indexed(245)),
-                    )));
+                    render_tool_card_lines(card, is_focused, &mut all_lines);
                 }
                 ChatMessage::System { text } => {
                     for line in text.lines() {
@@ -261,4 +239,104 @@ impl ChatPanel {
             scrollbar.render(area, buf, &mut scrollbar_state);
         }
     }
+}
+
+/// Render a tool call card as text lines with proper formatting.
+fn render_tool_card_lines<'a>(card: &'a ToolCallCard, is_focused: bool, lines: &mut Vec<Line<'a>>) {
+    let status_icon = match &card.status {
+        tui_widgets::ToolCallStatus::Running { .. } => "⠋",
+        tui_widgets::ToolCallStatus::Completed { .. } => "✓",
+        tui_widgets::ToolCallStatus::Failed { .. } => "✗",
+    };
+    let status_color = match &card.status {
+        tui_widgets::ToolCallStatus::Running { .. } => Color::Blue,
+        tui_widgets::ToolCallStatus::Completed { .. } => Color::Green,
+        tui_widgets::ToolCallStatus::Failed { .. } => Color::Red,
+    };
+    let border_color = if is_focused {
+        Color::Cyan
+    } else {
+        Color::Indexed(245)
+    };
+    let duration = card.status.duration_label();
+
+    // Calculate inner width based on all content
+    let title_inner = 1 + 1 + card.tool_name.chars().count() + 4 + duration.chars().count() + 1;
+    let mut max_content = card.input_preview.chars().count();
+    if card.expanded {
+        if let Some(ref output) = card.output {
+            for line in output.lines().take(20) {
+                max_content = max_content.max(line.chars().count());
+            }
+        }
+    }
+    let inner_width = title_inner.max(max_content + 1).max(10);
+
+    // Top border: ╭─ ✓ Read ── 340ms ────╮
+    let top_pad = inner_width.saturating_sub(title_inner);
+    lines.push(Line::from(vec![
+        Span::styled(if is_focused { "▸ " } else { "  " }, Style::default().fg(Color::Cyan)),
+        Span::styled("╭─ ", Style::default().fg(border_color)),
+        Span::styled(status_icon, Style::default().fg(status_color)),
+        Span::raw(" "),
+        Span::styled(&card.tool_name, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        Span::styled(format!(" ── {duration} "), Style::default().fg(border_color)),
+        Span::styled(format!("{}╮", "─".repeat(top_pad)), Style::default().fg(border_color)),
+    ]));
+
+    // Input preview: │ src/auth.rs              │
+    let preview_pad = inner_width.saturating_sub(card.input_preview.chars().count());
+    lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled("│ ", Style::default().fg(border_color)),
+        Span::styled(&card.input_preview, Style::default().fg(Color::Indexed(252))),
+        Span::raw(" ".repeat(preview_pad)),
+        Span::styled("│", Style::default().fg(border_color)),
+    ]));
+
+    // Expanded output
+    if card.expanded {
+        if let Some(ref output) = card.output {
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled("│ ", Style::default().fg(border_color)),
+                Span::styled("─".repeat(inner_width), Style::default().fg(Color::Indexed(238))),
+                Span::styled("│", Style::default().fg(border_color)),
+            ]));
+            let max_lines = 20;
+            let output_lines: Vec<&str> = output.lines().collect();
+            for (i, line) in output_lines.iter().enumerate() {
+                if i >= max_lines {
+                    let msg = format!("... ({} more lines)", output_lines.len() - max_lines);
+                    let msg_pad = inner_width.saturating_sub(msg.chars().count());
+                    lines.push(Line::from(vec![
+                        Span::raw("  "),
+                        Span::styled("│ ", Style::default().fg(border_color)),
+                        Span::styled(msg, Style::default().fg(Color::DarkGray)),
+                        Span::raw(" ".repeat(msg_pad)),
+                        Span::styled("│", Style::default().fg(border_color)),
+                    ]));
+                    break;
+                }
+                let line_str = line.to_string();
+                let line_pad = inner_width.saturating_sub(line_str.chars().count());
+                lines.push(Line::from(vec![
+                    Span::raw("  "),
+                    Span::styled("│ ", Style::default().fg(border_color)),
+                    Span::raw(line_str),
+                    Span::raw(" ".repeat(line_pad)),
+                    Span::styled("│", Style::default().fg(border_color)),
+                ]));
+            }
+        }
+    }
+
+    // Bottom border: ╰──────────────────────╯
+    lines.push(Line::from(vec![
+        Span::raw("  "),
+        Span::styled(
+            format!("╰{}╯", "─".repeat(inner_width + 1)),
+            Style::default().fg(border_color),
+        ),
+    ]));
 }

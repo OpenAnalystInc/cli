@@ -1835,6 +1835,7 @@ impl ApiClient for ProviderRuntimeClient {
             tools: (!tools.is_empty()).then_some(tools),
             tool_choice: (!self.allowed_tools.is_empty()).then_some(ToolChoice::Auto),
             stream: true,
+            thinking: None,
         };
 
         self.runtime.block_on(async {
@@ -1921,6 +1922,7 @@ impl ApiClient for ProviderRuntimeClient {
                 .client
                 .send_message(&MessageRequest {
                     stream: false,
+            thinking: None,
                     ..message_request.clone()
                 })
                 .await

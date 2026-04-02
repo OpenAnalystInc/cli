@@ -14,6 +14,19 @@ pub struct MessageRequest {
     pub tool_choice: Option<ToolChoice>,
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub stream: bool,
+    /// Extended thinking configuration (Anthropic Claude).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub thinking: Option<ThinkingConfig>,
+}
+
+/// Extended thinking configuration for models that support it.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ThinkingConfig {
+    /// Thinking type — always "enabled" when set.
+    #[serde(rename = "type")]
+    pub thinking_type: String,
+    /// Token budget for thinking (1024 to 128000).
+    pub budget_tokens: u32,
 }
 
 impl MessageRequest {
