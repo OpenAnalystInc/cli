@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>LLM Providers - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link active">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Core Concepts</span>
+        <h1>LLM Providers</h1>
+        <p class="subtitle">Seven first-class providers with live model discovery, streaming, and full tool support. Switch mid-conversation without losing context.</p>
+      </div>
+
+      <h2 id="supported">Supported Providers</h2>
+
+      <div class="card-grid">
+        <div class="card">
+          <h3>OpenAnalyst <span class="badge-sm badge-blue">Default</span></h3>
+          <p>OpenAnalyst's own API with models fetched live.</p>
+          <p><code>OPENANALYST_AUTH_TOKEN</code></p>
+        </div>
+        <div class="card">
+          <h3>Anthropic / Claude</h3>
+          <p>Claude Opus, Sonnet, Haiku with extended thinking support.</p>
+          <p><code>ANTHROPIC_API_KEY</code></p>
+        </div>
+        <div class="card">
+          <h3>OpenAI / Codex</h3>
+          <p>GPT-4o, o3, Codex Mini via direct OpenAI API.</p>
+          <p><code>OPENAI_API_KEY</code></p>
+        </div>
+        <div class="card">
+          <h3>Google Gemini</h3>
+          <p>Gemini 2.5 Pro, Gemini 2.5 Flash with live model discovery.</p>
+          <p><code>GEMINI_API_KEY</code></p>
+        </div>
+        <div class="card">
+          <h3>xAI / Grok</h3>
+          <p>Grok-3, Grok Mini with streaming tool support.</p>
+          <p><code>XAI_API_KEY</code></p>
+        </div>
+        <div class="card">
+          <h3>OpenRouter</h3>
+          <p>350+ models from any provider through a single gateway.</p>
+          <p><code>OPENROUTER_API_KEY</code></p>
+        </div>
+        <div class="card">
+          <h3>Amazon Bedrock</h3>
+          <p>AWS-hosted models with live discovery from your Bedrock account.</p>
+          <p><code>BEDROCK_API_KEY</code></p>
+        </div>
+      </div>
+
+      <h2 id="switching">Mid-Conversation Model Switching</h2>
+      <p>One of OpenAnalyst's defining features: switch models without losing your conversation context.</p>
+
+      <pre><code><span class="token-comment"># Start with Claude</span>
+openanalyst --model opus
+&gt; explain this codebase
+
+<span class="token-comment"># Switch to GPT-4o mid-conversation</span>
+/model gpt-4o
+&gt; now refactor the auth module
+
+<span class="token-comment"># Switch to Gemini for review</span>
+/model gemini-2.5-pro
+&gt; review the changes for security issues</code></pre>
+
+      <div class="callout callout-info">
+        <div class="callout-title">How It Works</div>
+        The session state (messages, tool results, system prompt) is provider-agnostic. When you switch models, the runtime translates the conversation into the new provider's format while preserving full context.
+      </div>
+
+      <h2 id="model-aliases">Model Aliases</h2>
+      <p>Use short aliases instead of full model IDs:</p>
+
+      <table>
+        <thead><tr><th>Alias</th><th>Resolves To</th><th>Provider</th></tr></thead>
+        <tbody>
+          <tr><td><code>opus</code></td><td>claude-opus-4-6</td><td>Anthropic</td></tr>
+          <tr><td><code>sonnet</code></td><td>claude-sonnet-4-6</td><td>Anthropic</td></tr>
+          <tr><td><code>haiku</code></td><td>claude-haiku-4-5</td><td>Anthropic</td></tr>
+          <tr><td><code>gpt-4o</code></td><td>gpt-4o</td><td>OpenAI</td></tr>
+          <tr><td><code>o3</code></td><td>o3</td><td>OpenAI</td></tr>
+          <tr><td><code>codex-mini</code></td><td>codex-mini-latest</td><td>OpenAI</td></tr>
+          <tr><td><code>gemini-2.5-pro</code></td><td>gemini-2.5-pro-preview</td><td>Google</td></tr>
+          <tr><td><code>gemini-2.5-flash</code></td><td>gemini-2.5-flash-preview</td><td>Google</td></tr>
+          <tr><td><code>grok</code></td><td>grok-3</td><td>xAI</td></tr>
+          <tr><td><code>grok-mini</code></td><td>grok-3-mini</td><td>xAI</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="discovery">Live Model Discovery</h2>
+      <p>All providers support <strong>live model discovery</strong> &mdash; available models are fetched from the provider's API at runtime, so you always have access to the latest models without updating the CLI.</p>
+
+      <pre><code><span class="token-comment"># List available models for current provider</span>
+/model
+
+<span class="token-comment"># List models from a specific provider</span>
+openanalyst models --provider openai</code></pre>
+
+      <h2 id="features">Provider Feature Matrix</h2>
+      <table>
+        <thead><tr><th>Feature</th><th>OpenAnalyst</th><th>Anthropic</th><th>OpenAI</th><th>Gemini</th><th>xAI</th><th>OpenRouter</th><th>Bedrock</th></tr></thead>
+        <tbody>
+          <tr><td>Streaming</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
+          <tr><td>Tool calling</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
+          <tr><td>Live discovery</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
+          <tr><td>Extended thinking</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>Varies</td><td>&mdash;</td></tr>
+          <tr><td>OAuth login</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+        </tbody>
+      </table>
+
+      <div class="page-footer">
+        <a href="authentication.html">&larr; Authentication</a>
+        <a href="tui.html">Terminal UI &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>
