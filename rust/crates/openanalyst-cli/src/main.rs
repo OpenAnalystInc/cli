@@ -2325,6 +2325,8 @@ fn run_resume_command(
         | SlashCommand::Context
         | SlashCommand::Changelog { .. }
         | SlashCommand::AddDir { .. }
+        | SlashCommand::Exit
+        | SlashCommand::Sidebar
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -2369,15 +2371,27 @@ fn run_tui(
         version: VERSION.to_string(),
     });
 
+    // Install panic hook to restore terminal on crash
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |info| {
+        let _ = tui::restore_terminal();
+        original_hook(info);
+    }));
+
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
         // Spawn orchestrator in background
-        tokio::spawn(orchestrator.run());
+        let orchestrator_handle = tokio::spawn(orchestrator.run());
 
         // Run TUI event loop
         let terminal = tui::setup_terminal()?;
         let result = tui::event_loop::run_event_loop(app, terminal).await;
         tui::restore_terminal()?;
+
+        // Send Quit to orchestrator and wait for clean shutdown
+        orchestrator_handle.abort();
+        let _ = orchestrator_handle.await;
+
         result
     })?;
 
@@ -2943,6 +2957,13 @@ impl LiveCli {
             }
             SlashCommand::AddDir { path } => {
                 self.run_add_dir(path.as_deref())?;
+                false
+            }
+            SlashCommand::Exit => {
+                true // signal quit
+            }
+            SlashCommand::Sidebar => {
+                // Sidebar is TUI-only, no-op in legacy REPL
                 false
             }
             SlashCommand::Unknown(name) => {

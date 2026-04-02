@@ -120,7 +120,8 @@ impl AgentOrchestrator {
             .await;
 
         let agent_id_clone = agent_id.clone();
-        tokio::spawn(async move {
+        let registry_for_handle = self.registry.clone();
+        let handle = tokio::spawn(async move {
             let result = worker::run_agent_turn(
                 agent_id_clone.clone(),
                 prompt,
@@ -151,6 +152,10 @@ impl AgentOrchestrator {
                 }
             }
         });
+
+        // Store handle so we can abort on cancel
+        let mut reg = registry_for_handle.lock().await;
+        reg.set_handle(&agent_id, handle);
     }
 
     /// Handle a spawn request from the Agent tool.
@@ -217,10 +222,12 @@ impl AgentOrchestrator {
         registry.resolve_permission(request_id, allow);
     }
 
-    /// Cancel an agent.
+    /// Cancel an agent — abort the running task.
     async fn cancel_agent(&self, agent_id: &str) {
         let mut registry = self.registry.lock().await;
+        registry.abort_agent(agent_id);
         registry.set_status(agent_id, AgentStatus::Failed);
+        drop(registry);
         let _ = self
             .ui_tx
             .send(UiEvent::AgentFailed {
