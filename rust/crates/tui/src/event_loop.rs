@@ -76,6 +76,8 @@ pub async fn run_event_loop(
         }
 
         if app.should_quit {
+            // Signal orchestrator to shut down cleanly
+            let _ = app.action_tx.try_send(events::Action::Quit);
             break;
         }
     }

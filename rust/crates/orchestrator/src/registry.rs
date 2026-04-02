@@ -3,16 +3,29 @@
 use std::collections::HashMap;
 
 use events::{AgentId, AgentStatus, AgentType, PermissionResponseTx};
+use tokio::task::JoinHandle;
 
 use crate::agent::ManagedAgent;
 
 /// Registry tracking all active agents and pending permission prompts.
-#[derive(Default)]
 pub struct AgentRegistry {
     agents: HashMap<AgentId, ManagedAgent>,
     /// Pending permission responses: request_id → oneshot sender.
     permission_pending: HashMap<String, PermissionResponseTx>,
+    /// Task handles for spawned agents — used for cancellation.
+    task_handles: HashMap<AgentId, JoinHandle<()>>,
     next_id: u64,
+}
+
+impl Default for AgentRegistry {
+    fn default() -> Self {
+        Self {
+            agents: HashMap::new(),
+            permission_pending: HashMap::new(),
+            task_handles: HashMap::new(),
+            next_id: 0,
+        }
+    }
 }
 
 impl AgentRegistry {
@@ -62,6 +75,18 @@ impl AgentRegistry {
         if let Some(tx) = self.permission_pending.remove(request_id) {
             // Send the decision — if the receiver was dropped, the error is harmless.
             let _ = tx.send(allow);
+        }
+    }
+
+    /// Store a task handle for an agent.
+    pub fn set_handle(&mut self, agent_id: &str, handle: JoinHandle<()>) {
+        self.task_handles.insert(agent_id.to_string(), handle);
+    }
+
+    /// Abort a running agent's task.
+    pub fn abort_agent(&mut self, agent_id: &str) {
+        if let Some(handle) = self.task_handles.remove(agent_id) {
+            handle.abort();
         }
     }
 
