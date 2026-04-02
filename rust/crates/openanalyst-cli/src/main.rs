@@ -68,6 +68,54 @@ const INTERNAL_PROGRESS_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(3);
 
 type AllowedToolSet = BTreeSet<String>;
 
+/// Background update check — silently notifies if a newer version is available.
+/// Does NOT auto-download; just creates a marker file that the TUI/REPL can read.
+fn background_update_check() {
+    const CURRENT_VERSION: &str = "1.0.1";
+    const REPO: &str = "AnitChaudhry/openanalyst-cli";
+
+    // Only check once per day
+    let config_dir = env::var("OPENANALYST_CONFIG_HOME")
+        .or_else(|_| env::var("HOME").map(|h| format!("{h}/.openanalyst")))
+        .or_else(|_| env::var("USERPROFILE").map(|h| format!("{h}\\.openanalyst")))
+        .unwrap_or_default();
+    if config_dir.is_empty() { return; }
+    let marker_path = PathBuf::from(&config_dir).join(".update-check");
+    if let Ok(meta) = fs::metadata(&marker_path) {
+        if let Ok(modified) = meta.modified() {
+            if modified.elapsed().unwrap_or_default() < Duration::from_secs(86400) {
+                return; // Checked within 24h
+            }
+        }
+    }
+
+    let rt = match tokio::runtime::Runtime::new() {
+        Ok(rt) => rt,
+        Err(_) => return,
+    };
+    let latest = rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build().ok()?;
+        let resp = client
+            .get(format!("https://api.github.com/repos/{REPO}/releases/latest"))
+            .header("User-Agent", "openanalyst-cli")
+            .send().await.ok()?;
+        let body: serde_json::Value = resp.json().await.ok()?;
+        body.get("tag_name")
+            .and_then(|v| v.as_str())
+            .map(|v| v.trim_start_matches('v').to_string())
+    });
+
+    // Write marker regardless (so we don't check again for 24h)
+    let _ = fs::create_dir_all(&config_dir);
+    let content = match &latest {
+        Some(v) if v != CURRENT_VERSION => format!("{v}\n"),
+        _ => String::new(),
+    };
+    let _ = fs::write(&marker_path, content);
+}
+
 /// Detect and load auth tokens from installed CLIs (Claude, Codex, Gemini).
 /// Only sets env vars that are NOT already set — user's explicit config always wins.
 ///
@@ -219,6 +267,8 @@ fn main() {
     load_external_cli_credentials();
     // Prune old/empty sessions in the background (non-blocking)
     std::thread::spawn(cleanup_old_sessions);
+    // 5. Check for updates in background (non-blocking, silent)
+    std::thread::spawn(background_update_check);
 
     if let Err(error) = run() {
         let msg = error.to_string();
@@ -266,6 +316,8 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
         CliAction::Login => run_login()?,
         CliAction::Logout => run_logout()?,
         CliAction::WhoAmI => run_whoami()?,
+        CliAction::Update => run_update()?,
+        CliAction::Uninstall => run_uninstall()?,
         CliAction::Init => run_init()?,
         CliAction::Agent {
             task,
@@ -323,6 +375,8 @@ enum CliAction {
     Logout,
     WhoAmI,
     Init,
+    Update,
+    Uninstall,
     Repl {
         model: String,
         allowed_tools: Option<AllowedToolSet>,
@@ -494,6 +548,8 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
         "logout" => Ok(CliAction::Logout),
         "whoami" => Ok(CliAction::WhoAmI),
         "init" => Ok(CliAction::Init),
+        "update" => Ok(CliAction::Update),
+        "uninstall" => Ok(CliAction::Uninstall),
         "prompt" => {
             let prompt = rest[1..].join(" ");
             if prompt.trim().is_empty() {
@@ -1578,6 +1634,228 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
     println!();
     println!("  \x1b[2mNote: Keys in \x1b[0m~/.openanalyst/.env\x1b[2m are not removed.\x1b[0m");
     println!("  \x1b[2mRun \x1b[0m\x1b[1mopenanalyst login\x1b[0m\x1b[2m to authenticate with a different provider.\x1b[0m");
+    println!();
+    Ok(())
+}
+
+fn run_update() -> Result<(), Box<dyn std::error::Error>> {
+    const CURRENT_VERSION: &str = "1.0.1";
+    const REPO: &str = "AnitChaudhry/openanalyst-cli";
+
+    println!();
+    println!("  \x1b[38;5;45m\x1b[1mOpenAnalyst CLI \x1b[0m\x1b[2m— Update\x1b[0m");
+    println!();
+    println!("  \x1b[2mCurrent version:\x1b[0m v{CURRENT_VERSION}");
+
+    // 1. Check latest release from GitHub API
+    print!("  \x1b[2mChecking for updates...\x1b[0m");
+    io::stdout().flush()?;
+
+    let rt = tokio::runtime::Runtime::new()?;
+    let latest_version = rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build().ok()?;
+        let resp = client
+            .get(format!("https://api.github.com/repos/{REPO}/releases/latest"))
+            .header("User-Agent", "openanalyst-cli")
+            .send().await.ok()?;
+        let body: serde_json::Value = resp.json().await.ok()?;
+        body.get("tag_name")
+            .and_then(|v| v.as_str())
+            .map(|v| v.trim_start_matches('v').to_string())
+    });
+
+    let Some(latest) = latest_version else {
+        println!(" \x1b[38;5;208mcould not reach GitHub\x1b[0m");
+        println!();
+        return Ok(());
+    };
+
+    if latest == CURRENT_VERSION {
+        println!(" \x1b[38;5;46m\u{2713} already up to date (v{latest})\x1b[0m");
+        println!();
+        return Ok(());
+    }
+
+    println!(" \x1b[38;5;46mv{latest} available\x1b[0m");
+    println!();
+
+    // 2. Detect platform and download binary
+    let current_exe = env::current_exe().unwrap_or_default();
+    let target = if cfg!(target_os = "windows") {
+        "x86_64-pc-windows-msvc"
+    } else if cfg!(target_os = "macos") {
+        if cfg!(target_arch = "aarch64") { "aarch64-apple-darwin" } else { "x86_64-apple-darwin" }
+    } else {
+        if cfg!(target_arch = "aarch64") { "aarch64-unknown-linux-gnu" } else { "x86_64-unknown-linux-gnu" }
+    };
+
+    let ext = if cfg!(target_os = "windows") { ".exe" } else { "" };
+    let download_url = format!(
+        "https://github.com/{REPO}/releases/download/v{latest}/openanalyst-{target}{ext}"
+    );
+
+    print!("  \x1b[2mDownloading v{latest}...\x1b[0m");
+    io::stdout().flush()?;
+
+    let download_result = rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(60))
+            .build()?;
+        let resp = client.get(&download_url).send().await?;
+        if !resp.status().is_success() {
+            return Err(format!("HTTP {}", resp.status()).into());
+        }
+        let bytes = resp.bytes().await?;
+        Ok::<_, Box<dyn std::error::Error + Send + Sync>>(bytes)
+    });
+
+    match download_result {
+        Ok(bytes) => {
+            println!(" \x1b[38;5;46m\u{2713} {:.1} MB\x1b[0m", bytes.len() as f64 / 1_048_576.0);
+
+            // 3. Replace binary
+            let temp_path = current_exe.with_extension("update");
+            fs::write(&temp_path, &bytes)?;
+
+            if cfg!(target_os = "windows") {
+                // Windows: rename current → .old, new → current
+                let old_path = current_exe.with_extension("old.exe");
+                let _ = fs::remove_file(&old_path);
+                fs::rename(&current_exe, &old_path)?;
+                fs::rename(&temp_path, &current_exe)?;
+                println!("  \x1b[38;5;46m\u{2713} Updated to v{latest}\x1b[0m");
+                println!("  \x1b[2mRestart your terminal to use the new version.\x1b[0m");
+            } else {
+                // Unix: replace in place, set executable
+                fs::rename(&temp_path, &current_exe)?;
+                #[cfg(unix)]
+                {
+                    use std::os::unix::fs::PermissionsExt;
+                    let _ = fs::set_permissions(&current_exe, fs::Permissions::from_mode(0o755));
+                }
+                println!("  \x1b[38;5;46m\u{2713} Updated to v{latest}\x1b[0m");
+            }
+        }
+        Err(e) => {
+            println!(" \x1b[38;5;208mfailed: {e}\x1b[0m");
+            println!();
+            println!("  \x1b[2mManual update:\x1b[0m");
+            if cfg!(target_os = "windows") {
+                println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex\x1b[0m");
+            } else {
+                println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash\x1b[0m");
+            }
+        }
+    }
+
+    println!();
+    Ok(())
+}
+
+fn run_uninstall() -> Result<(), Box<dyn std::error::Error>> {
+    use crossterm::{
+        cursor,
+        event::{self, Event, KeyCode, KeyModifiers},
+        execute,
+        terminal,
+    };
+
+    println!();
+    println!("  \x1b[38;5;45m\x1b[1mOpenAnalyst CLI \x1b[0m\x1b[2m— Uninstall\x1b[0m");
+    println!();
+
+    let current_exe = env::current_exe().unwrap_or_default();
+    let config_dir = env::var("OPENANALYST_CONFIG_HOME")
+        .or_else(|_| env::var("HOME").map(|h| format!("{h}/.openanalyst")))
+        .or_else(|_| env::var("USERPROFILE").map(|h| format!("{h}\\.openanalyst")))
+        .unwrap_or_else(|_| "~/.openanalyst".to_string());
+
+    println!("  This will remove:");
+    println!("    \x1b[2m•\x1b[0m Binary:  {}", current_exe.display());
+    println!("    \x1b[2m•\x1b[0m Config:  {}", config_dir);
+    println!();
+    print!("  \x1b[38;5;208mAre you sure? [y/N]\x1b[0m ");
+    io::stdout().flush()?;
+
+    terminal::enable_raw_mode()?;
+    let confirmed = loop {
+        if event::poll(Duration::from_millis(100))? {
+            if let Event::Key(key) = event::read()? {
+                match key.code {
+                    KeyCode::Char('y') | KeyCode::Char('Y') => break true,
+                    KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc | KeyCode::Enter => break false,
+                    KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => break false,
+                    _ => {}
+                }
+            }
+        }
+    };
+    terminal::disable_raw_mode()?;
+    let mut stdout = io::stdout();
+    execute!(stdout, cursor::Show)?;
+
+    if !confirmed {
+        println!("\n\n  \x1b[2mUninstall cancelled.\x1b[0m\n");
+        return Ok(());
+    }
+
+    println!("y\n");
+
+    // Remove config directory
+    let config_path = PathBuf::from(&config_dir);
+    if config_path.exists() {
+        match fs::remove_dir_all(&config_path) {
+            Ok(()) => println!("  \x1b[38;5;46m\u{2713}\x1b[0m Removed {config_dir}"),
+            Err(e) => println!("  \x1b[38;5;208m\u{26a0}\x1b[0m Could not remove {config_dir}: {e}"),
+        }
+    }
+
+    // Remove PATH entry (best-effort)
+    if let Some(parent) = current_exe.parent() {
+        let install_dir = parent.to_string_lossy();
+        // Try removing from shell rc files
+        for rc_name in &[".zshrc", ".bashrc", ".bash_profile"] {
+            let home = env::var("HOME").or_else(|_| env::var("USERPROFILE")).unwrap_or_default();
+            let rc_path = PathBuf::from(&home).join(rc_name);
+            if rc_path.exists() {
+                if let Ok(content) = fs::read_to_string(&rc_path) {
+                    let filtered: Vec<&str> = content.lines()
+                        .filter(|line| !line.contains(&*install_dir) && !line.contains("# OpenAnalyst CLI"))
+                        .collect();
+                    let _ = fs::write(&rc_path, filtered.join("\n") + "\n");
+                }
+            }
+        }
+        println!("  \x1b[38;5;46m\u{2713}\x1b[0m Removed PATH entry");
+    }
+
+    // Remove binary (schedule self-deletion)
+    if current_exe.exists() {
+        if cfg!(target_os = "windows") {
+            // On Windows, can't delete running exe — schedule deletion
+            let _ = Command::new("cmd")
+                .args(["/C", "ping", "127.0.0.1", "-n", "2", ">nul", "&", "del", "/f",
+                    &current_exe.to_string_lossy()])
+                .spawn();
+            println!("  \x1b[38;5;46m\u{2713}\x1b[0m Binary will be removed on exit");
+        } else {
+            match fs::remove_file(&current_exe) {
+                Ok(()) => println!("  \x1b[38;5;46m\u{2713}\x1b[0m Removed {}", current_exe.display()),
+                Err(e) => println!("  \x1b[38;5;208m\u{26a0}\x1b[0m Could not remove binary: {e}"),
+            }
+        }
+    }
+
+    println!();
+    println!("  \x1b[38;5;45mOpenAnalyst CLI has been uninstalled.\x1b[0m");
+    println!("  \x1b[2mTo reinstall:\x1b[0m");
+    if cfg!(target_os = "windows") {
+        println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex\x1b[0m");
+    } else {
+        println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash\x1b[0m");
+    }
     println!();
     Ok(())
 }
@@ -7227,6 +7505,8 @@ fn print_help_to(out: &mut impl Write) -> io::Result<()> {
     writeln!(out, "  openanalyst login")?;
     writeln!(out, "  openanalyst logout")?;
     writeln!(out, "  openanalyst whoami")?;
+    writeln!(out, "  openanalyst update")?;
+    writeln!(out, "  openanalyst uninstall")?;
     writeln!(out, "  openanalyst init")?;
     writeln!(out)?;
     writeln!(out, "Flags:")?;
