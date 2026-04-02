@@ -19,9 +19,18 @@ Clear-Host
 
 Write-Host ""
 Write-Host ""
-Write-Host "   " -NoNewline; Write-Host ([char]0x2588)*5 -ForegroundColor Blue -NoNewline; Write-Host ([char]0x2557) -ForegroundColor Blue -NoNewline; Write-Host " " -NoNewline; Write-Host ([char]0x2588)*6 -ForegroundColor Cyan -NoNewline; Write-Host ([char]0x2557) -ForegroundColor Cyan
-Write-Host "   " -NoNewline; Write-Host "O P E N" -ForegroundColor Blue -NoNewline; Write-Host "   " -NoNewline; Write-Host "A N A L Y S T" -ForegroundColor Cyan
+Write-Host "    " -NoNewline; Write-Host ([char]0x2588)*6 -ForegroundColor Blue -NoNewline; Write-Host ([char]0x2557) -ForegroundColor Blue -NoNewline
+Write-Host "  " -NoNewline; Write-Host ([char]0x2588)*5 -ForegroundColor Cyan -NoNewline; Write-Host ([char]0x2557) -ForegroundColor Cyan
+Write-Host "   " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Blue -NoNewline; Write-Host "    " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Blue -NoNewline
+Write-Host " " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Cyan -NoNewline; Write-Host "   " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Cyan
+Write-Host "   " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Blue -NoNewline; Write-Host "    " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Blue -NoNewline
+Write-Host " " -NoNewline; Write-Host ([char]0x2588)*5 -ForegroundColor Cyan -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Cyan
+Write-Host "   " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Blue -NoNewline; Write-Host "    " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Blue -NoNewline
+Write-Host " " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Cyan -NoNewline; Write-Host "   " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Cyan
+Write-Host "    " -NoNewline; Write-Host ([char]0x2588)*6 -ForegroundColor Blue -NoNewline; Write-Host ([char]0x255D) -ForegroundColor Blue -NoNewline
+Write-Host " " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Cyan -NoNewline; Write-Host "   " -NoNewline; Write-Host ([char]0x2551) -ForegroundColor Cyan
 Write-Host ""
+Write-Host "   OpenAnalyst CLI" -ForegroundColor White -NoNewline; Write-Host "  v1.0.1" -ForegroundColor DarkGray
 Write-Host "   The Universal AI Agent for Your Terminal" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "   " -NoNewline; Write-Host ([string]([char]0x2500) * 44) -ForegroundColor DarkGray
