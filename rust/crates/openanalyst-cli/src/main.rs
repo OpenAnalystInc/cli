@@ -754,6 +754,14 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
         test_header: "bearer",
         placeholder: "AIza...",
     },
+    ProviderOption {
+        name: "Stability AI",
+        description: "Stable Diffusion image generation (/image)",
+        env_var: "STABILITY_API_KEY",
+        test_url: "",
+        test_header: "bearer",
+        placeholder: "sk-...",
+    },
 ];
 
 fn run_login() -> Result<(), Box<dyn std::error::Error>> {
@@ -2606,10 +2614,10 @@ impl LiveCli {
         let (provider, api_key, url, request_body) =
             if let Some(key) = env::var("GEMINI_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
                 ("Gemini Imagen", key.clone(),
-                 format!("https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash-exp:generateContent?key={key}"),
+                 format!("https://generativelanguage.googleapis.com/v1beta/models/imagen-3.0-generate-002:predict?key={key}"),
                  json!({
-                     "contents": [{"parts": [{"text": format!("Generate an image: {prompt}")}]}],
-                     "generationConfig": {"responseModalities": ["TEXT","IMAGE"]}
+                     "instances": [{"prompt": prompt}],
+                     "parameters": {"sampleCount": 1, "aspectRatio": "1:1"}
                  }))
             } else if let Some(key) = env::var("OPENAI_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
                 ("DALL-E 3", key,
@@ -2652,8 +2660,13 @@ impl LiveCli {
                 let timestamp = SystemTime::now().duration_since(UNIX_EPOCH).unwrap_or_default().as_secs();
                 let filename = format!("generated-{timestamp}.png");
                 // Try to extract base64 image from response
+                // Extract base64 image from response — try all known provider formats:
+                // OpenAI DALL-E: data[0].b64_json or data[0].url
+                // Stability AI: artifacts[0].base64
+                // Gemini Imagen: predictions[0].bytesBase64Encoded
                 let b64 = body.pointer("/data/0/b64_json")
                     .or_else(|| body.pointer("/artifacts/0/base64"))
+                    .or_else(|| body.pointer("/predictions/0/bytesBase64Encoded"))
                     .and_then(|v| v.as_str());
                 if let Some(b64_data) = b64 {
                     use std::io::Write as _;
@@ -2661,24 +2674,10 @@ impl LiveCli {
                     let mut file = fs::File::create(&filename)?;
                     file.write_all(&decoded)?;
                     println!("  Image saved: {filename} ({} bytes)", decoded.len());
+                } else if let Some(img_url) = body.pointer("/data/0/url").and_then(|v| v.as_str()) {
+                    println!("  Image URL: {img_url}");
                 } else {
-                    // Gemini might return image URL or inline data differently
-                    let url = body.pointer("/data/0/url")
-                        .or_else(|| body.pointer("/candidates/0/content/parts/0/inlineData/data"))
-                        .and_then(|v| v.as_str());
-                    if let Some(img_url_or_data) = url {
-                        if img_url_or_data.starts_with("http") {
-                            println!("  Image URL: {img_url_or_data}");
-                        } else {
-                            use std::io::Write as _;
-                            let decoded = base64_decode(img_url_or_data);
-                            let mut file = fs::File::create(&filename)?;
-                            file.write_all(&decoded)?;
-                            println!("  Image saved: {filename} ({} bytes)", decoded.len());
-                        }
-                    } else {
-                        println!("  Response: {}", serde_json::to_string_pretty(&body)?);
-                    }
+                    println!("  Response: {}", serde_json::to_string_pretty(&body)?);
                 }
             }
             Err(e) => println!("  Image generation failed: {e}"),
