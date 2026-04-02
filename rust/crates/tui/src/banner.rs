@@ -1,4 +1,4 @@
-//! Startup banner widget — dual-column box with OA block letters.
+//! Startup banner widget — OA block letters with account info.
 
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
@@ -29,57 +29,71 @@ impl Banner {
     /// Get the banner as a Vec of Lines for embedding in the chat scroll buffer.
     #[must_use]
     pub fn to_lines(&self) -> Vec<Line<'static>> {
+        let accent = Style::default().fg(Color::Indexed(208)); // Orange
         let blue = Style::default().fg(Color::Indexed(39));
         let cyan = Style::default().fg(Color::Indexed(45));
+        let white = Style::default().fg(Color::White).add_modifier(Modifier::BOLD);
         let text = Style::default().fg(Color::Indexed(252));
         let dim = Style::default().fg(Color::DarkGray);
-        let _bold = Style::default().add_modifier(Modifier::BOLD);
 
         let mut lines = Vec::new();
+        lines.push(Line::from(""));
 
-        // Header line
-        let header = format!("─── OpenAnalyst CLI v{} ", self.info.version);
-        let pad_len = 80usize.saturating_sub(header.len());
-        lines.push(Line::from(Span::styled(
-            format!("{header}{}", "─".repeat(pad_len)),
-            cyan,
-        )));
-
-        // OA block letters
-        let mascot = [
-            ("  ██████  ", " █████ "),
-            (" ██    ██ ", "██   ██"),
-            (" ██    ██ ", "███████"),
-            (" ██    ██ ", "██   ██"),
-            ("  ██████  ", "██   ██"),
+        // ── OA block letters (orange gradient) ──
+        let logo: &[(&str, &str)] = &[
+            (" ████████  ", "  ████   "),
+            (" ██    ██  ", " ██  ██  "),
+            (" ██    ██  ", "██    ██ "),
+            (" ██    ██  ", "████████ "),
+            (" ██    ██  ", "██    ██ "),
+            (" ████████  ", "██    ██ "),
         ];
 
-        // Welcome line
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            format!("  Welcome back, {}!", self.info.display_name),
-            text.add_modifier(Modifier::BOLD),
-        )));
-        lines.push(Line::from(""));
-
-        // Mascot
-        for (left, right) in &mascot {
+        for (o_part, a_part) in logo {
             lines.push(Line::from(vec![
                 Span::raw("  "),
-                Span::styled(*left, blue),
-                Span::styled(*right, cyan),
+                Span::styled(*o_part, accent),
+                Span::styled(*a_part, accent),
             ]));
         }
 
         lines.push(Line::from(""));
 
-        // Model + provider
+        // ── Title line ──
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled("OpenAnalyst CLI", white),
+            Span::styled(format!("  v{}", self.info.version), dim),
+        ]));
+
+        // ── Welcome ──
+        if !self.info.display_name.is_empty() {
+            lines.push(Line::from(vec![
+                Span::raw("  "),
+                Span::styled(
+                    format!("Welcome back, {}", self.info.display_name),
+                    cyan,
+                ),
+            ]));
+        }
+
+        lines.push(Line::from(""));
+
+        // ── Model + provider ──
+        lines.push(Line::from(vec![
+            Span::raw("  "),
+            Span::styled(self.info.model_display.clone(), blue),
+            Span::styled(" · ", dim),
+            Span::styled(self.info.provider_name.clone(), text),
+        ]));
+
+        // ── Working directory ──
         lines.push(Line::from(Span::styled(
-            format!("  {} · {}", self.info.model_display, self.info.provider_name),
-            text,
+            format!("  {}", self.info.cwd),
+            dim,
         )));
 
-        // User info
+        // ── User info (email, org) ──
         let mut user_parts = Vec::new();
         if let Some(ref email) = self.info.user_email {
             user_parts.push(email.clone());
@@ -94,17 +108,11 @@ impl Banner {
             )));
         }
 
-        // Working directory
-        lines.push(Line::from(Span::styled(
-            format!("  {}", self.info.cwd),
-            dim,
-        )));
-
         lines.push(Line::from(""));
 
-        // Hint
+        // ── Hints ──
         lines.push(Line::from(Span::styled(
-            "  (ctrl+b to run in background)",
+            "  /help for commands · /model to switch · ctrl+c to exit",
             dim,
         )));
 
