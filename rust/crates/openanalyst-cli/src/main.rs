@@ -6,17 +6,15 @@ use std::collections::BTreeSet;
 use std::env;
 use std::fmt::Write as _;
 use std::fs;
-use std::io::{self, Read, Write};
-use std::net::TcpListener;
+use std::io::{self, Write};
 use std::path::{Path, PathBuf};
-use std::process::Command;
 use std::sync::mpsc::{self, RecvTimeoutError};
 use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use api::{
-    resolve_startup_auth_source, OpenAnalystApiClient, AuthSource, ContentBlockDelta, InputContentBlock,
+    resolve_startup_auth_source, AuthSource, ContentBlockDelta, InputContentBlock,
     InputMessage, MessageRequest, MessageResponse, OutputContentBlock,
     StreamEvent as ApiStreamEvent, ToolChoice, ToolDefinition, ToolResultContentBlock,
 };
@@ -30,11 +28,10 @@ use init::initialize_repo;
 use plugins::{PluginManager, PluginManagerConfig};
 use render::{MarkdownStreamState, Spinner, TerminalRenderer};
 use runtime::{
-    clear_oauth_credentials, generate_pkce_pair, generate_state, load_system_prompt,
-    parse_oauth_callback_request_target, save_oauth_credentials, ApiClient, ApiRequest,
+    clear_oauth_credentials, load_system_prompt, ApiClient, ApiRequest,
     AssistantEvent, CompactionConfig, ConfigLoader, ConfigSource, ContentBlock,
-    ConversationMessage, ConversationRuntime, MessageRole, OAuthAuthorizationRequest, OAuthConfig,
-    OAuthTokenExchangeRequest, PermissionMode, PermissionPolicy, ProjectContext, RuntimeError,
+    ConversationMessage, ConversationRuntime, MessageRole,
+    PermissionMode, PermissionPolicy, ProjectContext, RuntimeError,
     Session, TokenUsage, ToolError, ToolExecutor, UsageTracker,
 };
 use serde_json::json;
@@ -61,7 +58,6 @@ fn max_tokens_for_model(model: &str) -> u32 {
     }
 }
 const DEFAULT_DATE: &str = "2026-03-31";
-const DEFAULT_OAUTH_CALLBACK_PORT: u16 = 4545;
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 const BUILD_TARGET: Option<&str> = option_env!("TARGET");
 const GIT_SHA: Option<&str> = option_env!("GIT_SHA");
@@ -674,28 +670,6 @@ fn print_bootstrap_plan() {
     }
 }
 
-fn default_oauth_config() -> OAuthConfig {
-    // OAuth routes to Anthropic's platform (the actual OAuth provider).
-    // OpenAnalyst uses API key auth, not OAuth — so this only applies
-    // when the user is authenticating via Anthropic/Claude.
-    let base = env::var("ANTHROPIC_BASE_URL")
-        .unwrap_or_else(|_| "https://console.anthropic.com".to_string());
-    let base = base.trim_end_matches('/').to_string();
-
-    OAuthConfig {
-        client_id: String::from("9d1c250a-e61b-44d9-88ed-5944d1962f5e"),
-        authorize_url: format!("{base}/oauth/authorize"),
-        token_url: format!("{base}/v1/oauth/token"),
-        callback_port: None,
-        manual_redirect_url: None,
-        scopes: vec![
-            String::from("user:profile"),
-            String::from("user:inference"),
-            String::from("user:sessions:openanalyst"),
-        ],
-    }
-}
-
 // ── Provider definitions for interactive login ──
 
 struct ProviderOption {
@@ -771,7 +745,7 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
         cursor,
         event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
         execute,
-        terminal::{self, ClearType},
+        terminal,
     };
 
     let mut stdout = io::stdout();
@@ -1052,60 +1026,6 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
     println!("  \x1b[38;5;45mAll credentials cleared.\x1b[0m");
     println!("  Removed: {}", creds_path.display());
     Ok(())
-}
-
-fn open_browser(url: &str) -> io::Result<()> {
-    let commands = if cfg!(target_os = "macos") {
-        vec![("open", vec![url])]
-    } else if cfg!(target_os = "windows") {
-        vec![("cmd", vec!["/C", "start", "", url])]
-    } else {
-        vec![("xdg-open", vec![url])]
-    };
-    for (program, args) in commands {
-        match Command::new(program).args(args).spawn() {
-            Ok(_) => return Ok(()),
-            Err(error) if error.kind() == io::ErrorKind::NotFound => {}
-            Err(error) => return Err(error),
-        }
-    }
-    Err(io::Error::new(
-        io::ErrorKind::NotFound,
-        "no supported browser opener command found",
-    ))
-}
-
-fn wait_for_oauth_callback(
-    port: u16,
-) -> Result<runtime::OAuthCallbackParams, Box<dyn std::error::Error>> {
-    let listener = TcpListener::bind(("127.0.0.1", port))?;
-    let (mut stream, _) = listener.accept()?;
-    let mut buffer = [0_u8; 4096];
-    let bytes_read = stream.read(&mut buffer)?;
-    let request = String::from_utf8_lossy(&buffer[..bytes_read]);
-    let request_line = request.lines().next().ok_or_else(|| {
-        io::Error::new(io::ErrorKind::InvalidData, "missing callback request line")
-    })?;
-    let target = request_line.split_whitespace().nth(1).ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidData,
-            "missing callback request target",
-        )
-    })?;
-    let callback = parse_oauth_callback_request_target(target)
-        .map_err(|error| io::Error::new(io::ErrorKind::InvalidData, error))?;
-    let body = if callback.error.is_some() {
-        "OpenAnalyst login failed. You can close this window."
-    } else {
-        "OpenAnalyst login succeeded. You can close this window."
-    };
-    let response = format!(
-        "HTTP/1.1 200 OK\r\ncontent-type: text/plain; charset=utf-8\r\ncontent-length: {}\r\nconnection: close\r\n\r\n{}",
-        body.len(),
-        body
-    );
-    stream.write_all(response.as_bytes())?;
-    Ok(callback)
 }
 
 fn print_system_prompt(cwd: PathBuf, date: String) {
