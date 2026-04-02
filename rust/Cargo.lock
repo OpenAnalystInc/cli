@@ -1716,6 +1716,7 @@ dependencies = [
  "reqwest",
  "runtime",
  "rustyline",
+ "serde",
  "serde_json",
  "syntect",
  "tokio",
