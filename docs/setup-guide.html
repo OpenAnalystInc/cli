@@ -5,15 +5,15 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>OpenAnalyst CLI — The Universal AI Agent for Your Terminal</title>
 <style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
-:root{--bg:#0a0e17;--bg2:#0f1520;--card:#111827;--code:#0d1321;--border:#1e293b;--border2:#2d3a4d;--text:#e2e8f0;--dim:#64748b;--muted:#94a3b8;--accent:#0ea5e9;--accent2:#38bdf8;--accent3:#7dd3fc;--glow:rgba(14,165,233,0.12);--glow2:rgba(14,165,233,0.06);--green:#22c55e;--yellow:#eab308;--purple:#a78bfa;--cyan:#22d3ee;--pink:#f472b6;--orange:#f97316;--red:#ef4444}
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
+:root{--bg:#0a0a0f;--bg2:#0f0f16;--card:#141419;--code:#0d0d14;--border:#1e1e2a;--border2:#2d2d3d;--text:#e8e6e0;--dim:#6b6966;--muted:#9a9590;--accent:#FF6B00;--accent2:#FF8C33;--accent3:#FFB366;--glow:rgba(255,107,0,0.12);--glow2:rgba(255,107,0,0.06);--green:#10B981;--yellow:#f59e0b;--purple:#8B5CF6;--cyan:#22d3ee;--pink:#f472b6;--orange:#FF6B00;--red:#ef4444;--blue:#3B82F6}
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth;scroll-padding-top:72px}
-body{font-family:'Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased}
+body{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased}
 
 /* ── Navbar ── */
 .nav{position:sticky;top:0;z-index:100;background:rgba(10,14,23,0.85);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06);padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto}
-.nav-logo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;color:var(--accent);letter-spacing:4px;border:1.5px solid var(--accent);padding:3px 10px;border-radius:6px;text-decoration:none;box-shadow:0 0 12px var(--glow)}
+.nav-logo{font-family:'JetBrains Mono',monospace;font-weight:700;font-size:16px;color:var(--accent);letter-spacing:4px;border:1.5px solid var(--accent);padding:3px 10px;border-radius:8px;text-decoration:none;box-shadow:0 0 16px var(--glow)}
 .nav-links{display:flex;gap:24px;list-style:none}.nav-links a{color:var(--dim);text-decoration:none;font-size:13px;font-weight:500;transition:color .2s}.nav-links a:hover{color:var(--accent)}
 @media(max-width:640px){.nav-links{display:none}}
 
@@ -26,9 +26,9 @@ section{padding:64px 0}
 
 /* ── Hero ── */
 .hero{text-align:center;padding:100px 24px 80px;position:relative;overflow:hidden}
-.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(14,165,233,0.1),transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(139,92,246,0.06),transparent 50%);pointer-events:none}
-.hero-badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;padding:6px 16px;border:2px solid var(--accent);border-radius:10px;color:var(--accent);letter-spacing:6px;box-shadow:0 0 24px var(--glow);margin-bottom:24px;position:relative}
-.hero h1{font-size:clamp(36px,6vw,56px);font-weight:800;letter-spacing:-2px;background:linear-gradient(135deg,var(--accent),var(--cyan),var(--accent2));background-size:200% 200%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradient-shift 4s ease-in-out infinite;margin-bottom:16px;position:relative}
+.hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% 0%,rgba(255,107,0,0.08),transparent 60%),radial-gradient(ellipse at 80% 100%,rgba(139,92,246,0.05),transparent 50%);pointer-events:none}
+.hero-badge{display:inline-block;font-family:'JetBrains Mono',monospace;font-size:18px;font-weight:700;padding:6px 16px;border:2px solid var(--accent);border-radius:12px;color:var(--accent);letter-spacing:6px;box-shadow:0 0 30px var(--glow),inset 0 0 20px var(--glow2);margin-bottom:24px;position:relative}
+.hero h1{font-size:clamp(36px,6vw,56px);font-weight:800;letter-spacing:-2px;background:linear-gradient(135deg,var(--accent),var(--purple),var(--green),var(--blue),var(--accent));background-size:300% 300%;-webkit-background-clip:text;-webkit-text-fill-color:transparent;animation:gradient-shift 6s ease-in-out infinite;margin-bottom:16px;position:relative}
 @keyframes gradient-shift{0%,100%{background-position:0% 50%}50%{background-position:100% 50%}}
 .hero-sub{color:var(--muted);font-size:18px;margin-bottom:8px;position:relative}
 .hero-cycle{color:var(--accent2);font-weight:600;display:inline-block;min-width:180px;text-align:left}
@@ -37,18 +37,18 @@ section{padding:64px 0}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.3}}
 .cta-row{display:flex;gap:16px;justify-content:center;flex-wrap:wrap;position:relative}
 .btn{padding:12px 28px;border-radius:10px;font-size:14px;font-weight:600;text-decoration:none;transition:all .2s;cursor:pointer;border:none;font-family:'Inter',sans-serif}
-.btn-primary{background:var(--accent);color:#fff;box-shadow:0 0 20px var(--glow)}.btn-primary:hover{background:var(--accent2);box-shadow:0 0 30px rgba(14,165,233,0.25)}
-.btn-outline{background:transparent;color:var(--accent);border:1.5px solid rgba(14,165,233,0.4)}.btn-outline:hover{border-color:var(--accent);background:var(--glow)}
+.btn-primary{background:var(--accent);color:#fff;box-shadow:0 0 24px var(--glow)}.btn-primary:hover{background:var(--accent2);box-shadow:0 0 32px rgba(255,107,0,0.25)}
+.btn-outline{background:transparent;color:var(--accent);border:1.5px solid rgba(255,107,0,0.4)}.btn-outline:hover{border-color:var(--accent);background:var(--glow)}
 
 /* ── Cards ── */
-.card{background:var(--card);border:1px solid var(--border);border-radius:16px;padding:32px;position:relative;overflow:hidden;transition:border-color .3s}.card:hover{border-color:rgba(14,165,233,0.25)}
+.card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;position:relative;overflow:hidden;transition:border-color .3s}.card:hover{border-color:rgba(255,107,0,0.25)}
 
 /* ── Code blocks ── */
 .cb{background:var(--code);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:12px 0}
 .cb-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)}
 .cb-dots{display:flex;gap:6px}.cb-dot{width:10px;height:10px;border-radius:50%}.d1{background:#ef4444}.d2{background:#eab308}.d3{background:#22c55e}
 .cb-label{font-size:12px;font-weight:500;color:var(--dim)}
-.cb-copy{background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.cb-copy:hover{background:var(--glow);border-color:var(--accent);color:var(--accent)}
+.cb-copy{background:rgba(255,255,255,0.05);border:1px solid var(--border);color:var(--muted);font-size:12px;padding:4px 12px;border-radius:6px;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.cb-copy:hover{background:var(--glow2);border-color:var(--accent);color:var(--accent)}
 pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:13.5px;line-height:1.9;overflow-x:auto;white-space:pre;color:var(--text)}
 .c-g{color:var(--green)}.c-c{color:var(--cyan)}.c-p{color:var(--purple)}.c-y{color:var(--yellow)}.c-d{color:var(--dim)}.c-k{color:var(--pink)}.c-o{color:var(--orange)}
 
@@ -57,12 +57,12 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 /* ── Provider grid ── */
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:20px}
-.pcard{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:18px;transition:.2s}.pcard:hover{border-color:rgba(14,165,233,0.3)}.pcard.df{border-color:rgba(14,165,233,0.35);background:var(--glow2)}
+.pcard{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:14px;padding:18px;transition:.2s}.pcard:hover{border-color:rgba(255,107,0,0.3)}.pcard.df{border-color:rgba(255,107,0,0.35);background:var(--glow2)}
 .pcard-name{font-weight:600;font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:8px}.pcard-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(14,165,233,0.2);color:var(--accent)}
 .pcard-env{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--purple);margin:5px 0}.pcard-desc{font-size:12px;color:var(--dim)}
 
 /* ── Accordion ── */
-.acc{border:1px solid var(--border);border-radius:12px;margin-bottom:10px;overflow:hidden;transition:border-color .2s}.acc:hover{border-color:rgba(14,165,233,0.2)}
+.acc{border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;transition:border-color .2s}.acc:hover{border-color:rgba(255,107,0,0.2)}
 .acc-header{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;background:rgba(255,255,255,0.01);transition:background .2s;user-select:none}
 .acc-header:hover{background:rgba(255,255,255,0.03)}
 .acc-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:15px;flex-shrink:0}
@@ -73,7 +73,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 /* ── Tool grid ── */
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
-.tcard{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:10px;padding:14px;transition:.2s}.tcard:hover{border-color:rgba(14,165,233,0.3)}
+.tcard{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:14px;transition:.2s}.tcard:hover{border-color:rgba(255,107,0,0.3)}
 .tcard-name{font-weight:600;font-size:14px;margin-bottom:3px}.tcard-desc{font-size:12px;color:var(--dim);line-height:1.5}
 
 /* ── Command table ── */
@@ -82,7 +82,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 .cmd-table td{padding:8px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:top}
 .cmd-table td:first-child{font-family:'JetBrains Mono',monospace;color:var(--cyan);padding-right:16px;white-space:nowrap}
 .cmd-table td:last-child{color:var(--muted)}
-.cmd-cat{font-size:12px;font-weight:600;color:var(--accent);padding:14px 0 6px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(14,165,233,0.12)}
+.cmd-cat{font-size:12px;font-weight:600;color:var(--accent);padding:14px 0 6px;text-transform:uppercase;letter-spacing:1px;border-bottom:1px solid rgba(255,107,0,0.12)}
 .tag{display:inline-block;font-size:9px;padding:1px 6px;border-radius:4px;margin-left:6px;font-weight:600;letter-spacing:0.5px}
 .tag-n{background:rgba(234,179,8,0.12);color:var(--yellow);border:1px solid rgba(234,179,8,0.2)}
 
@@ -103,7 +103,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <body>
 
 <!-- ═══ 1. NAVBAR ═══ -->
-<nav style="position:sticky;top:0;z-index:100;background:rgba(10,14,23,0.88);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06)">
+<nav style="position:sticky;top:0;z-index:100;background:rgba(10,10,15,0.9);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06)">
 <div class="nav">
   <a href="#" class="nav-logo">O A</a>
   <ul class="nav-links">
@@ -220,7 +220,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   <div class="section-sub">Everything you need for AI-powered software engineering, in one tool.</div>
 
   <div class="acc open" onclick="toggleAcc(this)">
-    <div class="acc-header"><div class="acc-icon" style="background:var(--glow);color:var(--accent)">&#9889;</div><div class="acc-title">Switch Models Mid-Conversation</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(255,107,0,0.15);color:var(--accent)">&#9889;</div><div class="acc-title">Switch Models Mid-Conversation</div><div class="acc-arrow">&#9654;</div></div>
     <div class="acc-body"><div class="acc-content">Switch between any LLM provider mid-conversation. Your session ID, chat history, tool results, and context persist across provider boundaries. Start with Claude, continue with GPT-4o, finish with Gemini &mdash; all in one session.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
