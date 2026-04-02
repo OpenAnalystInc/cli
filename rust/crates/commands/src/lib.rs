@@ -332,6 +332,21 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: Some("[list|add <name> <command> [args...]|remove <name>]"),
         resume_supported: false,
     },
+    // ── Knowledge & Exploration Commands ──
+    SlashCommandSpec {
+        name: "knowledge",
+        aliases: &["kb"],
+        summary: "Search the OpenAnalyst knowledge base for expert strategies and insights",
+        argument_hint: Some("<query>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "explore",
+        aliases: &["repo-explore"],
+        summary: "Smart-explore any GitHub repo from its commit history",
+        argument_hint: Some("<github-url-or-path>"),
+        resume_supported: false,
+    },
     // ── Claude Code parity commands ──
     SlashCommandSpec {
         name: "doctor",
@@ -504,6 +519,13 @@ pub enum SlashCommand {
         action: Option<String>,
         args: Option<String>,
     },
+    // ── Knowledge & Exploration ──
+    Knowledge {
+        query: Option<String>,
+    },
+    Explore {
+        target: Option<String>,
+    },
     // ── Claude Code parity ──
     Doctor,
     Login,
@@ -661,6 +683,12 @@ impl SlashCommand {
                     let rest = parts.collect::<Vec<_>>().join(" ");
                     (!rest.is_empty()).then_some(rest)
                 },
+            },
+            "knowledge" | "kb" => Self::Knowledge {
+                query: remainder_after_command(trimmed, command),
+            },
+            "explore" | "repo-explore" => Self::Explore {
+                target: remainder_after_command(trimmed, command),
             },
             "doctor" => Self::Doctor,
             "login" => Self::Login,
@@ -1922,6 +1950,8 @@ pub fn handle_slash_command(
         | SlashCommand::Json { .. }
         | SlashCommand::Dev { .. }
         | SlashCommand::Mcp { .. }
+        | SlashCommand::Knowledge { .. }
+        | SlashCommand::Explore { .. }
         | SlashCommand::Doctor
         | SlashCommand::Login
         | SlashCommand::Logout
@@ -2286,7 +2316,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 48);
+        assert_eq!(slash_command_specs().len(), 50);
         assert_eq!(resume_supported_slash_commands().len(), 14);
     }
 

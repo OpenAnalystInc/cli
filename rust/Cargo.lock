@@ -3236,6 +3236,7 @@ dependencies = [
  "orchestrator",
  "plugins",
  "ratatui 0.30.0",
+ "reqwest",
  "runtime",
  "serde_json",
  "tokio",

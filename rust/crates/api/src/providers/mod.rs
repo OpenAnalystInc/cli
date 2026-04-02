@@ -82,42 +82,42 @@ const MODEL_REGISTRY: &[(&str, ProviderMetadata)] = &[
         default_base_url: openanalyst_provider::DEFAULT_BASE_URL,
     }),
 
-    // ── Anthropic / Claude (also routed via OpenAnalyst when OA auth is set) ──
+    // ── Anthropic / Claude (direct API calls with user's own key) ──
     ("opus", ProviderMetadata {
-        provider: ProviderKind::OpenAnalystApi,
-        auth_env: "OPENANALYST_API_KEY",
-        base_url_env: "OPENANALYST_BASE_URL",
-        default_base_url: openanalyst_provider::DEFAULT_BASE_URL,
+        provider: ProviderKind::Anthropic,
+        auth_env: "ANTHROPIC_API_KEY",
+        base_url_env: "ANTHROPIC_BASE_URL",
+        default_base_url: openanalyst_provider::DEFAULT_ANTHROPIC_BASE_URL,
     }),
     ("sonnet", ProviderMetadata {
-        provider: ProviderKind::OpenAnalystApi,
-        auth_env: "OPENANALYST_API_KEY",
-        base_url_env: "OPENANALYST_BASE_URL",
-        default_base_url: openanalyst_provider::DEFAULT_BASE_URL,
+        provider: ProviderKind::Anthropic,
+        auth_env: "ANTHROPIC_API_KEY",
+        base_url_env: "ANTHROPIC_BASE_URL",
+        default_base_url: openanalyst_provider::DEFAULT_ANTHROPIC_BASE_URL,
     }),
     ("haiku", ProviderMetadata {
-        provider: ProviderKind::OpenAnalystApi,
-        auth_env: "OPENANALYST_API_KEY",
-        base_url_env: "OPENANALYST_BASE_URL",
-        default_base_url: openanalyst_provider::DEFAULT_BASE_URL,
+        provider: ProviderKind::Anthropic,
+        auth_env: "ANTHROPIC_API_KEY",
+        base_url_env: "ANTHROPIC_BASE_URL",
+        default_base_url: openanalyst_provider::DEFAULT_ANTHROPIC_BASE_URL,
     }),
     ("claude-opus-4-6", ProviderMetadata {
-        provider: ProviderKind::OpenAnalystApi,
-        auth_env: "OPENANALYST_API_KEY",
-        base_url_env: "OPENANALYST_BASE_URL",
-        default_base_url: openanalyst_provider::DEFAULT_BASE_URL,
+        provider: ProviderKind::Anthropic,
+        auth_env: "ANTHROPIC_API_KEY",
+        base_url_env: "ANTHROPIC_BASE_URL",
+        default_base_url: openanalyst_provider::DEFAULT_ANTHROPIC_BASE_URL,
     }),
     ("claude-sonnet-4-6", ProviderMetadata {
-        provider: ProviderKind::OpenAnalystApi,
-        auth_env: "OPENANALYST_API_KEY",
-        base_url_env: "OPENANALYST_BASE_URL",
-        default_base_url: openanalyst_provider::DEFAULT_BASE_URL,
+        provider: ProviderKind::Anthropic,
+        auth_env: "ANTHROPIC_API_KEY",
+        base_url_env: "ANTHROPIC_BASE_URL",
+        default_base_url: openanalyst_provider::DEFAULT_ANTHROPIC_BASE_URL,
     }),
     ("claude-haiku-4-5-20251213", ProviderMetadata {
-        provider: ProviderKind::OpenAnalystApi,
-        auth_env: "OPENANALYST_API_KEY",
-        base_url_env: "OPENANALYST_BASE_URL",
-        default_base_url: openanalyst_provider::DEFAULT_BASE_URL,
+        provider: ProviderKind::Anthropic,
+        auth_env: "ANTHROPIC_API_KEY",
+        base_url_env: "ANTHROPIC_BASE_URL",
+        default_base_url: openanalyst_provider::DEFAULT_ANTHROPIC_BASE_URL,
     }),
 
     // ── OpenAI / GPT / Codex ──
@@ -271,8 +271,11 @@ pub fn resolve_model_alias(model: &str) -> String {
         .iter()
         .find_map(|(alias, metadata)| {
             (*alias == lower).then_some(match metadata.provider {
-                ProviderKind::OpenAnalystApi | ProviderKind::Anthropic => match *alias {
+                ProviderKind::OpenAnalystApi => match *alias {
                     "openanalyst" | "openanalyst-beta" => "openanalyst-beta",
+                    _ => trimmed,
+                },
+                ProviderKind::Anthropic => match *alias {
                     "opus" => "claude-opus-4-6",
                     "sonnet" => "claude-sonnet-4-6",
                     "haiku" => "claude-haiku-4-5-20251213",
@@ -344,6 +347,14 @@ pub fn metadata_for_model(model: &str) -> Option<ProviderMetadata> {
             auth_env: "GEMINI_API_KEY",
             base_url_env: "GEMINI_BASE_URL",
             default_base_url: openai_compat::DEFAULT_GEMINI_BASE_URL,
+        });
+    }
+    if lower.starts_with("claude") {
+        return Some(ProviderMetadata {
+            provider: ProviderKind::Anthropic,
+            auth_env: "ANTHROPIC_API_KEY",
+            base_url_env: "ANTHROPIC_BASE_URL",
+            default_base_url: openanalyst_provider::DEFAULT_ANTHROPIC_BASE_URL,
         });
     }
     None
@@ -435,7 +446,7 @@ mod tests {
     fn detects_provider_from_model_name_first() {
         assert_eq!(detect_provider_kind("grok"), ProviderKind::Xai);
         assert_eq!(detect_provider_kind("openanalyst-beta"), ProviderKind::OpenAnalystApi);
-        assert_eq!(detect_provider_kind("claude-sonnet-4-6"), ProviderKind::OpenAnalystApi);
+        assert_eq!(detect_provider_kind("claude-sonnet-4-6"), ProviderKind::Anthropic);
     }
 
     #[test]

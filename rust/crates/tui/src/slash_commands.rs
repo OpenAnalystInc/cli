@@ -405,6 +405,159 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system(msg);
         }
 
+        // ── Knowledge & Exploration ──
+        SlashCommand::Knowledge { query } => {
+            if let Some(q) = query {
+                app.chat.push_system(format!("[>] Searching knowledge base: {q}..."));
+                app.status_bar.phase = tui_widgets::status_bar::AgentPhase::Thinking;
+
+                let api_key = std::env::var("OPENANALYST_API_KEY")
+                    .or_else(|_| std::env::var("OA_API_KEY"))
+                    .unwrap_or_default();
+
+                if api_key.is_empty() {
+                    app.chat.push_system(
+                        "[!] OPENANALYST_API_KEY not set.\n\
+                         Set your key to access the knowledge base:\n\
+                           export OPENANALYST_API_KEY=oa_...\n\
+                         Falling back to AI-only answer...".to_string()
+                    );
+                    let prompt = format!(
+                        "Answer this query as an expert consultant. Be specific, actionable, \
+                         and practical with concrete steps:\n\n{q}"
+                    );
+                    app.submit_prompt_internal(prompt);
+                    return true;
+                }
+
+                let kb_endpoint = std::env::var("OPENANALYST_KB_URL")
+                    .unwrap_or_else(|_| "https://kb.openanalyst.com/v1/knowledge/query".to_string());
+
+                let query_clone = q.clone();
+                let tx = app.action_tx.clone();
+                tokio::spawn(async move {
+                    let result = kb_fetch(&kb_endpoint, &api_key, &query_clone).await;
+                    let prompt = match result {
+                        Ok(body) => format!(
+                            "The user asked: \"{query_clone}\"\n\n\
+                             The knowledge base returned these results:\n\
+                             ```json\n{body}\n```\n\n\
+                             Synthesize a comprehensive, actionable answer from these results. \
+                             Include source citations [1], [2] etc. Be specific and practical."
+                        ),
+                        Err(_) => format!(
+                            "Answer this query as an expert consultant. Be specific, actionable, \
+                             and practical with concrete steps:\n\n{query_clone}"
+                        ),
+                    };
+                    let _ = tx.send(events::Action::SubmitPrompt(prompt)).await;
+                });
+            } else {
+                app.chat.push_system(
+                    "OpenAnalyst Knowledge Base\n\n\
+                     Usage: /knowledge <query>\n\
+                     Example: /knowledge how to create Meta Ads strategy for D2C\n\n\
+                     Searches the hosted knowledge base for expert strategies,\n\
+                     course insights, and actionable guidance.\n\n\
+                     Requires OPENANALYST_API_KEY environment variable.".to_string()
+                );
+            }
+        }
+        SlashCommand::Explore { target } => {
+            if let Some(url) = target {
+                app.chat.push_system(format!("[>] Exploring repository: {url}..."));
+
+                let target_clone = url.clone();
+                let is_local = url == "." || std::path::Path::new(&url).is_dir();
+
+                if is_local {
+                    // Local repo — gather git data and send to LLM
+                    let path = target_clone.clone();
+                    let log = capture_command_output("git", &["-C", &path, "log", "--oneline", "--no-merges", "-50"]);
+                    let stats = capture_command_output("git", &["-C", &path, "log", "--oneline", "--stat", "--no-merges", "-20"]);
+                    let authors = capture_command_output("git", &["-C", &path, "shortlog", "-sn", "--no-merges", "-10"]);
+                    let prompt = format!(
+                        "You are analyzing a local repository at `{path}`. Based on the data below, provide:\n\
+                         1. **Architecture Overview** — key modules, structure, entry points\n\
+                         2. **Tech Stack** — languages, frameworks, build tools\n\
+                         3. **Development Patterns** — active areas, commit themes\n\
+                         4. **Key Features** — what this project does\n\
+                         5. **Health Assessment** — commit frequency, contributor diversity\n\n\
+                         Be concise and specific.\n\n\
+                         --- RECENT COMMITS ---\n```\n{log}\n```\n\n\
+                         --- FILE CHANGES ---\n```\n{stats}\n```\n\n\
+                         --- CONTRIBUTORS ---\n```\n{authors}\n```"
+                    );
+                    app.submit_prompt_internal(prompt);
+                } else {
+                    // GitHub repo — use gh API in spawned task
+                    let repo_slug = if url.contains("github.com") {
+                        url.trim_end_matches('/')
+                            .trim_end_matches(".git")
+                            .rsplit("github.com/")
+                            .next()
+                            .unwrap_or(&url)
+                            .to_string()
+                    } else {
+                        url.clone()
+                    };
+
+                    let tx = app.action_tx.clone();
+                    tokio::spawn(async move {
+                        let commits = tokio::task::spawn_blocking({
+                            let slug = repo_slug.clone();
+                            move || capture_command_output("gh", &[
+                                "api", &format!("repos/{slug}/commits?per_page=50"),
+                                "--jq", ".[] | \"\\(.sha[0:7]) \\(.commit.message | split(\"\\n\") | .[0])\""
+                            ])
+                        }).await.unwrap_or_default();
+
+                        let languages = tokio::task::spawn_blocking({
+                            let slug = repo_slug.clone();
+                            move || capture_command_output("gh", &[
+                                "api", &format!("repos/{slug}/languages")
+                            ])
+                        }).await.unwrap_or_default();
+
+                        let tree = tokio::task::spawn_blocking({
+                            let slug = repo_slug.clone();
+                            move || capture_command_output("gh", &[
+                                "api", &format!("repos/{slug}/git/trees/HEAD"),
+                                "--jq", ".tree[] | \"\\(.type) \\(.path)\""
+                            ])
+                        }).await.unwrap_or_default();
+
+                        let prompt = format!(
+                            "You are analyzing the GitHub repository **{repo_slug}**. Provide:\n\
+                             1. **What This Project Does** — purpose, key features\n\
+                             2. **Architecture** — module structure, key directories\n\
+                             3. **Tech Stack** — languages, frameworks\n\
+                             4. **Development Activity** — active areas, commit patterns\n\
+                             5. **Community** — health assessment\n\n\
+                             Be concise and specific.\n\n\
+                             --- LANGUAGES ---\n{languages}\n\n\
+                             --- ROOT TREE ---\n{tree}\n\n\
+                             --- RECENT COMMITS ---\n```\n{commits}\n```"
+                        );
+                        let _ = tx.send(events::Action::SubmitPrompt(prompt)).await;
+                    });
+                }
+            } else {
+                app.chat.push_system(
+                    "Smart Repo Explorer\n\n\
+                     Usage: /explore <github-url-or-local-path>\n\
+                     Examples:\n\
+                       /explore https://github.com/rust-lang/rust\n\
+                       /explore owner/repo\n\
+                       /explore .                     (current directory)\n\n\
+                     Analyzes a repository from its git history to produce:\n\
+                       - Architecture overview & tech stack\n\
+                       - Commit patterns & active areas\n\
+                       - Key contributors & development velocity".to_string()
+                );
+            }
+        }
+
         // ── Claude Code parity ──
         SlashCommand::Doctor => {
             app.chat.push_system("Run /doctor in the REPL for full diagnostics.".to_string());
@@ -481,5 +634,38 @@ fn truncate(s: &str, max: usize) -> String {
     } else {
         let t: String = s.chars().take(max.saturating_sub(3)).collect();
         format!("{t}...")
+    }
+}
+
+/// Fetch knowledge base results from the hosted API.
+async fn kb_fetch(endpoint: &str, api_key: &str, query: &str) -> Result<String, String> {
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(60))
+        .build()
+        .map_err(|e| format!("HTTP client error: {e}"))?;
+
+    let payload = serde_json::json!({
+        "query": query,
+        "mode": "progressive",
+        "max_results": 10,
+        "synthesize": false
+    });
+
+    let resp = client
+        .post(endpoint)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .header("Content-Type", "application/json")
+        .json(&payload)
+        .send()
+        .await
+        .map_err(|e| format!("Request failed: {e}"))?;
+
+    let status = resp.status();
+    let body = resp.text().await.map_err(|e| format!("Read body failed: {e}"))?;
+
+    if status.is_success() {
+        Ok(body)
+    } else {
+        Err(format!("HTTP {status}: {body}"))
     }
 }
