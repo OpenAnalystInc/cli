@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Built-in Tools - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link active">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Core Concepts</span>
+        <h1>Built-in Tools</h1>
+        <p class="subtitle">19 tools available to the AI agent for file operations, code search, web access, and more. Each tool respects your permission mode.</p>
+      </div>
+
+      <h2 id="overview">Tool Overview</h2>
+      <p>Tools are capabilities the AI agent can invoke during a conversation. Each tool has a required permission level &mdash; if the current mode doesn't allow it, a permission dialog appears for approval.</p>
+
+      <table>
+        <thead><tr><th>Tool</th><th>Permission</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>bash</code></td><td><span class="badge-sm badge-red">Full Access</span></td><td>Execute shell commands with sandboxing</td></tr>
+          <tr><td><code>read_file</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Read file contents with line numbers</td></tr>
+          <tr><td><code>write_file</code></td><td><span class="badge-sm badge-yellow">Workspace</span></td><td>Create or overwrite files</td></tr>
+          <tr><td><code>edit_file</code></td><td><span class="badge-sm badge-yellow">Workspace</span></td><td>Modify files with exact string replacement patches</td></tr>
+          <tr><td><code>glob_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Find files by glob patterns (e.g., <code>**/*.rs</code>)</td></tr>
+          <tr><td><code>grep_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Search file contents with regex patterns</td></tr>
+          <tr><td><code>web_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Search the internet for information</td></tr>
+          <tr><td><code>web_fetch</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Fetch and parse URL content</td></tr>
+          <tr><td><code>agent</code></td><td><span class="badge-sm badge-purple">Varies</span></td><td>Spawn sub-agents for parallel tasks</td></tr>
+          <tr><td><code>todo_write</code></td><td><span class="badge-sm badge-yellow">Workspace</span></td><td>Create and manage task lists</td></tr>
+          <tr><td><code>notebook_edit</code></td><td><span class="badge-sm badge-yellow">Workspace</span></td><td>Edit Jupyter notebook cells</td></tr>
+          <tr><td><code>skill</code></td><td><span class="badge-sm badge-purple">Varies</span></td><td>Invoke custom skills</td></tr>
+          <tr><td><code>tool_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Discover available tools by keyword</td></tr>
+          <tr><td><code>config</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Read configuration and settings</td></tr>
+          <tr><td><code>repl</code></td><td><span class="badge-sm badge-purple">Varies</span></td><td>Run code in Python or Node REPL</td></tr>
+          <tr><td><code>structured_output</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Validate output against a JSON schema</td></tr>
+          <tr><td><code>sleep</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Pause execution for a duration</td></tr>
+          <tr><td><code>send_user_message</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Send a notification to the user</td></tr>
+          <tr><td><code>powershell</code></td><td><span class="badge-sm badge-purple">Varies</span></td><td>Execute PowerShell commands (Windows)</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="file-tools">File Tools</h2>
+
+      <h3>read_file</h3>
+      <p>Reads a file from the filesystem. Supports offset and limit for large files, PDF page ranges, and image viewing.</p>
+      <div class="param-table">
+        <div class="param-row">
+          <span class="param-name">file_path</span>
+          <span class="param-type">string</span>
+          <span class="param-required">Required</span>
+          <span class="param-desc">Absolute path to the file</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">offset</span>
+          <span class="param-type">number</span>
+          <span class="param-optional">Optional</span>
+          <span class="param-desc">Line number to start reading from</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">limit</span>
+          <span class="param-type">number</span>
+          <span class="param-optional">Optional</span>
+          <span class="param-desc">Number of lines to read (default: 2000)</span>
+        </div>
+      </div>
+
+      <h3>write_file</h3>
+      <p>Creates or overwrites a file. The agent must read the file first before overwriting.</p>
+      <div class="param-table">
+        <div class="param-row">
+          <span class="param-name">file_path</span>
+          <span class="param-type">string</span>
+          <span class="param-required">Required</span>
+          <span class="param-desc">Absolute path to the file</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">content</span>
+          <span class="param-type">string</span>
+          <span class="param-required">Required</span>
+          <span class="param-desc">Content to write</span>
+        </div>
+      </div>
+
+      <h3>edit_file</h3>
+      <p>Performs exact string replacement in files. More efficient than rewriting &mdash; only sends the diff.</p>
+      <div class="param-table">
+        <div class="param-row">
+          <span class="param-name">file_path</span>
+          <span class="param-type">string</span>
+          <span class="param-required">Required</span>
+          <span class="param-desc">Absolute path to the file</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">old_string</span>
+          <span class="param-type">string</span>
+          <span class="param-required">Required</span>
+          <span class="param-desc">Exact text to replace (must be unique in file)</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">new_string</span>
+          <span class="param-type">string</span>
+          <span class="param-required">Required</span>
+          <span class="param-desc">Replacement text</span>
+        </div>
+      </div>
+
+      <h2 id="search-tools">Search Tools</h2>
+
+      <h3>glob_search</h3>
+      <p>Find files by glob pattern. Returns matching paths sorted by modification time.</p>
+      <pre><code><span class="token-comment">// Example: find all Rust source files</span>
+glob_search { pattern: "**/*.rs" }</code></pre>
+
+      <h3>grep_search</h3>
+      <p>Search file contents with regex. Supports context lines, file type filters, and multiple output modes.</p>
+      <pre><code><span class="token-comment">// Example: find all function definitions</span>
+grep_search { pattern: "fn\\s+\\w+", type: "rust" }</code></pre>
+
+      <h2 id="web-tools">Web Tools</h2>
+
+      <h3>web_search</h3>
+      <p>Search the internet and return results. Useful for looking up documentation, error messages, or recent information.</p>
+
+      <h3>web_fetch</h3>
+      <p>Fetch and parse content from a URL. Supports HTML pages (converted to readable text), JSON APIs, and raw content.</p>
+
+      <h2 id="execution">Execution Tools</h2>
+
+      <h3>bash</h3>
+      <p>Execute shell commands. Working directory persists between calls. Supports timeout, background execution, and sandboxing.</p>
+      <div class="callout callout-warning">
+        <div class="callout-title">Security</div>
+        Requires <code>danger-full-access</code> permission mode. Commands run in a sandbox by default.
+      </div>
+
+      <h3>powershell</h3>
+      <p>Execute PowerShell commands on Windows. Same capabilities and safety model as the bash tool.</p>
+
+      <h2 id="mcp-tools">MCP Tools</h2>
+      <p>In addition to the 19 built-in tools, you can register <strong>unlimited additional tools</strong> via <a href="mcp.html">MCP servers</a>. These appear alongside built-in tools and are invoked the same way.</p>
+
+      <div class="page-footer">
+        <a href="commands.html">&larr; Slash Commands</a>
+        <a href="agents.html">Multi-Agent System &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>

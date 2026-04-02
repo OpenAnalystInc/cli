@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Multi-Agent System - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link active">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Advanced</span>
+        <h1>Multi-Agent System</h1>
+        <p class="subtitle">Orchestrate parallel agents, autonomous loops, and swarm task decomposition for complex workflows.</p>
+      </div>
+
+      <h2 id="overview">Agent Types</h2>
+
+      <div class="card-grid">
+        <div class="card">
+          <div class="card-icon">&#128172;</div>
+          <h3>Primary Agent</h3>
+          <p>The interactive conversational agent. Always one active, connected to your TUI or REPL.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#128269;</div>
+          <h3>Explore Agent</h3>
+          <p>Fast, read-only codebase exploration. Uses search and file reading tools only.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#128203;</div>
+          <h3>Plan Agent</h3>
+          <p>Read-only architecture and design planning. Returns step-by-step implementation plans.</p>
+        </div>
+        <div class="card">
+          <div class="card-icon">&#9881;</div>
+          <h3>General Agent</h3>
+          <p>Full-tool access general-purpose agent. Can read, write, execute, and search.</p>
+        </div>
+      </div>
+
+      <h2 id="sub-agents">Sub-Agents</h2>
+      <p>The primary agent can spawn sub-agents for parallel work. Each sub-agent has its own conversation runtime, tool permissions, and token budget.</p>
+
+      <pre><code><span class="token-comment"># The agent tool spawns sub-agents automatically when needed.</span>
+<span class="token-comment"># For example, when exploring a large codebase:</span>
+"Search for all API endpoints in this project"
+
+<span class="token-comment"># The agent may spawn an Explore sub-agent to search in parallel</span>
+<span class="token-comment"># while continuing to work on the main task.</span></code></pre>
+
+      <h2 id="swarm">Agent Swarm</h2>
+      <p>Use <code>/swarm</code> to decompose a complex task into parallel sub-tasks, each handled by a separate agent:</p>
+
+      <pre><code><span class="token-comment"># Spawn multiple agents for parallel task execution</span>
+/swarm refactor all API handlers to use the new error type</code></pre>
+
+      <p>The swarm:</p>
+      <ol>
+        <li>Analyzes the task and decomposes it into independent sub-tasks</li>
+        <li>Spawns a dedicated agent for each sub-task</li>
+        <li>Runs all agents in parallel</li>
+        <li>Collects and synthesizes results</li>
+      </ol>
+
+      <h2 id="autonomous">Autonomous Agent</h2>
+      <p>The <code>/openanalyst</code> command runs a fully autonomous agent loop inspired by the Karpathy agentic pattern:</p>
+
+      <pre><code>/openanalyst "add comprehensive error handling to the API crate" --max-turns 20</code></pre>
+
+      <h3>The Loop: Think &rarr; Act &rarr; Observe &rarr; Verify</h3>
+
+      <div class="steps">
+        <div class="step">
+          <h3>Think</h3>
+          <p>The agent uses extended thinking (when available) to plan the next action. It considers the goal, current state, and what it has learned so far.</p>
+        </div>
+        <div class="step">
+          <h3>Act</h3>
+          <p>Executes one or more tool calls: reading files, editing code, running commands, or searching.</p>
+        </div>
+        <div class="step">
+          <h3>Observe</h3>
+          <p>Processes tool results and updates its understanding of the codebase state.</p>
+        </div>
+        <div class="step">
+          <h3>Verify</h3>
+          <p>Self-checks whether the goal has been achieved. If not, loops back to Think. If verification criteria are provided, runs them.</p>
+        </div>
+      </div>
+
+      <h3>Options</h3>
+      <div class="param-table">
+        <div class="param-row">
+          <span class="param-name">--goal &lt;text&gt;</span>
+          <span class="param-type">string</span>
+          <span class="param-optional">Optional</span>
+          <span class="param-desc">Explicit goal statement for the agent</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">--criteria &lt;cmd&gt;</span>
+          <span class="param-type">string</span>
+          <span class="param-optional">Optional</span>
+          <span class="param-desc">Shell command to verify success (exit code 0 = done)</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">--max-turns &lt;n&gt;</span>
+          <span class="param-type">number</span>
+          <span class="param-optional">Optional</span>
+          <span class="param-desc">Maximum loop iterations before stopping</span>
+        </div>
+      </div>
+
+      <h2 id="moe">Mixture of Experts (MOE)</h2>
+      <p>For complex problems, the orchestrator can dispatch to multiple specialized agents simultaneously, each using a model best suited for their task type:</p>
+
+      <table>
+        <thead><tr><th>Agent Role</th><th>Optimized For</th><th>Example Model</th></tr></thead>
+        <tbody>
+          <tr><td>Explorer</td><td>Fast codebase search</td><td>haiku / grok-mini</td></tr>
+          <tr><td>Planner</td><td>Architecture design</td><td>opus / gemini-2.5-pro</td></tr>
+          <tr><td>Coder</td><td>Code generation</td><td>sonnet / gpt-4o</td></tr>
+          <tr><td>Writer</td><td>Documentation</td><td>sonnet / gemini-2.5-flash</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="model-routing">Smart Model Routing</h2>
+      <p>The <code>ModelRouter</code> automatically selects the best model for each action type. Configure routing with:</p>
+
+      <pre><code><span class="token-comment"># View the routing table</span>
+/route
+
+<span class="token-comment"># Set routing for a category</span>
+/route explore haiku
+/route code sonnet
+/route plan opus</code></pre>
+
+      <h2 id="effort">Effort Budget</h2>
+      <p>Control how much "thinking" the agent invests per category:</p>
+
+      <pre><code><span class="token-comment"># Set global effort</span>
+/effort high
+
+<span class="token-comment"># Set per-category effort</span>
+/effort explore low
+/effort plan max
+/effort code medium</code></pre>
+
+      <table>
+        <thead><tr><th>Level</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>low</code></td><td>Minimal thinking, fast responses</td></tr>
+          <tr><td><code>medium</code></td><td>Balanced thinking and speed</td></tr>
+          <tr><td><code>high</code></td><td>More thorough reasoning</td></tr>
+          <tr><td><code>max</code></td><td>Extended thinking with full reasoning chains</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="lifecycle">Agent Lifecycle Events</h2>
+      <p>The TUI displays real-time agent events:</p>
+      <ul>
+        <li><strong>AgentSpawned</strong> &mdash; New agent created with parent-child relationship</li>
+        <li><strong>AgentStatusChanged</strong> &mdash; Pending &rarr; Running &rarr; Completed/Failed</li>
+        <li><strong>AgentCompleted</strong> &mdash; Agent finished with result summary</li>
+        <li><strong>AgentFailed</strong> &mdash; Agent encountered an error</li>
+      </ul>
+
+      <div class="page-footer">
+        <a href="tools.html">&larr; Built-in Tools</a>
+        <a href="configuration.html">Configuration &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>

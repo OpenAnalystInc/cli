@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuration - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link active">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Advanced</span>
+        <h1>Configuration</h1>
+        <p class="subtitle">Multi-layered configuration system with project, user, and machine-local settings.</p>
+      </div>
+
+      <h2 id="hierarchy">Configuration Hierarchy</h2>
+      <p>Settings are merged from multiple sources, with later sources overriding earlier ones (bottom wins):</p>
+
+      <table>
+        <thead><tr><th>Priority</th><th>File</th><th>Scope</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>1 (lowest)</td><td><code>.openanalyst.json</code></td><td>Project (shared)</td><td>Shared project defaults, committed to git</td></tr>
+          <tr><td>2</td><td><code>.openanalyst/settings.json</code></td><td>Project</td><td>Full project feature config</td></tr>
+          <tr><td>3</td><td><code>~/.openanalyst/.env</code></td><td>User</td><td>API keys and base URLs</td></tr>
+          <tr><td>4</td><td><code>~/.openanalyst/credentials.json</code></td><td>User</td><td>OAuth tokens (auto-managed)</td></tr>
+          <tr><td>5 (highest)</td><td><code>.openanalyst/settings.local.json</code></td><td>Machine</td><td>Machine-specific overrides (gitignored)</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="project-guidance">Project Guidance: OPENANALYST.md</h2>
+      <p>Create an <code>OPENANALYST.md</code> file in your project root to provide AI instructions and project context. This file is auto-detected at startup and injected into the system prompt.</p>
+
+      <div class="code-title">OPENANALYST.md</div>
+      <pre><code># Project: My App
+
+## Architecture
+This is a React + Node.js monorepo with:
+- /frontend — React SPA (Vite)
+- /backend — Express API server
+- /shared — Shared types and utilities
+
+## Guidelines
+- Use TypeScript strict mode
+- Prefer functional components with hooks
+- All API routes must have error handling middleware
+- Tests use Vitest for frontend, Jest for backend
+
+## Common Tasks
+- Run dev: `npm run dev` (starts both frontend and backend)
+- Run tests: `npm test`
+- Deploy: `npm run deploy` (requires AWS credentials)</code></pre>
+
+      <div class="callout callout-tip">
+        <div class="callout-title">Tip</div>
+        Use <code>/init</code> inside the TUI to generate an <code>OPENANALYST.md</code> template for your project.
+      </div>
+
+      <h2 id="settings">Settings File</h2>
+      <p>The main settings file supports these sections:</p>
+
+      <div class="code-title">.openanalyst/settings.json</div>
+      <pre><code>{
+  "model": "sonnet",
+  "permission_mode": "workspace-write",
+  "env": {
+    "ANTHROPIC_API_KEY": "sk-ant-..."
+  },
+  "hooks": {
+    "PreToolUse": [...],
+    "PostToolUse": [...],
+    "SessionStart": [...],
+    "SessionEnd": [...],
+    "CwdChanged": [...],
+    "FileChanged": [...]
+  },
+  "plugins": {
+    "enabled": ["my-plugin"],
+    "directories": ["./plugins"]
+  },
+  "mcp": {
+    "servers": {
+      "my-server": {
+        "transport": "stdio",
+        "command": "node",
+        "args": ["server.js"]
+      }
+    }
+  },
+  "sandbox": {
+    "filesystem_mode": "workspace",
+    "allowed_mounts": ["/data"]
+  }
+}</code></pre>
+
+      <h2 id="permissions">Permission Modes</h2>
+
+      <table>
+        <thead><tr><th>Mode</th><th>Bash</th><th>Write</th><th>Edit</th><th>Install</th><th>Delete</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><code>read-only</code></td>
+            <td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td><td>&#10007;</td>
+          </tr>
+          <tr>
+            <td><code>workspace-write</code></td>
+            <td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10007;</td><td>&#10007;</td>
+          </tr>
+          <tr>
+            <td><code>danger-full-access</code></td>
+            <td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p>Set via CLI flag, config, or slash command:</p>
+      <pre><code><span class="token-comment"># CLI flag</span>
+openanalyst --permission-mode workspace-write
+
+<span class="token-comment"># In settings.json</span>
+{ "permission_mode": "workspace-write" }
+
+<span class="token-comment"># During a session</span>
+/permissions workspace-write</code></pre>
+
+      <h2 id="hooks">Hooks</h2>
+      <p>Hooks are shell commands that execute in response to lifecycle events:</p>
+
+      <table>
+        <thead><tr><th>Event</th><th>Fires When</th></tr></thead>
+        <tbody>
+          <tr><td><code>PreToolUse</code></td><td>Before a tool is executed</td></tr>
+          <tr><td><code>PostToolUse</code></td><td>After a tool completes</td></tr>
+          <tr><td><code>SessionStart</code></td><td>When a new session begins</td></tr>
+          <tr><td><code>SessionEnd</code></td><td>When a session ends</td></tr>
+          <tr><td><code>CwdChanged</code></td><td>When the working directory changes</td></tr>
+          <tr><td><code>FileChanged</code></td><td>When a file is modified</td></tr>
+          <tr><td><code>TaskCreated</code></td><td>When a new task is created</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="env-vars">Environment Variables</h2>
+
+      <h3>Authentication</h3>
+      <table>
+        <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>OPENANALYST_AUTH_TOKEN</code></td><td>OpenAnalyst API key</td></tr>
+          <tr><td><code>OPENANALYST_BASE_URL</code></td><td>OpenAnalyst API base URL</td></tr>
+          <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Anthropic Claude API key</td></tr>
+          <tr><td><code>OPENAI_API_KEY</code></td><td>OpenAI API key</td></tr>
+          <tr><td><code>GEMINI_API_KEY</code></td><td>Google Gemini API key</td></tr>
+          <tr><td><code>XAI_API_KEY</code></td><td>xAI Grok API key</td></tr>
+          <tr><td><code>OPENROUTER_API_KEY</code></td><td>OpenRouter API key</td></tr>
+          <tr><td><code>BEDROCK_API_KEY</code></td><td>Amazon Bedrock API key</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Runtime</h3>
+      <table>
+        <thead><tr><th>Variable</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>OPENANALYST_CONFIG_HOME</code></td><td>Override default config directory (<code>~/.openanalyst</code>)</td></tr>
+          <tr><td><code>OPENANALYST_MODEL</code></td><td>Override default model</td></tr>
+          <tr><td><code>OPENANALYST_PERMISSION_MODE</code></td><td>Set permission mode</td></tr>
+          <tr><td><code>OPENANALYST_SANDBOX_FILESYSTEM_MODE</code></td><td>Sandbox isolation level</td></tr>
+          <tr><td><code>OPENANALYST_SANDBOX_ALLOWED_MOUNTS</code></td><td>Permitted directories for sandbox</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="file-structure">File Structure</h2>
+      <pre><code>~/.openanalyst/                  <span class="token-comment"># User config directory</span>
+  ├── credentials.json           <span class="token-comment"># Saved OAuth tokens</span>
+  ├── .env                       <span class="token-comment"># API keys</span>
+  ├── sessions/                  <span class="token-comment"># Saved conversations</span>
+  ├── plugins/                   <span class="token-comment"># Installed plugins</span>
+  ├── settings.json              <span class="token-comment"># Global user settings</span>
+  └── settings.local.json        <span class="token-comment"># Machine-local overrides</span>
+
+.openanalyst/                    <span class="token-comment"># Project config directory</span>
+  ├── settings.json              <span class="token-comment"># Project settings</span>
+  ├── settings.local.json        <span class="token-comment"># Machine overrides (gitignored)</span>
+  ├── agents/                    <span class="token-comment"># Configured agents</span>
+  ├── skills/                    <span class="token-comment"># Custom skills</span>
+  ├── hooks/                     <span class="token-comment"># Hook definitions</span>
+  └── mcp/                       <span class="token-comment"># MCP server configs</span>
+
+OPENANALYST.md                   <span class="token-comment"># Project guidance (auto-detected)</span>
+.openanalyst.json                <span class="token-comment"># Shared project defaults</span>
+.openanalyst-todos.json          <span class="token-comment"># Task tracking</span></code></pre>
+
+      <div class="page-footer">
+        <a href="agents.html">&larr; Multi-Agent System</a>
+        <a href="mcp.html">MCP Integration &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>

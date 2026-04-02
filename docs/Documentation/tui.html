@@ -1,0 +1,184 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terminal UI - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link active">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Core Concepts</span>
+        <h1>Terminal UI (TUI)</h1>
+        <p class="subtitle">A full-screen, interactive terminal interface built with Ratatui &mdash; the default experience for OpenAnalyst CLI.</p>
+      </div>
+
+      <h2 id="overview">Overview</h2>
+      <p>The TUI is OpenAnalyst's default mode. It provides a rich, interactive experience with multiple panels, real-time streaming, and vim-style keybindings &mdash; all inside your terminal.</p>
+
+      <pre><code><span class="token-comment"># Launch TUI (default)</span>
+openanalyst
+
+<span class="token-comment"># Disable TUI for classic REPL</span>
+openanalyst --no-tui</code></pre>
+
+      <h2 id="layout">Layout</h2>
+      <p>The TUI is organized into distinct panels:</p>
+
+      <div class="feature-card">
+        <div class="icon">&#128172;</div>
+        <div class="content">
+          <h4>Chat Panel</h4>
+          <p>The main area displaying the conversation. Scrollable message history with real-time streaming deltas, syntax-highlighted code blocks, and inline tool call cards showing file diffs.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="icon">&#128196;</div>
+        <div class="content">
+          <h4>Sidebar</h4>
+          <p>Toggleable panel showing file tree, background task status, and file actions (preview, edit, delete). Toggle with <code>/sidebar</code> or the keybinding.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="icon">&#9881;</div>
+        <div class="content">
+          <h4>Status Bar</h4>
+          <p>Bottom bar showing: animated spinner during generation, elapsed time, input/output token counts, current model name, and agent phase indicator.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="icon">&#9000;</div>
+        <div class="content">
+          <h4>Input Box</h4>
+          <p>Text input with vim-mode support (via edtui), slash command autocomplete, and input history navigation with up/down arrows.</p>
+        </div>
+      </div>
+
+      <div class="feature-card">
+        <div class="icon">&#128274;</div>
+        <div class="content">
+          <h4>Permission Dialog</h4>
+          <p>Modal overlay that appears when a tool requires higher permissions. Approve once, deny, or always-allow for the session.</p>
+        </div>
+      </div>
+
+      <h2 id="startup">Startup Banner</h2>
+      <p>On launch, the TUI displays a startup banner with:</p>
+      <ul>
+        <li>OA block-letter logo in blue/turquoise theme</li>
+        <li>Logged-in account and provider information</li>
+        <li>Current model and permission mode</li>
+        <li>Session ID for resume capability</li>
+      </ul>
+
+      <h2 id="keybindings">Keybindings</h2>
+
+      <h3>General</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Enter</kbd></td><td>Send message (insert mode)</td></tr>
+          <tr><td><kbd>Ctrl+C</kbd></td><td>Cancel generation / exit</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Normal mode (vim) / close dialog</td></tr>
+          <tr><td><kbd>Up</kbd> / <kbd>Down</kbd></td><td>Input history navigation</td></tr>
+          <tr><td><kbd>Scroll</kbd></td><td>Mouse scroll through chat</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Vim Mode</h3>
+      <p>Enable with <code>/vim</code>. Full vim-style navigation in the input box:</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd></td><td>Cursor movement</td></tr>
+          <tr><td><kbd>i</kbd></td><td>Enter insert mode</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Return to normal mode</td></tr>
+          <tr><td><kbd>g</kbd><kbd>g</kbd></td><td>Scroll to top of chat</td></tr>
+          <tr><td><kbd>G</kbd></td><td>Scroll to bottom of chat</td></tr>
+          <tr><td><kbd>d</kbd><kbd>d</kbd></td><td>Delete line</td></tr>
+          <tr><td><kbd>y</kbd><kbd>y</kbd></td><td>Yank (copy) line</td></tr>
+          <tr><td><kbd>p</kbd></td><td>Paste</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-tip">
+        <div class="callout-title">Custom Keybindings</div>
+        Customize keybindings by editing <code>~/.openanalyst/keybindings.json</code>. See <a href="configuration.html">Configuration</a> for details.
+      </div>
+
+      <h2 id="autocomplete">Slash Command Autocomplete</h2>
+      <p>Type <code>/</code> in the input box to see a dropdown of available slash commands. Continue typing to filter. Press <kbd>Tab</kbd> to accept a suggestion.</p>
+
+      <h2 id="tool-cards">Inline Tool Call Cards</h2>
+      <p>When the agent executes tools (file edits, bash commands, web searches), the results appear as styled cards in the chat panel:</p>
+      <ul>
+        <li><strong>Edit cards</strong> &mdash; Show rich diffs with added/removed lines highlighted</li>
+        <li><strong>Bash cards</strong> &mdash; Display command and output with syntax highlighting</li>
+        <li><strong>Search cards</strong> &mdash; Show matching files and line excerpts</li>
+        <li><strong>Web cards</strong> &mdash; Display fetched content summaries</li>
+      </ul>
+
+      <h2 id="voice">Voice Input</h2>
+      <p>Use voice input to dictate prompts:</p>
+      <pre><code>/voice</code></pre>
+      <p>Starts recording from your microphone. Speak your prompt, and it's transcribed and sent as a message.</p>
+
+      <h2 id="agent-panel">Agent Panel</h2>
+      <p>When sub-agents are spawned, the TUI shows real-time lifecycle events:</p>
+      <ul>
+        <li>Agent spawn events with parent-child relationships</li>
+        <li>Status transitions: Pending &rarr; Running &rarr; Completed/Failed</li>
+        <li>Streaming output from each agent</li>
+        <li>Elapsed time and token usage per agent</li>
+      </ul>
+
+      <h2 id="fallback">REPL Fallback</h2>
+      <p>If your terminal doesn't support the full TUI, or you prefer a simpler interface:</p>
+      <pre><code>openanalyst --no-tui</code></pre>
+      <p>This gives you a classic line-by-line REPL with streaming markdown output, ANSI colors, and all the same slash commands.</p>
+
+      <div class="page-footer">
+        <a href="providers.html">&larr; LLM Providers</a>
+        <a href="commands.html">Slash Commands &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>

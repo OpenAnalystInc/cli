@@ -1,0 +1,185 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Slash Commands - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link active">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Core Concepts</span>
+        <h1>Slash Commands</h1>
+        <p class="subtitle">51+ built-in commands for session management, git, multimedia, web scraping, analysis, and agent control.</p>
+      </div>
+
+      <div class="callout callout-tip">
+        <div class="callout-title">Autocomplete</div>
+        Type <code>/</code> in the input box to see autocomplete suggestions. Continue typing to filter.
+      </div>
+
+      <h2 id="session">Session &amp; Config</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>/help</code></td><td>Show available commands and usage</td></tr>
+          <tr><td><code>/status</code></td><td>Display session info: model, tokens, cost, elapsed time</td></tr>
+          <tr><td><code>/cost</code></td><td>Show token usage and estimated cost breakdown</td></tr>
+          <tr><td><code>/model [name]</code></td><td>Show or switch the current model (e.g., <code>/model gpt-4o</code>)</td></tr>
+          <tr><td><code>/clear</code></td><td>Clear the conversation history</td></tr>
+          <tr><td><code>/compact</code></td><td>Compact session history to reduce token usage</td></tr>
+          <tr><td><code>/session</code></td><td>Show session ID and metadata</td></tr>
+          <tr><td><code>/export</code></td><td>Export conversation to JSON or Markdown</td></tr>
+          <tr><td><code>/resume</code></td><td>Resume a previous conversation session</td></tr>
+          <tr><td><code>/version</code></td><td>Show CLI version</td></tr>
+          <tr><td><code>/login</code></td><td>Login to a provider</td></tr>
+          <tr><td><code>/logout</code></td><td>Logout and clear saved credentials</td></tr>
+          <tr><td><code>/context</code></td><td>Show current context window usage</td></tr>
+          <tr><td><code>/vim</code></td><td>Toggle vim mode for the input box</td></tr>
+          <tr><td><code>/config</code></td><td>Show or edit configuration</td></tr>
+          <tr><td><code>/memory</code></td><td>Show or manage conversation memory</td></tr>
+          <tr><td><code>/init</code></td><td>Initialize project with <code>OPENANALYST.md</code></td></tr>
+          <tr><td><code>/exit</code></td><td>Exit the CLI</td></tr>
+          <tr><td><code>/sidebar</code></td><td>Toggle the sidebar panel</td></tr>
+          <tr><td><code>/permissions</code></td><td>Show or change permission mode</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="git">Git &amp; Code</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>/diff</code></td><td>Show git diff with syntax highlighting</td></tr>
+          <tr><td><code>/commit</code></td><td>Generate commit message from staged changes and commit</td></tr>
+          <tr><td><code>/commit-push-pr</code></td><td>Commit, push, and create a pull request in one step</td></tr>
+          <tr><td><code>/pr</code></td><td>Create a pull request with AI-generated description</td></tr>
+          <tr><td><code>/issue</code></td><td>Create a GitHub issue</td></tr>
+          <tr><td><code>/branch</code></td><td>Create and switch to a new branch</td></tr>
+          <tr><td><code>/worktree</code></td><td>Manage git worktrees for isolated work</td></tr>
+          <tr><td><code>/teleport</code></td><td>Jump to a specific file and line in the codebase</td></tr>
+          <tr><td><code>/diff-review</code></td><td>AI-powered code review of current diff</td></tr>
+          <tr><td><code>/changelog</code></td><td>Generate changelog from recent commits</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="analysis">Analysis &amp; Planning</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>/bughunter</code></td><td>Deep automated bug analysis across the codebase</td></tr>
+          <tr><td><code>/ultraplan</code></td><td>Generate a comprehensive implementation plan</td></tr>
+          <tr><td><code>/debug-tool-call</code></td><td>Debug the last failed tool call</td></tr>
+          <tr><td><code>/think</code></td><td>Use extended thinking for complex reasoning</td></tr>
+          <tr><td><code>/doctor</code></td><td>Diagnose CLI configuration and connectivity</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="multimedia">Multimedia</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>/image [prompt]</code></td><td>Generate an image from a text description</td></tr>
+          <tr><td><code>/voice</code></td><td>Record and transcribe voice input</td></tr>
+          <tr><td><code>/speak [text]</code></td><td>Text-to-speech output</td></tr>
+          <tr><td><code>/vision [path]</code></td><td>Analyze an image file with vision AI</td></tr>
+          <tr><td><code>/diagram [desc]</code></td><td>Generate a Mermaid diagram from description</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="web">Web &amp; Data</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>/scrape [url] [selector]</code></td><td>Scrape a web page, optionally with CSS selector</td></tr>
+          <tr><td><code>/json [url]</code></td><td>Fetch and display JSON from an API endpoint</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="ai">AI &amp; Translation</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>/translate [lang]</code></td><td>Translate text to the specified language</td></tr>
+          <tr><td><code>/tokens</code></td><td>Count tokens in the current context</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="dev">Dev Tools</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>/dev install</code></td><td>Install Playwright browser automation</td></tr>
+          <tr><td><code>/dev open [url]</code></td><td>Open a URL in the controlled browser</td></tr>
+          <tr><td><code>/dev screenshot</code></td><td>Take a screenshot of the current page</td></tr>
+          <tr><td><code>/dev snap [selector]</code></td><td>Screenshot a specific element</td></tr>
+          <tr><td><code>/dev click [selector]</code></td><td>Click an element on the page</td></tr>
+          <tr><td><code>/dev type [selector] [text]</code></td><td>Type into an element</td></tr>
+          <tr><td><code>/dev test [url]</code></td><td>Run automated test on a URL</td></tr>
+          <tr><td><code>/dev codegen [url]</code></td><td>Generate test code from browser interactions</td></tr>
+          <tr><td><code>/dev stop</code></td><td>Close the browser</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="advanced">Advanced &amp; Agents</h2>
+      <table>
+        <thead><tr><th>Command</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>/swarm &lt;task&gt;</code></td><td>Spawn parallel agents for task decomposition</td></tr>
+          <tr><td><code>/openanalyst &lt;task&gt;</code></td><td>Run autonomous agent loop (think&rarr;act&rarr;observe&rarr;verify)</td></tr>
+          <tr><td><code>/ask &lt;question&gt;</code></td><td>Quick question without tool usage</td></tr>
+          <tr><td><code>/user-prompt &lt;text&gt;</code></td><td>Inject a user message into the conversation</td></tr>
+          <tr><td><code>/effort [category] [level]</code></td><td>Set thinking budget (low/medium/high/max)</td></tr>
+          <tr><td><code>/route [category] [tier]</code></td><td>View or edit the model routing table</td></tr>
+          <tr><td><code>/mcp</code></td><td>List, add, or remove MCP servers</td></tr>
+          <tr><td><code>/knowledge</code></td><td>Search the knowledge base</td></tr>
+          <tr><td><code>/explore</code></td><td>Explore a GitHub repository</td></tr>
+          <tr><td><code>/agents</code></td><td>List active and completed agents</td></tr>
+          <tr><td><code>/skills</code></td><td>List available skills</td></tr>
+          <tr><td><code>/plugins</code></td><td>Manage plugins</td></tr>
+          <tr><td><code>/hooks</code></td><td>View configured hooks</td></tr>
+          <tr><td><code>/add-dir [path]</code></td><td>Add a directory to the workspace context</td></tr>
+        </tbody>
+      </table>
+
+      <div class="page-footer">
+        <a href="tui.html">&larr; Terminal UI</a>
+        <a href="tools.html">Built-in Tools &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>

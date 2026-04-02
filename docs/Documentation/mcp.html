@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MCP Integration - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <h2>OpenAnalyst CLI</h2>
+        <span>Documentation v1.0.89</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Getting Started</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link active">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+
+      <div class="page-header">
+        <span class="badge">Advanced</span>
+        <h1>MCP Integration</h1>
+        <p class="subtitle">Extend OpenAnalyst with unlimited tools via the Model Context Protocol (MCP).</p>
+      </div>
+
+      <h2 id="what-is-mcp">What is MCP?</h2>
+      <p>The <strong>Model Context Protocol</strong> (MCP) is an open standard for connecting AI models to external tools and data sources. OpenAnalyst CLI includes a full MCP client that can connect to any MCP-compliant server.</p>
+
+      <p>MCP tools appear alongside the 19 built-in tools and are invoked the same way by the agent.</p>
+
+      <h2 id="transports">Supported Transports</h2>
+
+      <table>
+        <thead><tr><th>Transport</th><th>Description</th><th>Use Case</th></tr></thead>
+        <tbody>
+          <tr><td><code>stdio</code></td><td>Standard input/output</td><td>Local processes, npm packages</td></tr>
+          <tr><td><code>sse</code></td><td>Server-Sent Events over HTTP</td><td>Remote servers, cloud services</td></tr>
+          <tr><td><code>websocket</code></td><td>WebSocket connection</td><td>Bidirectional real-time</td></tr>
+          <tr><td><code>http</code></td><td>HTTP request/response</td><td>REST API wrappers</td></tr>
+          <tr><td><code>sdk</code></td><td>Direct SDK integration</td><td>In-process tools</td></tr>
+          <tr><td><code>managed-proxy</code></td><td>Managed proxy connection</td><td>Enterprise environments</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="configuration">Configuring MCP Servers</h2>
+
+      <h3>Via Settings File</h3>
+      <div class="code-title">.openanalyst/settings.json</div>
+      <pre><code>{
+  "mcp": {
+    "servers": {
+      "filesystem": {
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-filesystem", "/path/to/dir"]
+      },
+      "github": {
+        "transport": "stdio",
+        "command": "npx",
+        "args": ["-y", "@modelcontextprotocol/server-github"],
+        "env": {
+          "GITHUB_TOKEN": "ghp_..."
+        }
+      },
+      "remote-api": {
+        "transport": "sse",
+        "url": "https://mcp.example.com/sse"
+      }
+    }
+  }
+}</code></pre>
+
+      <h3>Via Slash Command</h3>
+      <pre><code><span class="token-comment"># List connected MCP servers</span>
+/mcp
+
+<span class="token-comment"># Add a new MCP server</span>
+/mcp add my-server stdio npx -y @my/mcp-server
+
+<span class="token-comment"># Remove a server</span>
+/mcp remove my-server</code></pre>
+
+      <h2 id="how-it-works">How It Works</h2>
+
+      <div class="steps">
+        <div class="step">
+          <h3>Bootstrap</h3>
+          <p>At startup, OpenAnalyst reads MCP server configs from settings and connects to each server. For stdio servers, it spawns the process. For network servers, it establishes the connection.</p>
+        </div>
+        <div class="step">
+          <h3>Tool Discovery</h3>
+          <p>The MCP client sends a <code>tools/list</code> request via JSON-RPC. The server responds with its available tools, including names, descriptions, and parameter schemas.</p>
+        </div>
+        <div class="step">
+          <h3>Tool Registration</h3>
+          <p>Discovered tools are registered alongside the 19 built-in tools. They appear in the agent's tool list and can be invoked like any other tool.</p>
+        </div>
+        <div class="step">
+          <h3>Invocation</h3>
+          <p>When the agent calls an MCP tool, the request is routed through the MCP client to the appropriate server. Results are streamed back to the agent.</p>
+        </div>
+      </div>
+
+      <h2 id="examples">Popular MCP Servers</h2>
+
+      <div class="card-grid">
+        <div class="card">
+          <h3>Filesystem</h3>
+          <p>Read, write, and search files with controlled access to specific directories.</p>
+          <p><code>@modelcontextprotocol/server-filesystem</code></p>
+        </div>
+        <div class="card">
+          <h3>GitHub</h3>
+          <p>Create issues, PRs, search repos, manage branches via GitHub API.</p>
+          <p><code>@modelcontextprotocol/server-github</code></p>
+        </div>
+        <div class="card">
+          <h3>PostgreSQL</h3>
+          <p>Query databases, inspect schemas, run migrations.</p>
+          <p><code>@modelcontextprotocol/server-postgres</code></p>
+        </div>
+        <div class="card">
+          <h3>Slack</h3>
+          <p>Read channels, post messages, search conversations.</p>
+          <p><code>@modelcontextprotocol/server-slack</code></p>
+        </div>
+      </div>
+
+      <h2 id="resources">MCP Resources</h2>
+      <p>In addition to tools, MCP servers can expose <strong>resources</strong> &mdash; contextual data that the agent can read. Resources might include database schemas, API documentation, or project metadata.</p>
+
+      <div class="callout callout-info">
+        <div class="callout-title">Protocol</div>
+        MCP uses JSON-RPC 2.0 over the configured transport. See the <a href="https://modelcontextprotocol.io">MCP specification</a> for full protocol details.
+      </div>
+
+      <div class="page-footer">
+        <a href="configuration.html">&larr; Configuration</a>
+        <a href="architecture.html">Architecture &rarr;</a>
+      </div>
+
+    </main>
+  </div>
+</body>
+</html>
