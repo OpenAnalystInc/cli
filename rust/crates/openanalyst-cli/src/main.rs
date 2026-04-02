@@ -2023,9 +2023,15 @@ impl LiveCli {
             }
             SlashCommand::Think { prompt } => {
                 let think_prompt = if let Some(p) = prompt {
-                    format!("Think deeply and step-by-step about this before answering:\n\n{p}")
+                    format!(
+                        "Use extended thinking for this task. Before answering:\n\
+                         1. Identify all assumptions and constraints\n\
+                         2. Consider multiple approaches and their trade-offs\n\
+                         3. Reason through edge cases and failure modes\n\
+                         4. Only then provide your well-reasoned answer\n\n{p}"
+                    )
                 } else {
-                    "For the next prompt, use extended thinking — reason step-by-step before answering.".to_string()
+                    "For the next prompt, use extended thinking — identify assumptions, consider alternatives, reason through edge cases, then answer.".to_string()
                 };
                 self.run_turn(&think_prompt)?;
                 true
@@ -2991,7 +2997,11 @@ impl LiveCli {
         };
         let diagram_prompt = format!(
             "Generate a Mermaid diagram for: {description}\n\n\
-             Return ONLY the Mermaid code block, no explanation. Start with the diagram type (graph, sequenceDiagram, classDiagram, etc)."
+             Requirements:\n\
+             1. Choose the best diagram type (graph TD, sequenceDiagram, classDiagram, erDiagram, stateDiagram-v2, flowchart, gantt, pie, mindmap)\n\
+             2. Use clear, descriptive node labels — never single letters\n\
+             3. Show all meaningful relationships and data flows\n\
+             4. Return ONLY a ```mermaid code block, no explanation before or after"
         );
         self.run_turn(&diagram_prompt)?;
 
@@ -3036,7 +3046,13 @@ impl LiveCli {
             return Ok(());
         };
         let translate_prompt = format!(
-            "Translate the following text to {language}. Return ONLY the translation, no explanation.\n\n{text}"
+            "Translate the following text to {language}.\n\n\
+             Rules:\n\
+             - Return ONLY the translated text, nothing else\n\
+             - Preserve formatting, line breaks, markdown, and code blocks\n\
+             - Use natural, fluent {language} — not literal word-by-word translation\n\
+             - Keep technical terms, brand names, and code identifiers untranslated\n\n\
+             Text to translate:\n{text}"
         );
         self.run_turn(&translate_prompt)
     }
@@ -3085,12 +3101,15 @@ impl LiveCli {
             return Ok(());
         }
         let review_prompt = format!(
-            "Review this git diff. Focus on:\n\
-             - Bugs or logic errors\n\
-             - Security issues\n\
-             - Performance concerns\n\
-             - Code style issues\n\n\
-             Be concise. If the changes look good, say so briefly.\n\n\
+            "You are a senior code reviewer. Review this git diff with a critical eye.\n\n\
+             Check for:\n\
+             1. **Bugs** — logic errors, off-by-one, null/undefined access, race conditions\n\
+             2. **Security** — injection, XSS, hardcoded secrets, unsafe deserialization\n\
+             3. **Performance** — unnecessary allocations, O(n^2) loops, missing caching\n\
+             4. **Error handling** — swallowed errors, missing edge cases, panic paths\n\
+             5. **API contract** — breaking changes, missing validation, wrong HTTP methods\n\n\
+             For each issue found: state the file, line, severity (critical/warning/info), and fix.\n\
+             If the changes are clean, say \"LGTM\" with a brief summary of what was changed.\n\n\
              ```diff\n{diff}\n```"
         );
         self.run_turn(&review_prompt)
@@ -3391,15 +3410,21 @@ impl LiveCli {
             return Ok(());
         };
         let test_prompt = format!(
-            "Write a Playwright test for: {description}\n\n\
-             Rules:\n\
-             - Use `import {{ test, expect }} from '@playwright/test';`\n\
-             - Use `test('...', async ({{ page }}) => {{ ... }});` format\n\
-             - Prefer accessibility-based locators: page.getByRole(), page.getByText(),\n\
-               page.getByLabel(), page.getByPlaceholder() over CSS selectors\n\
-             - Use `await page.goto('...')` to navigate\n\
-             - Return ONLY the test code in a ```javascript block, no explanation\n\
-             - Make it a complete, runnable Playwright test file"
+            "Write a production-quality Playwright test for: {description}\n\n\
+             Requirements:\n\
+             1. Use `import {{ test, expect }} from '@playwright/test';`\n\
+             2. Use `test.describe` for grouping related assertions\n\
+             3. ALWAYS use accessibility locators (never CSS selectors):\n\
+                - page.getByRole('button', {{ name: '...' }})\n\
+                - page.getByText('...')\n\
+                - page.getByLabel('...')\n\
+                - page.getByPlaceholder('...')\n\
+                - page.getByTestId('...')\n\
+             4. Add meaningful assertions with expect()\n\
+             5. Handle async properly — await all page interactions\n\
+             6. Include setup (page.goto) and cleanup if needed\n\
+             7. Test both happy path AND at least one error case\n\
+             8. Return ONLY a ```javascript code block — no explanation"
         );
         self.run_turn(&test_prompt)?;
 
