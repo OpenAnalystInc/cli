@@ -68,6 +68,106 @@ const INTERNAL_PROGRESS_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(3);
 
 type AllowedToolSet = BTreeSet<String>;
 
+/// Detect and load auth tokens from installed CLIs (Claude, Codex, Gemini).
+/// Only sets env vars that are NOT already set — user's explicit config always wins.
+///
+/// Credential locations:
+///   Claude CLI:  ~/.claude/.credentials.json  → claudeAiOauth.accessToken
+///   Codex CLI:   ~/.codex/auth.json           → tokens.access_token
+///   Gemini CLI:  ~/AppData/Roaming/gcloud/application_default_credentials.json (Windows)
+///                ~/.config/gcloud/application_default_credentials.json (Unix)
+fn load_external_cli_credentials() {
+    let home = env::var("HOME")
+        .or_else(|_| env::var("USERPROFILE"))
+        .unwrap_or_default();
+    if home.is_empty() { return; }
+    let home = PathBuf::from(&home);
+
+    // ── Claude CLI → ANTHROPIC_API_KEY ──
+    if env::var("ANTHROPIC_API_KEY").ok().filter(|v| !v.is_empty()).is_none() {
+        let claude_creds = home.join(".claude").join(".credentials.json");
+        if let Ok(content) = fs::read_to_string(&claude_creds) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(token) = val
+                    .get("claudeAiOauth")
+                    .and_then(|o| o.get("accessToken"))
+                    .and_then(|t| t.as_str())
+                    .filter(|t| !t.is_empty())
+                {
+                    env::set_var("ANTHROPIC_API_KEY", token);
+                }
+            }
+        }
+    }
+
+    // ── Codex CLI → OPENAI_API_KEY ──
+    if env::var("OPENAI_API_KEY").ok().filter(|v| !v.is_empty()).is_none() {
+        let codex_auth = home.join(".codex").join("auth.json");
+        if let Ok(content) = fs::read_to_string(&codex_auth) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(token) = val
+                    .get("tokens")
+                    .and_then(|t| t.get("access_token"))
+                    .and_then(|t| t.as_str())
+                    .filter(|t| !t.is_empty())
+                {
+                    env::set_var("OPENAI_API_KEY", token);
+                }
+            }
+        }
+    }
+
+    // ── Gemini CLI (gcloud ADC) → GEMINI_API_KEY ──
+    if env::var("GEMINI_API_KEY").ok().filter(|v| !v.is_empty()).is_none() {
+        // Windows: ~/AppData/Roaming/gcloud/  Unix: ~/.config/gcloud/
+        let gcloud_dir = if cfg!(target_os = "windows") {
+            home.join("AppData").join("Roaming").join("gcloud")
+        } else {
+            home.join(".config").join("gcloud")
+        };
+        let adc_path = gcloud_dir.join("application_default_credentials.json");
+        if let Ok(content) = fs::read_to_string(&adc_path) {
+            if let Ok(val) = serde_json::from_str::<serde_json::Value>(&content) {
+                // gcloud ADC has refresh_token + client_id + client_secret.
+                // We exchange the refresh token for a fresh access token.
+                let refresh_token = val.get("refresh_token").and_then(|v| v.as_str());
+                let client_id = val.get("client_id").and_then(|v| v.as_str());
+                let client_secret = val.get("client_secret").and_then(|v| v.as_str());
+                if let (Some(rt), Some(cid), Some(cs)) = (refresh_token, client_id, client_secret) {
+                    if let Some(access_token) = exchange_google_refresh_token(rt, cid, cs) {
+                        env::set_var("GEMINI_API_KEY", &access_token);
+                    }
+                }
+            }
+        }
+    }
+}
+
+/// Exchange a Google refresh token for a fresh access token.
+fn exchange_google_refresh_token(refresh_token: &str, client_id: &str, client_secret: &str) -> Option<String> {
+    let rt = tokio::runtime::Runtime::new().ok()?;
+    rt.block_on(async {
+        let client = reqwest::Client::builder()
+            .timeout(Duration::from_secs(5))
+            .build()
+            .ok()?;
+        let resp = client
+            .post("https://oauth2.googleapis.com/token")
+            .form(&[
+                ("grant_type", "refresh_token"),
+                ("refresh_token", refresh_token),
+                ("client_id", client_id),
+                ("client_secret", client_secret),
+            ])
+            .send()
+            .await
+            .ok()?;
+        if !resp.status().is_success() { return None; }
+        let body: serde_json::Value = resp.json().await.ok()?;
+        body.get("access_token").and_then(|v| v.as_str()).map(ToOwned::to_owned)
+    })
+}
+
 /// Load ALL saved provider credentials from ~/.openanalyst/credentials.json
 /// Sets env vars for EVERY saved provider so /model switching works across providers.
 /// Env vars already set by the user take priority (not overwritten).
@@ -115,6 +215,8 @@ fn main() {
     let _ = runtime::load_dotenv();
     // 3. Load saved credentials from ~/.openanalyst/credentials.json into env vars
     load_saved_provider_credentials();
+    // 4. Detect auth from installed CLIs (Claude, Codex, Gemini)
+    load_external_cli_credentials();
     // Prune old/empty sessions in the background (non-blocking)
     std::thread::spawn(cleanup_old_sessions);
 
