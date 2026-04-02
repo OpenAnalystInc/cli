@@ -7,6 +7,7 @@
 //! cheap/fast models for exploration, balanced for planning, capable for coding.
 
 pub mod agent;
+pub mod autonomous;
 pub mod context;
 pub mod registry;
 pub mod router;
@@ -80,6 +81,15 @@ impl AgentOrchestrator {
                         }
                         Some(Action::CancelAgent(id)) => {
                             self.cancel_agent(&id).await;
+                        }
+                        Some(Action::UpdateModel(model)) => {
+                            self.config.model = model.clone();
+                            self.router = ModelRouter::from_default_model(&model);
+                        }
+                        Some(Action::UpdatePermissions(mode)) => {
+                            if let Some(pm) = parse_permission_mode(&mode) {
+                                self.config.permission_mode = pm;
+                            }
                         }
                         Some(Action::Quit) | None => break,
                         Some(Action::SlashCommand(_)) => {}
@@ -276,5 +286,17 @@ impl AgentOrchestrator {
                 error: "Cancelled by user".to_string(),
             })
             .await;
+    }
+}
+
+/// Parse a permission mode string into `PermissionMode`.
+fn parse_permission_mode(mode: &str) -> Option<PermissionMode> {
+    match mode.to_ascii_lowercase().as_str() {
+        "read-only" | "readonly" | "ro" => Some(PermissionMode::ReadOnly),
+        "workspace" | "workspace-write" | "ws" => Some(PermissionMode::WorkspaceWrite),
+        "full" | "danger-full-access" | "yolo" => Some(PermissionMode::DangerFullAccess),
+        "prompt" | "ask" | "default" => Some(PermissionMode::Prompt),
+        "allow" | "allow-all" => Some(PermissionMode::Allow),
+        _ => None,
     }
 }

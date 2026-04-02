@@ -68,6 +68,9 @@ pub struct App {
     // Per-prompt model override — used for one prompt then reverts
     pub model_override: Option<String>,
 
+    // Current permission mode (tracked for display, orchestrator has canonical copy)
+    pub permission_mode: String,
+
     // Slash command autocomplete
     pub suggestions: SlashSuggestions,
 
@@ -99,6 +102,7 @@ impl App {
             pending_queue: Vec::new(),
             router: ModelRouter::from_default_model(default_model),
             model_override: None,
+            permission_mode: "danger-full-access".to_string(),
             suggestions: SlashSuggestions::default(),
             history: InputHistory::default(),
         }
