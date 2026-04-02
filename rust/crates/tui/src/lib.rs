@@ -22,8 +22,27 @@ use ratatui::crossterm::terminal::{
 use ratatui::prelude::CrosstermBackend;
 use ratatui::Terminal;
 
-/// Set up the terminal for TUI mode.
+/// Set up the terminal for TUI mode with a panic handler that restores the terminal.
 pub fn setup_terminal() -> io::Result<Terminal<CrosstermBackend<io::Stdout>>> {
+    // Install panic hook that restores the terminal before printing the panic message.
+    // Without this, a panic leaves the terminal in raw mode with the alternate screen,
+    // making the error invisible and the shell unusable.
+    let original_hook = std::panic::take_hook();
+    std::panic::set_hook(Box::new(move |panic_info| {
+        // Best-effort terminal restoration — ignore errors since we're already panicking
+        let _ = disable_raw_mode();
+        let _ = execute!(io::stdout(), LeaveAlternateScreen);
+
+        // Auto-save session on crash (best-effort)
+        let sessions_dir = std::path::Path::new(".openanalyst").join("sessions");
+        let _ = std::fs::create_dir_all(&sessions_dir);
+        let crash_marker = sessions_dir.join("crash-recovery.marker");
+        let _ = std::fs::write(&crash_marker, format!("Crash at: {:?}", panic_info.location()));
+
+        // Print the original panic message to the restored terminal
+        original_hook(panic_info);
+    }));
+
     enable_raw_mode()?;
     let mut stdout = io::stdout();
     execute!(stdout, EnterAlternateScreen)?;

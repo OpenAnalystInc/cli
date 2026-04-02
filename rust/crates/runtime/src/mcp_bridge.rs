@@ -9,14 +9,18 @@ use std::io::{BufRead, BufReader, Write};
 use std::process::{Child, Command, Stdio};
 
 use crate::mcp::mcp_tool_name;
-use crate::mcp_client::{McpClientBootstrap, McpClientTransport, McpStdioTransport};
+use crate::mcp_client::{McpClientBootstrap, McpClientTransport, McpRemoteTransport, McpStdioTransport};
 
-/// An active MCP server connection.
+/// An active MCP server connection (stdio or HTTP).
 pub struct McpConnection {
     pub server_name: String,
     pub tool_prefix: String,
     pub tools: Vec<McpToolDef>,
     child: Option<Child>,
+    /// HTTP endpoint for remote MCP servers.
+    http_url: Option<String>,
+    /// HTTP headers for remote MCP servers.
+    http_headers: BTreeMap<String, String>,
 }
 
 /// A tool definition from an MCP server.
@@ -96,11 +100,26 @@ pub fn connect_stdio(bootstrap: &McpClientBootstrap) -> Option<McpConnection> {
         tool_prefix: bootstrap.tool_prefix.clone(),
         tools,
         child: Some(child),
+        http_url: None,
+        http_headers: BTreeMap::new(),
     })
 }
 
-/// Call an MCP tool on a running connection.
+/// Call an MCP tool on a running connection (routes to stdio or HTTP).
 pub fn call_tool(
+    connection: &mut McpConnection,
+    tool_name: &str,
+    arguments: serde_json::Value,
+) -> Result<String, String> {
+    if connection.http_url.is_some() {
+        call_tool_http(connection, tool_name, arguments)
+    } else {
+        call_tool_stdio(connection, tool_name, arguments)
+    }
+}
+
+/// Call a tool via stdio transport.
+fn call_tool_stdio(
     connection: &mut McpConnection,
     tool_name: &str,
     arguments: serde_json::Value,
@@ -122,8 +141,51 @@ pub fn call_tool(
 
     send_jsonrpc(stdin, &request).map_err(|e| e.to_string())?;
     let response = read_jsonrpc_response(&mut reader).ok_or("No response from MCP server")?;
+    extract_mcp_result(&response)
+}
 
-    // Extract content from result
+/// Call a tool via HTTP transport (JSON-RPC over POST).
+fn call_tool_http(
+    connection: &McpConnection,
+    tool_name: &str,
+    arguments: serde_json::Value,
+) -> Result<String, String> {
+    let url = connection.http_url.as_deref().ok_or("No HTTP URL configured")?;
+    let request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 3,
+        "method": "tools/call",
+        "params": {
+            "name": tool_name,
+            "arguments": arguments,
+        }
+    });
+
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("HTTP client error: {e}"))?;
+
+    let mut req = client.post(url).json(&request);
+    for (key, value) in &connection.http_headers {
+        req = req.header(key.as_str(), value.as_str());
+    }
+
+    let resp = req.send().map_err(|e| format!("MCP HTTP request failed: {e}"))?;
+    let status = resp.status();
+    let body = resp.text().map_err(|e| format!("MCP HTTP read failed: {e}"))?;
+
+    if !status.is_success() {
+        return Err(format!("MCP HTTP {status}: {body}"));
+    }
+
+    let response: serde_json::Value = serde_json::from_str(&body)
+        .map_err(|e| format!("MCP HTTP JSON parse failed: {e}"))?;
+    extract_mcp_result(&response)
+}
+
+/// Extract text content from an MCP JSON-RPC response.
+fn extract_mcp_result(response: &serde_json::Value) -> Result<String, String> {
     if let Some(result) = response.get("result") {
         if let Some(content) = result.get("content") {
             if let Some(arr) = content.as_array() {
@@ -155,7 +217,12 @@ pub fn bootstrap_mcp_servers(
                     connections.push(conn);
                 }
             }
-            // Other transports need async HTTP/WebSocket — not yet implemented
+            McpClientTransport::Http(remote) | McpClientTransport::Sse(remote) => {
+                if let Some(conn) = connect_http(&bootstrap.server_name, remote) {
+                    connections.push(conn);
+                }
+            }
+            // WebSocket, SDK, ManagedProxy — not yet implemented
             _ => {}
         }
     }
@@ -239,6 +306,80 @@ fn parse_tools_list(server_name: &str, response: &serde_json::Value) -> Vec<McpT
             })
         })
         .collect()
+}
+
+/// Connect to an MCP server via HTTP transport.
+/// Sends JSON-RPC requests via HTTP POST, receives responses in the body.
+fn connect_http(server_name: &str, remote: &McpRemoteTransport) -> Option<McpConnection> {
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(15))
+        .build()
+        .ok()?;
+
+    let mut headers = remote.headers.clone();
+    headers
+        .entry("Content-Type".to_string())
+        .or_insert_with(|| "application/json".to_string());
+
+    // Initialize
+    let init_request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 1,
+        "method": "initialize",
+        "params": {
+            "protocolVersion": "2024-11-05",
+            "capabilities": {},
+            "clientInfo": {
+                "name": "openanalyst-cli",
+                "version": "1.0.89"
+            }
+        }
+    });
+
+    let mut req = client.post(&remote.url).json(&init_request);
+    for (key, value) in &headers {
+        req = req.header(key.as_str(), value.as_str());
+    }
+    let resp = req.send().ok()?;
+    if !resp.status().is_success() {
+        return None;
+    }
+    let _init_response: serde_json::Value = resp.json().ok()?;
+
+    // Send initialized notification
+    let initialized = serde_json::json!({
+        "jsonrpc": "2.0",
+        "method": "notifications/initialized"
+    });
+    let mut req = client.post(&remote.url).json(&initialized);
+    for (key, value) in &headers {
+        req = req.header(key.as_str(), value.as_str());
+    }
+    let _ = req.send();
+
+    // Query tools
+    let tools_request = serde_json::json!({
+        "jsonrpc": "2.0",
+        "id": 2,
+        "method": "tools/list",
+        "params": {}
+    });
+    let mut req = client.post(&remote.url).json(&tools_request);
+    for (key, value) in &headers {
+        req = req.header(key.as_str(), value.as_str());
+    }
+    let resp = req.send().ok()?;
+    let tools_response: serde_json::Value = resp.json().ok()?;
+    let tools = parse_tools_list(server_name, &tools_response);
+
+    Some(McpConnection {
+        server_name: server_name.to_string(),
+        tool_prefix: crate::mcp::mcp_tool_prefix(server_name),
+        tools,
+        child: None,
+        http_url: Some(remote.url.clone()),
+        http_headers: headers,
+    })
 }
 
 impl Drop for McpConnection {

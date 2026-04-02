@@ -56,9 +56,30 @@ pub struct ToolSpec {
     pub required_permission: PermissionMode,
 }
 
+/// An MCP tool registered from a connected MCP server.
+#[derive(Debug, Clone)]
+pub struct McpRegisteredTool {
+    /// Full prefixed name: mcp__server__tool_name
+    pub name: String,
+    pub description: String,
+    pub input_schema: Value,
+    /// Server name for routing execution
+    pub server_name: String,
+    /// Original tool name on the server
+    pub original_name: String,
+}
+
+// McpRegisteredTool does not derive PartialEq because Value doesn't always impl it cleanly
+impl PartialEq for McpRegisteredTool {
+    fn eq(&self, other: &Self) -> bool {
+        self.name == other.name
+    }
+}
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct GlobalToolRegistry {
     plugin_tools: Vec<PluginTool>,
+    mcp_tools: Vec<McpRegisteredTool>,
 }
 
 impl GlobalToolRegistry {
@@ -66,6 +87,7 @@ impl GlobalToolRegistry {
     pub fn builtin() -> Self {
         Self {
             plugin_tools: Vec::new(),
+            mcp_tools: Vec::new(),
         }
     }
 
@@ -88,7 +110,12 @@ impl GlobalToolRegistry {
             }
         }
 
-        Ok(Self { plugin_tools })
+        Ok(Self { plugin_tools, mcp_tools: Vec::new() })
+    }
+
+    /// Register MCP tools discovered from connected MCP servers.
+    pub fn register_mcp_tools(&mut self, tools: Vec<McpRegisteredTool>) {
+        self.mcp_tools = tools;
     }
 
     pub fn normalize_allowed_tools(&self, values: &[String]) -> Result<Option<BTreeSet<String>>, String> {
@@ -158,7 +185,18 @@ impl GlobalToolRegistry {
                 description: tool.definition().description.clone(),
                 input_schema: tool.definition().input_schema.clone(),
             });
-        builtin.chain(plugin).collect()
+        let mcp = self.mcp_tools.iter().map(|tool| ToolDefinition {
+            name: tool.name.clone(),
+            description: Some(tool.description.clone()),
+            input_schema: tool.input_schema.clone(),
+        });
+        builtin.chain(plugin).chain(mcp).collect()
+    }
+
+    /// Get MCP tools for a given server.
+    #[must_use]
+    pub fn mcp_tools_for_server(&self, server_name: &str) -> Vec<&McpRegisteredTool> {
+        self.mcp_tools.iter().filter(|t| t.server_name == server_name).collect()
     }
 
     #[must_use]
@@ -186,15 +224,34 @@ impl GlobalToolRegistry {
     }
 
     pub fn execute(&self, name: &str, input: &Value) -> Result<String, String> {
+        // 1. Built-in tools
         if mvp_tool_specs().iter().any(|spec| spec.name == name) {
             return execute_tool(name, input);
         }
-        self.plugin_tools
-            .iter()
-            .find(|tool| tool.definition().name == name)
-            .ok_or_else(|| format!("unsupported tool: {name}"))?
-            .execute(input)
-            .map_err(|error| error.to_string())
+        // 2. Plugin tools
+        if let Some(plugin) = self.plugin_tools.iter().find(|tool| tool.definition().name == name) {
+            return plugin.execute(input).map_err(|error| error.to_string());
+        }
+        // 3. MCP tools (prefixed with mcp__)
+        if let Some(mcp_tool) = self.mcp_tools.iter().find(|t| t.name == name) {
+            return self.execute_mcp_tool(mcp_tool, input);
+        }
+        Err(format!("unsupported tool: {name}"))
+    }
+
+    /// Execute an MCP tool by calling the MCP server.
+    fn execute_mcp_tool(&self, tool: &McpRegisteredTool, input: &Value) -> Result<String, String> {
+        // MCP execution is handled via the bridge at call sites that have
+        // access to the MCP connections. The tool registry stores the metadata;
+        // actual execution is dispatched by the ChannelToolExecutor which holds
+        // a reference to live MCP connections.
+        //
+        // If we reach here, it means no MCP connection is available for this tool.
+        Err(format!(
+            "MCP tool '{}' (server: {}) is registered but no active connection is available. \
+             Check that the MCP server '{}' is running.",
+            tool.original_name, tool.server_name, tool.server_name
+        ))
     }
 }
 
