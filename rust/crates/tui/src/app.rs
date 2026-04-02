@@ -221,7 +221,12 @@ impl App {
             "tokens": self.status_bar.total_tokens,
         });
 
-        let _ = std::fs::write(&path, serde_json::to_string_pretty(&session).unwrap_or_default());
+        match serde_json::to_string_pretty(&session) {
+            Ok(json) => { let _ = std::fs::write(&path, json); }
+            Err(e) => {
+                eprintln!("[auto_save_session] Failed to serialize session: {e}");
+            }
+        }
     }
 
     /// Toggle sidebar visibility.
@@ -318,6 +323,11 @@ impl App {
     /// Slash commands always execute immediately (even mid-stream).
     /// Regular prompts are queued if streaming, sent immediately otherwise.
     pub fn submit_prompt(&mut self, text: String) {
+        // Ignore empty or whitespace-only input
+        if text.trim().is_empty() {
+            return;
+        }
+
         // Record in history
         self.history.push(text.clone());
         // Dismiss autocomplete
@@ -332,6 +342,13 @@ impl App {
 
         // Regular prompts: queue if streaming, send immediately otherwise
         if self.is_streaming {
+            const MAX_PENDING_QUEUE: usize = 50;
+            if self.pending_queue.len() >= MAX_PENDING_QUEUE {
+                self.chat.push_system(format!(
+                    "Queue full ({MAX_PENDING_QUEUE} items) — prompt dropped. Wait for current turn to finish."
+                ));
+                return;
+            }
             self.pending_queue.push(text.clone());
             self.chat.push_system(format!("[queued] {}", truncate_display(&text, 60)));
             return;
@@ -387,19 +404,16 @@ impl App {
             UiEvent::StreamDelta { text, .. } => {
                 self.chat.push_delta(&text);
             }
-            UiEvent::StreamEnd { .. } => {
+            UiEvent::StreamEnd { agent_id } => {
                 self.chat.finish_assistant();
                 self.status_bar.phase = AgentPhase::Done;
                 self.is_streaming = false;
                 if let Some(start) = self.turn_start.take() {
                     self.status_bar.elapsed = start.elapsed();
                 }
-                // Update background tasks
-                for bt in &mut self.sidebar_state.background_tasks {
-                    if bt.status == BackgroundTaskStatus::Running {
-                        bt.status = BackgroundTaskStatus::Completed;
-                        break;
-                    }
+                // Update background task matching this agent
+                if let Some(bt) = self.sidebar_state.background_tasks.iter_mut().find(|bt| bt.id == agent_id && bt.status == BackgroundTaskStatus::Running) {
+                    bt.status = BackgroundTaskStatus::Completed;
                 }
                 // Auto-send next queued prompt
                 self.drain_pending_queue();
@@ -527,12 +541,9 @@ impl App {
                 self.is_streaming = false;
                 self.chat.push_system(format!("Error: {error}"));
                 self.status_bar.phase = AgentPhase::Error;
-                // Update background tasks
-                for bt in &mut self.sidebar_state.background_tasks {
-                    if bt.status == BackgroundTaskStatus::Running {
-                        bt.status = BackgroundTaskStatus::Failed;
-                        break;
-                    }
+                // Update background task matching this agent
+                if let Some(bt) = self.sidebar_state.background_tasks.iter_mut().find(|bt| bt.id == agent_id && bt.status == BackgroundTaskStatus::Running) {
+                    bt.status = BackgroundTaskStatus::Failed;
                 }
                 // Auto-send next queued prompt
                 self.drain_pending_queue();

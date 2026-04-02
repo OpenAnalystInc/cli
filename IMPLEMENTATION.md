@@ -13,11 +13,11 @@ Complete rebranding of the "Claw Code" CLI agent harness to **OpenAnalyst CLI**,
 | CLI binary name | `claw` | `openanalyst` |
 | CLI crate name | `claw-cli` | `openanalyst-cli` |
 | Crate directory | `rust/crates/claw-cli/` | `rust/crates/openanalyst-cli/` |
-| Workspace version | `0.1.0` | `1.0.1` |
+| Workspace version | `0.1.0` | `1.0.89` |
 
 **Files changed:**
 - `rust/crates/openanalyst-cli/Cargo.toml` — `name = "openanalyst-cli"`, `[[bin]] name = "openanalyst"`
-- `rust/Cargo.toml` — `version = "1.0.1"`
+- `rust/Cargo.toml` — `version = "1.0.89"`
 
 ---
 

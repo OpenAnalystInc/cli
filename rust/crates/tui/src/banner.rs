@@ -56,7 +56,7 @@ impl Banner {
 
         let mut lines = Vec::new();
 
-        // ── Header line: ── OpenAnalyst CLI v1.0.1 ──────────── ──
+        // ── Header line: ── OpenAnalyst CLI v1.0.89 ──────────── ──
         let ver_text = format!(" OpenAnalyst CLI v{} ", self.info.version);
         let header_pad = total_inner.saturating_sub(ver_text.chars().count() + 4);
         lines.push(Line::from(vec![

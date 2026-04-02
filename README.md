@@ -211,6 +211,6 @@ THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. OpenAnalyst Inc
 ---
 
 <p align="center">
-  <strong>OpenAnalyst CLI v1.0.1</strong> — Built by OpenAnalyst Inc<br>
+  <strong>OpenAnalyst CLI v1.0.89</strong> — Built by OpenAnalyst Inc<br>
   <em>An independent, open-source AI agent for the terminal.</em>
 </p>

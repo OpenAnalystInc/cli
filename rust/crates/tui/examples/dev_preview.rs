@@ -40,7 +40,7 @@ fn main() -> io::Result<()> {
         user_email: Some("tools@openanalyst.com".to_string()),
         organization: Some("Org".to_string()),
         cwd: "D:\\Openanalyst CLI".to_string(),
-        version: "1.0.1".to_string(),
+        version: "1.0.89".to_string(),
     });
 
     // Add mock messages

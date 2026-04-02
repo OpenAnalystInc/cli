@@ -230,39 +230,55 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <div class="wrap">
   <div class="section-label">Capabilities</div>
   <div class="section-title">What you can do</div>
-  <div class="section-sub">Everything you need for AI-powered software engineering, in one tool.</div>
+  <div class="section-sub">Everything you need for AI-powered software engineering, in one tool. More features than Claude Code, with 7-provider flexibility.</div>
 
   <div class="acc open" onclick="toggleAcc(this)">
-    <div class="acc-header"><div class="acc-icon" style="background:rgba(255,107,0,0.15);color:var(--accent)">&#9889;</div><div class="acc-title">Switch Models Mid-Conversation</div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Switch between any LLM provider mid-conversation. Your session ID, chat history, tool results, and context persist across provider boundaries. Start with Claude, continue with GPT-4o, finish with Gemini &mdash; all in one session.</div></div>
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(255,107,0,0.15);color:var(--accent)">&#9889;</div><div class="acc-title">Smart Per-Action Model Routing <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Every prompt is auto-classified into <strong>explore</strong>, <strong>research</strong>, <strong>code</strong>, or <strong>write</strong> &mdash; each routed to the optimal model+effort. Explore tasks go to Haiku (1K thinking), coding goes to Opus (32K thinking). Save 80% on tokens without thinking about it.<br><br><code style="color:var(--cyan)">/effort code max</code> &mdash; per-category control<br><code style="color:var(--cyan)">/route</code> &mdash; view/edit the full routing table<br><code style="color:var(--cyan)">/effort high</code> &mdash; set all categories globally</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(255,107,0,0.12);color:var(--accent)">&#9889;</div><div class="acc-title">Switch Models Mid-Conversation</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Switch between any LLM provider mid-conversation. <code style="color:var(--cyan)">/model</code> now updates the orchestrator config and rebuilds the routing table in real-time. Session persists across provider boundaries. Start with Claude, continue with GPT-4o, finish with Gemini &mdash; all in one session.</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(16,185,129,0.15);color:var(--green)">&#9608;</div><div class="acc-title">Real Permission Enforcement <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">5-tier permission system: <strong>read-only</strong>, <strong>workspace-write</strong>, <strong>prompt</strong>, <strong>full</strong>, <strong>allow</strong>. Permission dialogs are real &mdash; the worker thread blocks on a oneshot channel until you Allow or Deny. Deny on timeout. Fail-safe, not fail-open. <code style="color:var(--cyan)">/permissions prompt</code> to switch modes at runtime.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(139,92,246,0.15);color:var(--purple)">&#9608;</div><div class="acc-title">Full Terminal UI (Ratatui TUI)</div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Default mode is a full Ratatui-based TUI with scrollable chat, inline tool call cards, animated status bar, vim-mode input (via edtui), permission dialogs as modal overlays, and mouse/keyboard navigation. Not just a readline prompt.</div></div>
+    <div class="acc-body"><div class="acc-content">Default mode is a full Ratatui-based TUI with scrollable chat, sidebar (agents, files, activity), inline tool call cards, animated status bar, vim-mode input, permission dialogs as real modals, input queue (type while streaming), slash command autocomplete, and input history.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(34,197,94,0.15);color:var(--green)">&#9881;</div><div class="acc-title">Multi-Agent Orchestrator</div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Spawn parallel sub-agents for complex tasks. Each agent has its own conversation runtime, tool permissions, and lifecycle. The orchestrator bridges sync execution to the async TUI via channels. Watch agents work in real-time.</div></div>
+    <div class="acc-body"><div class="acc-content">Spawn parallel sub-agents for complex tasks. Each agent has its own conversation runtime, tool permissions, and lifecycle. The orchestrator bridges sync execution to the async TUI via channels. Watch agents work in real-time in the sidebar panel.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
-    <div class="acc-header"><div class="acc-icon" style="background:rgba(244,114,182,0.15);color:var(--pink)">&#9998;</div><div class="acc-title">51+ Slash Commands</div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Session management, git integration, AI planning, multimedia generation, web scraping, code analysis, plugin management, and more. Every command works with every provider. Type <code style="color:var(--cyan)">/help</code> to see them all.</div></div>
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(244,114,182,0.15);color:var(--pink)">&#9998;</div><div class="acc-title">56 Slash Commands</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Session management, git integration, AI planning, multimedia generation, web scraping, code analysis, plugin management, MCP server control, autonomous agents, and more. All fully wired &mdash; no stubs. Every command works with every provider. Type <code style="color:var(--cyan)">/help</code> to see them all.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(249,115,22,0.15);color:var(--orange)">&#9836;</div><div class="acc-title">Multimedia AI</div><div class="acc-arrow">&#9654;</div></div>
     <div class="acc-body"><div class="acc-content"><strong>/image</strong> &mdash; Generate images (Gemini Imagen, DALL-E, Stability AI)<br><strong>/voice</strong> &mdash; Transcribe audio (Whisper, Gemini)<br><strong>/speak</strong> &mdash; Text-to-speech (OpenAI TTS)<br><strong>/vision</strong> &mdash; Analyze images (Gemini, GPT-4o, Claude)<br><strong>/diagram</strong> &mdash; Generate Mermaid diagrams</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(34,211,238,0.15);color:var(--cyan)">&#9095;</div><div class="acc-title">MCP Protocol + LSP Integration <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content"><strong>MCP (Model Context Protocol)</strong> &mdash; Connect external tool servers via stdio transport. JSON-RPC 2.0 compliant, proper Content-Length framing, multi-line JSON support. <code style="color:var(--cyan)">/mcp add</code> and <code style="color:var(--cyan)">/mcp remove</code> manage servers directly.<br><br><strong>LSP</strong> &mdash; Full Language Server Protocol client for diagnostics, go-to-definition, find-references. Tested with real mock servers.</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(34,211,238,0.15);color:var(--cyan)">&#9095;</div><div class="acc-title">Git Integration</div><div class="acc-arrow">&#9654;</div></div>
     <div class="acc-body"><div class="acc-content">Commit, branch, PR, issue creation, diff review &mdash; all from slash commands. <code style="color:var(--cyan)">/commit</code> generates a message and commits. <code style="color:var(--cyan)">/pr</code> drafts a pull request. <code style="color:var(--cyan)">/diff-review</code> gets AI-powered code review of your changes.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
-    <div class="acc-header"><div class="acc-icon" style="background:rgba(234,179,8,0.15);color:var(--yellow)">&#9733;</div><div class="acc-title">19 Built-in Tools + Plugin System</div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Bash, file read/write/edit, glob/grep search, web search/fetch, sub-agents, notebooks, REPL, PowerShell, and more. Plus a full plugin system &mdash; install custom tools from local paths or git repos with <code style="color:var(--cyan)">/plugin install</code>.</div></div>
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(234,179,8,0.15);color:var(--yellow)">&#9733;</div><div class="acc-title">22 Built-in Tools + Plugin System</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Bash, file read/write/edit, glob/grep search, web search/fetch, sub-agents, notebooks, REPL, PowerShell, and more. Plus a full plugin system &mdash; install, enable, disable, uninstall custom tools with <code style="color:var(--cyan)">/plugins install &lt;path&gt;</code>. All backed by real <code>PluginManager</code>.</div></div>
+  </div>
+  <div class="acc" onclick="toggleAcc(this)">
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(239,68,68,0.15);color:var(--red)">&#9888;</div><div class="acc-title">Production-Grade Reliability <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content"><strong>Stream timeout</strong> &mdash; 30s per-event timeout detects hung connections and provider stalls<br><strong>Retry with backoff</strong> &mdash; Exponential backoff (1s&rarr;2s&rarr;4s&rarr;8s, max 32s) on transient errors<br><strong>Zero unsafe code</strong> &mdash; <code>unsafe_code = "forbid"</code> enforced at workspace level<br><strong>309+ tests</strong> &mdash; Unit, integration, and mock-server tests across all crates<br><strong>No panics</strong> &mdash; All expect() in critical paths replaced with proper error handling</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(14,165,233,0.15);color:var(--accent)">&#9881;</div><div class="acc-title">Cross-Platform Native Binary</div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Single Rust binary. No Node.js, no Python, no Docker. Native on macOS (Intel + Apple Silicon), Linux (x64 + ARM), and Windows. Fast startup, low memory.</div></div>
+    <div class="acc-body"><div class="acc-content">Single Rust binary. No Node.js, no Python, no Docker. Native on macOS (Intel + Apple Silicon), Linux (x64 + ARM), and Windows. Fast startup, low memory. ~13MB release binary.</div></div>
   </div>
 </div>
 </section>
@@ -271,8 +287,8 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <section id="commands" style="background:var(--bg2)">
 <div class="wrap">
   <div class="section-label">Reference</div>
-  <div class="section-title">51+ slash commands</div>
-  <div class="section-sub">All commands work identically regardless of which LLM provider you use.</div>
+  <div class="section-title">56 slash commands</div>
+  <div class="section-sub">All commands work identically regardless of which LLM provider you use. Every command is fully wired &mdash; no stubs.</div>
 
   <div class="tabs">
     <button class="tab on" onclick="sw(event,'cmd-1')">Session</button>
@@ -291,7 +307,9 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/cost</td><td>Cumulative token usage and cost breakdown</td></tr>
       <tr><td>/model [name]</td><td>Show live models or switch mid-session</td></tr>
       <tr><td>/clear</td><td>Start a fresh session</td></tr>
-      <tr><td>/compact</td><td>Compact conversation to save context</td></tr>
+      <tr><td>/compact</td><td>Compact conversation &mdash; collapse tool calls, merge system msgs, trim to 100</td></tr>
+      <tr><td>/effort [category] [level] <span class="tag tag-n">NEW</span></td><td>Set thinking effort globally or per-category (explore/research/code/write)</td></tr>
+      <tr><td>/route [category] [tier] <span class="tag tag-n">NEW</span></td><td>View or edit the per-action model routing table</td></tr>
       <tr><td>/session [list|switch]</td><td>List or switch saved sessions</td></tr>
       <tr><td>/export [file]</td><td>Export conversation transcript</td></tr>
       <tr><td>/version</td><td>Show CLI version and build info</td></tr>
@@ -345,6 +363,8 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/think [prompt] <span class="tag tag-n">NEW</span></td><td>Force extended thinking for next response</td></tr>
       <tr><td>/changelog [since] <span class="tag tag-n">NEW</span></td><td>Generate changelog from git log via AI</td></tr>
       <tr><td>/doctor <span class="tag tag-n">NEW</span></td><td>Diagnose installation, provider keys, MCP, workspace</td></tr>
+      <tr><td>/openanalyst &lt;task&gt; <span class="tag tag-n">NEW</span></td><td>Autonomous agent &mdash; think&rarr;act&rarr;observe&rarr;verify loop</td></tr>
+      <tr><td>/swarm &lt;task&gt; <span class="tag tag-n">NEW</span></td><td>Spawn a swarm of parallel agents for complex tasks</td></tr>
     </table>
   </div>
 
@@ -385,8 +405,8 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <section id="tools">
 <div class="wrap">
   <div class="section-label">Tools</div>
-  <div class="section-title">19 built-in tools</div>
-  <div class="section-sub">The AI agent uses these automatically during conversations. Works with every provider.</div>
+  <div class="section-title">22 built-in tools</div>
+  <div class="section-sub">The AI agent uses these automatically during conversations. Works with every provider. Plus MCP protocol for unlimited external tools.</div>
 
   <div class="tgrid">
     <div class="tcard"><div class="tcard-name">Bash</div><div class="tcard-desc">Execute shell commands and scripts</div></div>
@@ -421,7 +441,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">rust/crates/</span></div></div>
 <pre class="code"><span class="c-c">api/</span>                 <span class="c-d"># Multi-provider API client (7 providers)</span>
-<span class="c-c">commands/</span>            <span class="c-d"># 51+ slash commands</span>
+<span class="c-c">commands/</span>            <span class="c-d"># 56 slash commands</span>
 <span class="c-c">events/</span>              <span class="c-d"># Shared TUI &harr; backend event types</span>
 <span class="c-c">orchestrator/</span>        <span class="c-d"># Multi-agent lifecycle + channel bridge</span>
 <span class="c-c">tui/</span>                 <span class="c-d"># Ratatui full-screen TUI application</span>
@@ -451,8 +471,9 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <div style="font-size:13px;color:var(--muted);line-height:1.8">
         <strong style="color:var(--text)">14</strong> crates in workspace<br>
         <strong style="color:var(--text)">7</strong> LLM providers<br>
-        <strong style="color:var(--text)">51+</strong> slash commands<br>
-        <strong style="color:var(--text)">19</strong> built-in tools<br>
+        <strong style="color:var(--text)">56</strong> slash commands<br>
+        <strong style="color:var(--text)">22</strong> built-in tools<br>
+        <strong style="color:var(--text)">309+</strong> tests<br>
         <strong style="color:var(--text)">MIT</strong> license
       </div>
     </div>
@@ -505,7 +526,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 <!-- ═══ 11. FOOTER ═══ -->
 <div class="footer" style="padding:40px 24px">
-  <p><strong>OpenAnalyst CLI v1.0.2</strong></p>
+  <p><strong>OpenAnalyst CLI v1.0.89</strong></p>
   <p style="margin-top:6px">An independent, open-source AI agent for the terminal</p>
   <p style="margin-top:12px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a> &middot; <a href="https://github.com/AnitChaudhry/openanalyst-cli" target="_blank">GitHub</a></p>
 </div>

@@ -8,7 +8,7 @@ set -e
 #   curl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash
 #
 # Or with a specific version:
-#   curl -fsSL ... | bash -s -- --version 1.0.1
+#   curl -fsSL ... | bash -s -- --version 1.0.89
 # ─────────────────────────────────────────────────
 
 REPO="AnitChaudhry/openanalyst-cli"

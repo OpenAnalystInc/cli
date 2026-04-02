@@ -1,6 +1,6 @@
 {
   "name": "@openanalyst/cli",
-  "version": "1.0.1",
+  "version": "1.0.89",
   "description": "OpenAnalyst CLI — AI-powered code analysis agent with multi-provider LLM support",
   "bin": {
     "openanalyst": "./bin/cli.js"
