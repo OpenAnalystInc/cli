@@ -343,6 +343,23 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system("Debug: no recent tool call to replay.".to_string());
         }
 
+        SlashCommand::Mcp { action, args } => {
+            let msg = match action.as_deref() {
+                None | Some("list") => "MCP servers: use /mcp list in REPL for full details".to_string(),
+                Some("add") => {
+                    if let Some(a) = args {
+                        format!("MCP server add requested: {a}\nRestart CLI to activate.")
+                    } else {
+                        "Usage: /mcp add <name> <command> [args...]".to_string()
+                    }
+                }
+                Some("remove") => {
+                    format!("MCP server remove: {}", args.unwrap_or_default())
+                }
+                Some(other) => format!("Unknown /mcp action: {other}"),
+            };
+            app.chat.push_system(msg);
+        }
         SlashCommand::Dev { action, target } => {
             let msg = match action.as_deref() {
                 None => "Usage: /dev <install|start|open URL|screenshot|click SEL|type SEL TEXT|eval JS|test DESC|stop|status>".to_string(),

@@ -322,7 +322,14 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         name: "dev",
         aliases: &["browser", "playwright"],
         summary: "Control a local browser via Playwright for testing & automation",
-        argument_hint: Some("<open URL|screenshot|click SELECTOR|type SELECTOR TEXT|test DESCRIPTION|start|stop|install>"),
+        argument_hint: Some("<install|open URL|screenshot|snap|click REF|type REF TEXT|test DESC|codegen|stop>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "mcp",
+        aliases: &[],
+        summary: "List, add, or remove MCP servers",
+        argument_hint: Some("[list|add <name> <command> [args...]|remove <name>]"),
         resume_supported: false,
     },
 ];
@@ -435,6 +442,10 @@ pub enum SlashCommand {
     Dev {
         action: Option<String>,
         target: Option<String>,
+    },
+    Mcp {
+        action: Option<String>,
+        args: Option<String>,
     },
     Unknown(String),
 }
@@ -568,6 +579,13 @@ impl SlashCommand {
             "dev" | "browser" | "playwright" => Self::Dev {
                 action: parts.next().map(ToOwned::to_owned),
                 target: {
+                    let rest = parts.collect::<Vec<_>>().join(" ");
+                    (!rest.is_empty()).then_some(rest)
+                },
+            },
+            "mcp" => Self::Mcp {
+                action: parts.next().map(ToOwned::to_owned),
+                args: {
                     let rest = parts.collect::<Vec<_>>().join(" ");
                     (!rest.is_empty()).then_some(rest)
                 },
@@ -1817,6 +1835,7 @@ pub fn handle_slash_command(
         | SlashCommand::Scrape { .. }
         | SlashCommand::Json { .. }
         | SlashCommand::Dev { .. }
+        | SlashCommand::Mcp { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2173,7 +2192,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 39);
+        assert_eq!(slash_command_specs().len(), 40);
         assert_eq!(resume_supported_slash_commands().len(), 13);
     }
 
