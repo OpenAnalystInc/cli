@@ -28,7 +28,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system(help);
         }
         SlashCommand::Version => {
-            app.chat.push_system("OpenAnalyst CLI v1.0.1".to_string());
+            app.chat.push_system("OpenAnalyst CLI v1.0.89".to_string());
         }
         SlashCommand::Cost => {
             let tokens = app.status_bar.total_tokens;
@@ -160,6 +160,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
         SlashCommand::Clear { .. } => {
             app.chat.messages.clear();
             app.chat.scroll_offset = 0;
+            app.chat.focused_message = None;
             app.status_bar.total_tokens = 0;
             app.chat.push_system("Session cleared.".to_string());
         }
@@ -886,6 +887,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                     criteria: criteria.clone(),
                     schedule: schedule.clone(),
                     max_turns: max_turns.unwrap_or(30),
+                    turns_used: 0,
                 };
 
                 // Show config in chat
@@ -1137,6 +1139,7 @@ fn load_session_into_chat(app: &mut crate::app::App, path: &str) -> Result<usize
     // Clear current chat
     app.chat.messages.clear();
     app.chat.scroll_offset = 0;
+    app.chat.focused_message = None;
 
     // Load messages from session
     let messages = session.get("messages")
@@ -1214,7 +1217,7 @@ fn run_doctor() -> String {
     let mut out = String::from("── OpenAnalyst CLI Diagnostics ──\n\n");
 
     // Check binary
-    out.push_str("Binary:      openanalyst v1.0.1\n");
+    out.push_str("Binary:      openanalyst v1.0.89\n");
     out.push_str(&format!("Working dir: {}\n", std::env::current_dir().unwrap_or_default().display()));
     out.push_str(&format!("OS:          {}\n\n", std::env::consts::OS));
 
@@ -1519,22 +1522,27 @@ fn mcp_add_server(args: &str) -> String {
         serde_json::json!({})
     };
 
-    let mcp_servers = root
-        .as_object_mut()
-        .unwrap()
-        .entry("mcpServers")
-        .or_insert_with(|| serde_json::json!({}));
-
     let server_config = if extra_args.is_empty() {
         serde_json::json!({ "command": command })
     } else {
         serde_json::json!({ "command": command, "args": extra_args })
     };
 
-    mcp_servers
-        .as_object_mut()
-        .unwrap()
-        .insert(name.to_string(), server_config);
+    // Scope mutable borrows so `root` can be serialized afterward
+    {
+        let Some(root_obj) = root.as_object_mut() else {
+            return "Error: settings.json root is not a JSON object.".to_string();
+        };
+
+        let mcp_servers = root_obj
+            .entry("mcpServers")
+            .or_insert_with(|| serde_json::json!({}));
+
+        let Some(mcp_obj) = mcp_servers.as_object_mut() else {
+            return "Error: \"mcpServers\" in settings.json is not a JSON object.".to_string();
+        };
+        mcp_obj.insert(name.to_string(), server_config);
+    }
 
     match std::fs::write(&settings_path, serde_json::to_string_pretty(&root).unwrap_or_default()) {
         Ok(()) => format!(

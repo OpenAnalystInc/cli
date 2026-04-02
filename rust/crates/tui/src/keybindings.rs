@@ -198,7 +198,7 @@ fn handle_permission_dialog_key(key: KeyEvent, app: &mut App) {
                 app.resolve_permission(request_id, true);
                 app.permission_dialog = None;
             }
-            KeyCode::Char('n') | KeyCode::Char('N') => {
+            KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
                 let request_id = dialog.request_id.clone();
                 app.resolve_permission(request_id, false);
                 app.permission_dialog = None;

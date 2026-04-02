@@ -44,7 +44,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "api"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "reqwest",
  "runtime",
@@ -291,7 +291,7 @@ dependencies = [
 
 [[package]]
 name = "commands"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "plugins",
  "runtime",
@@ -328,7 +328,7 @@ dependencies = [
 
 [[package]]
 name = "compat-harness"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "commands",
  "runtime",
@@ -634,7 +634,7 @@ dependencies = [
 
 [[package]]
 name = "events"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "serde",
  "serde_json",
@@ -1397,7 +1397,7 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "lsp"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "lsp-types",
  "serde",
@@ -1689,7 +1689,7 @@ dependencies = [
 
 [[package]]
 name = "openanalyst-agent"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "api",
  "plugins",
@@ -1701,7 +1701,7 @@ dependencies = [
 
 [[package]]
 name = "openanalyst-cli"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "api",
  "base64",
@@ -1727,7 +1727,7 @@ dependencies = [
 
 [[package]]
 name = "orchestrator"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "api",
  "events",
@@ -1904,7 +1904,7 @@ dependencies = [
 
 [[package]]
 name = "plugins"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "serde",
  "serde_json",
@@ -2400,7 +2400,7 @@ dependencies = [
 
 [[package]]
 name = "runtime"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "getrandom 0.2.17",
  "glob",
@@ -2624,7 +2624,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "async-stream",
  "axum",
@@ -3130,7 +3130,7 @@ dependencies = [
 
 [[package]]
 name = "tools"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "api",
  "plugins",
@@ -3227,7 +3227,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tui"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "api",
  "commands",
@@ -3285,7 +3285,7 @@ dependencies = [
 
 [[package]]
 name = "tui-widgets"
-version = "1.0.1"
+version = "1.0.89"
 dependencies = [
  "crossterm 0.29.0",
  "edtui",

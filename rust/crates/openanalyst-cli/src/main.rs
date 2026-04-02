@@ -71,7 +71,7 @@ type AllowedToolSet = BTreeSet<String>;
 /// Background update check — silently notifies if a newer version is available.
 /// Does NOT auto-download; just creates a marker file that the TUI/REPL can read.
 fn background_update_check() {
-    const CURRENT_VERSION: &str = "1.0.1";
+    const CURRENT_VERSION: &str = "1.0.89";
     const REPO: &str = "AnitChaudhry/openanalyst-cli";
 
     // Only check once per day
@@ -1639,7 +1639,7 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn run_update() -> Result<(), Box<dyn std::error::Error>> {
-    const CURRENT_VERSION: &str = "1.0.1";
+    const CURRENT_VERSION: &str = "1.0.89";
     const REPO: &str = "AnitChaudhry/openanalyst-cli";
 
     println!();

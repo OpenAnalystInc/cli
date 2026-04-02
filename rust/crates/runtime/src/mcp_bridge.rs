@@ -58,7 +58,7 @@ pub fn connect_stdio(bootstrap: &McpClientBootstrap) -> Option<McpConnection> {
             "capabilities": {},
             "clientInfo": {
                 "name": "openanalyst-cli",
-                "version": "1.0.1"
+                "version": "1.0.89"
             }
         }
     });

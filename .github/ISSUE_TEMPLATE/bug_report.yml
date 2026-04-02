@@ -34,7 +34,7 @@ body:
     attributes:
       label: OpenAnalyst CLI Version
       description: "Run `openanalyst --version` to get this"
-      placeholder: "v1.0.1"
+      placeholder: "v1.0.89"
     validations:
       required: true
 
