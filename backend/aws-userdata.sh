@@ -48,8 +48,8 @@ cat > .env << 'ENVEOF'
 HOST=0.0.0.0
 PORT=8420
 
-# Auth
-OPENANALYST_API_KEYS=oa_dev_key_openanalyst_2026
+# Auth — set your production key here
+OPENANALYST_API_KEYS=
 
 # Backend
 KB_BACKEND=neo4j

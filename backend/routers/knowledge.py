@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends
+from fastapi.responses import JSONResponse
 
 from auth import require_api_key
 from config import settings
@@ -38,15 +39,28 @@ async def query_knowledge_base(
     Progressive mode: metadata scan -> auto-deep transcript search -> LLM synthesis.
     """
     backend = _get_backend()
-    raw = backend.query(
-        body.query,
-        limit=body.max_results,
-        course_name=body.course_name,
-        module_path=body.module_path,
-        content_type=body.content_type,
-        has_timestamps=body.has_timestamps,
-        synthesize=body.synthesize,
-    )
+    try:
+        raw = backend.query(
+            body.query,
+            limit=body.max_results,
+            course_name=body.course_name,
+            module_path=body.module_path,
+            content_type=body.content_type,
+            has_timestamps=body.has_timestamps,
+            synthesize=body.synthesize,
+        )
+    except Exception as exc:
+        return JSONResponse(
+            status_code=200,
+            content={
+                "query": body.query,
+                "results": [],
+                "answer": {"text": None, "available": False, "reason": f"Search error: {exc}"},
+                "result_count": 0,
+                "backend": backend.backend_name,
+                "filters": {},
+            },
+        )
 
     results = []
     for r in raw.get("results", []):

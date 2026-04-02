@@ -315,101 +315,104 @@ class Neo4jKBBackend(KBBackend):
         if not query_text.strip():
             return []
 
-        where_clauses = []
-        params: dict[str, Any] = {"query": query_text, "limit": limit}
+        try:
+            where_clauses = []
+            params: dict[str, Any] = {"query": query_text, "limit": limit}
 
-        if filters.get("course_name"):
-            where_clauses.append("c.course_name = $course_name")
-            params["course_name"] = filters["course_name"]
-        if filters.get("module_path"):
-            where_clauses.append("c.module_path = $module_path")
-            params["module_path"] = filters["module_path"]
-        if filters.get("content_type"):
-            where_clauses.append("c.content_type = $content_type")
-            params["content_type"] = filters["content_type"]
-        if filters.get("has_timestamps") is not None:
-            where_clauses.append("c.has_timestamps = $has_timestamps")
-            params["has_timestamps"] = filters["has_timestamps"]
+            if filters.get("course_name"):
+                where_clauses.append("c.course_name = $course_name")
+                params["course_name"] = filters["course_name"]
+            if filters.get("module_path"):
+                where_clauses.append("c.module_path = $module_path")
+                params["module_path"] = filters["module_path"]
+            if filters.get("content_type"):
+                where_clauses.append("c.content_type = $content_type")
+                params["content_type"] = filters["content_type"]
+            if filters.get("has_timestamps") is not None:
+                where_clauses.append("c.has_timestamps = $has_timestamps")
+                params["has_timestamps"] = filters["has_timestamps"]
 
-        where = (" AND " + " AND ".join(where_clauses)) if where_clauses else ""
+            where = (" AND " + " AND ".join(where_clauses)) if where_clauses else ""
 
-        cypher = f"""
-            CALL db.index.fulltext.queryNodes('chunk_fulltext', $query)
-            YIELD node AS c, score
-            WHERE c:Chunk{where}
-            RETURN c.chunk_id AS chunk_id,
-                   c.text AS text,
-                   c.course_name AS course_name,
-                   c.module_path AS module_path,
-                   c.lesson_title AS lesson_title,
-                   c.breadcrumb AS breadcrumb,
-                   c.content_type AS content_type,
-                   c.quality_class AS quality_class,
-                   c.has_timestamps AS has_timestamps,
-                   c.start_sec AS start_sec,
-                   c.end_sec AS end_sec,
-                   c.page_start AS page_start,
-                   c.page_end AS page_end,
-                   score
-            ORDER BY score DESC
-            LIMIT $limit
-        """
+            cypher = f"""
+                CALL db.index.fulltext.queryNodes('chunk_fulltext', $query)
+                YIELD node AS c, score
+                WHERE c:Chunk{where}
+                RETURN c.chunk_id AS chunk_id,
+                       c.text AS text,
+                       c.course_name AS course_name,
+                       c.module_path AS module_path,
+                       c.lesson_title AS lesson_title,
+                       c.breadcrumb AS breadcrumb,
+                       c.content_type AS content_type,
+                       c.quality_class AS quality_class,
+                       c.has_timestamps AS has_timestamps,
+                       c.start_sec AS start_sec,
+                       c.end_sec AS end_sec,
+                       c.page_start AS page_start,
+                       c.page_end AS page_end,
+                       score
+                ORDER BY score DESC
+                LIMIT $limit
+            """
 
-        with self._session() as session:
-            result = session.run(cypher, **params)
-            return [dict(record) for record in result]
+            with self._session() as session:
+                result = session.run(cypher, **params)
+                return [dict(record) for record in result]
+        except Exception:
+            return []
 
     def _vector_search(self, query_text: str, *, filters: dict, limit: int) -> list[dict]:
         """Vector similarity search using Neo4j's native vector index."""
         if not query_text.strip():
             return []
 
-        # Embed the query
         try:
+            # Embed the query
             from sentence_transformers import SentenceTransformer
 
             model = SentenceTransformer(settings.embedding_model)
             query_vector = model.encode([query_text], normalize_embeddings=True)[0].tolist()
+
+            where_clauses = []
+            params: dict[str, Any] = {"query_vector": query_vector, "limit": limit}
+
+            if filters.get("course_name"):
+                where_clauses.append("c.course_name = $course_name")
+                params["course_name"] = filters["course_name"]
+            if filters.get("content_type"):
+                where_clauses.append("c.content_type = $content_type")
+                params["content_type"] = filters["content_type"]
+
+            where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
+
+            cypher = f"""
+                CALL db.index.vector.queryNodes('chunk_embeddings', $limit, $query_vector)
+                YIELD node AS c, score
+                {where}
+                RETURN c.chunk_id AS chunk_id,
+                       c.text AS text,
+                       c.course_name AS course_name,
+                       c.module_path AS module_path,
+                       c.lesson_title AS lesson_title,
+                       c.breadcrumb AS breadcrumb,
+                       c.content_type AS content_type,
+                       c.quality_class AS quality_class,
+                       c.has_timestamps AS has_timestamps,
+                       c.start_sec AS start_sec,
+                       c.end_sec AS end_sec,
+                       c.page_start AS page_start,
+                       c.page_end AS page_end,
+                       score
+                ORDER BY score DESC
+                LIMIT $limit
+            """
+
+            with self._session() as session:
+                result = session.run(cypher, **params)
+                return [dict(record) for record in result]
         except Exception:
-            return []  # Embeddings not available
-
-        where_clauses = []
-        params: dict[str, Any] = {"query_vector": query_vector, "limit": limit}
-
-        if filters.get("course_name"):
-            where_clauses.append("c.course_name = $course_name")
-            params["course_name"] = filters["course_name"]
-        if filters.get("content_type"):
-            where_clauses.append("c.content_type = $content_type")
-            params["content_type"] = filters["content_type"]
-
-        where = ("WHERE " + " AND ".join(where_clauses)) if where_clauses else ""
-
-        cypher = f"""
-            CALL db.index.vector.queryNodes('chunk_embeddings', $limit, $query_vector)
-            YIELD node AS c, score
-            {where}
-            RETURN c.chunk_id AS chunk_id,
-                   c.text AS text,
-                   c.course_name AS course_name,
-                   c.module_path AS module_path,
-                   c.lesson_title AS lesson_title,
-                   c.breadcrumb AS breadcrumb,
-                   c.content_type AS content_type,
-                   c.quality_class AS quality_class,
-                   c.has_timestamps AS has_timestamps,
-                   c.start_sec AS start_sec,
-                   c.end_sec AS end_sec,
-                   c.page_start AS page_start,
-                   c.page_end AS page_end,
-                   score
-            ORDER BY score DESC
-            LIMIT $limit
-        """
-
-        with self._session() as session:
-            result = session.run(cypher, **params)
-            return [dict(record) for record in result]
+            return []
 
     def _graph_expand(self, fused_results: list[dict], *, limit: int) -> list[dict]:
         """Expand results via graph — find related chunks through Topic nodes."""
@@ -441,6 +444,9 @@ class Neo4jKBBackend(KBBackend):
                    0.5 AS score
             LIMIT $limit
         """
+
+        if not top_chunk_ids:
+            return fused_results
 
         try:
             with self._session() as session:
