@@ -62,7 +62,7 @@
   <div class="hdr">
     <div class="oa">O A</div>
     <div class="title">OpenAnalyst CLI</div>
-    <div class="sub">One CLI, Every LLM Provider &mdash; Persistent Conversations Across Models</div>
+    <div class="sub">The Universal AI Agent for Your Terminal &mdash; 7 Providers, 38 Commands, Full TUI</div>
     <div class="ver">v1.0.1</div>
   </div>
 
@@ -136,6 +136,7 @@
 <span class="kw">export</span> <span class="vr">OPENAI_API_KEY</span>=<span class="st">"sk-..."</span>              <span class="cm"># GPT / Codex</span>
 <span class="kw">export</span> <span class="vr">OPENROUTER_API_KEY</span>=<span class="st">"sk-or-..."</span>       <span class="cm"># OpenRouter</span>
 <span class="kw">export</span> <span class="vr">XAI_API_KEY</span>=<span class="st">"xai-..."</span>               <span class="cm"># Grok</span>
+<span class="kw">export</span> <span class="vr">GEMINI_API_KEY</span>=<span class="st">"AIza..."</span>             <span class="cm"># Gemini</span>
 <span class="kw">export</span> <span class="vr">BEDROCK_API_KEY</span>=<span class="st">"..."</span>               <span class="cm"># Bedrock</span></pre></div>
     </div>
     <div id="c2" class="tc">
@@ -178,6 +179,7 @@
       <div class="pc"><div class="pn">OpenAI / GPT</div><div class="pe">OPENAI_API_KEY</div><div class="pm">Models fetched live &mdash; gpt-4o, o3, codex, and more</div></div>
       <div class="pc"><div class="pn">xAI / Grok</div><div class="pe">XAI_API_KEY</div><div class="pm">Models fetched live &mdash; grok-3, grok-mini, and more</div></div>
       <div class="pc"><div class="pn">OpenRouter</div><div class="pe">OPENROUTER_API_KEY</div><div class="pm">350+ models fetched live &mdash; any provider via one key</div></div>
+      <div class="pc"><div class="pn">Google Gemini</div><div class="pe">GEMINI_API_KEY</div><div class="pm">Models fetched live &mdash; gemini-2.5-pro, gemini-2.5-flash, and more</div></div>
       <div class="pc"><div class="pn">Amazon Bedrock</div><div class="pe">BEDROCK_API_KEY</div><div class="pm">Models fetched live from your Bedrock gateway</div></div>
     </div>
   </div>
@@ -205,22 +207,22 @@
     </table>
 
     <h3 style="font-size:15px;font-weight:600;margin:24px 0 8px;color:var(--text)">Interactive Slash Commands</h3>
-    <p style="color:var(--muted);font-size:13px;margin-bottom:12px"><span class="tag tag-r">resume-safe</span> commands also work with <code style="color:var(--cyan)">--resume session.json</code></p>
+    <p style="color:var(--muted);font-size:13px;margin-bottom:12px">All commands work in both TUI mode and legacy REPL mode.</p>
 
     <table class="cmd-table">
       <tr><td colspan="2" class="cmd-cat">Session</td></tr>
-      <tr><td>/help <span class="tag tag-r">resume</span></td><td>Show all available commands</td></tr>
-      <tr><td>/status <span class="tag tag-r">resume</span></td><td>Model, permissions, tokens, cost, git branch, session info</td></tr>
-      <tr><td>/cost <span class="tag tag-r">resume</span></td><td>Show cumulative token usage and cost breakdown</td></tr>
+      <tr><td>/help</td><td>Show all available commands</td></tr>
+      <tr><td>/status</td><td>Model, permissions, tokens, cost, git branch, session info</td></tr>
+      <tr><td>/cost</td><td>Show cumulative token usage and cost breakdown</td></tr>
       <tr><td>/model [name]</td><td>Show live models from all configured providers, or switch mid-session (e.g. <code style="color:var(--cyan)">/model gpt-4o</code>). Session persists across provider switches.</td></tr>
-      <tr><td>/clear [--confirm] <span class="tag tag-r">resume</span></td><td>Start a fresh session</td></tr>
-      <tr><td>/compact <span class="tag tag-r">resume</span></td><td>Compact conversation history to save context</td></tr>
-      <tr><td>/session [list|switch] <span class="tag tag-r">resume</span></td><td>List or switch between saved sessions</td></tr>
-      <tr><td>/export [file] <span class="tag tag-r">resume</span></td><td>Export conversation transcript to a file</td></tr>
+      <tr><td>/clear [--confirm]</td><td>Start a fresh session</td></tr>
+      <tr><td>/compact</td><td>Compact conversation history to save context</td></tr>
+      <tr><td>/session [list|switch]</td><td>List or switch between saved sessions</td></tr>
+      <tr><td>/export [file]</td><td>Export conversation transcript to a file</td></tr>
       <tr><td>/resume &lt;path&gt;</td><td>Load a saved session into the REPL</td></tr>
 
       <tr><td colspan="2" class="cmd-cat">Code &amp; Git</td></tr>
-      <tr><td>/diff <span class="tag tag-r">resume</span></td><td>Show git diff of workspace changes</td></tr>
+      <tr><td>/diff</td><td>Show git diff of workspace changes</td></tr>
       <tr><td>/commit</td><td>Generate commit message and create a git commit</td></tr>
       <tr><td>/commit-push-pr [ctx]</td><td>Commit, push branch, and open a pull request</td></tr>
       <tr><td>/pr [context]</td><td>Draft or create a GitHub pull request</td></tr>
@@ -235,15 +237,29 @@
       <tr><td>/debug-tool-call</td><td>Replay last tool call with debug output</td></tr>
 
       <tr><td colspan="2" class="cmd-cat">Config &amp; Memory</td></tr>
-      <tr><td>/config [section] <span class="tag tag-r">resume</span></td><td>Inspect config (env, hooks, model, plugins)</td></tr>
-      <tr><td>/memory <span class="tag tag-r">resume</span></td><td>Show loaded OPENANALYST.md instruction files</td></tr>
-      <tr><td>/init <span class="tag tag-r">resume</span></td><td>Create starter OPENANALYST.md for this repo</td></tr>
+      <tr><td>/config [section]</td><td>Inspect config (env, hooks, model, plugins)</td></tr>
+      <tr><td>/memory</td><td>Show loaded OPENANALYST.md instruction files</td></tr>
+      <tr><td>/init</td><td>Create starter OPENANALYST.md for this repo</td></tr>
       <tr><td>/permissions [mode]</td><td>Show or switch permission mode</td></tr>
-      <tr><td>/version <span class="tag tag-r">resume</span></td><td>Show CLI version and build info</td></tr>
+      <tr><td>/version</td><td>Show CLI version and build info</td></tr>
+
+      <tr><td colspan="2" class="cmd-cat">Multimedia &amp; AI</td></tr>
+      <tr><td>/image &lt;prompt&gt; <span class="tag tag-n">new</span></td><td>Generate an image from text (Gemini Imagen / DALL-E / Stability)</td></tr>
+      <tr><td>/voice &lt;file&gt; <span class="tag tag-n">new</span></td><td>Transcribe audio/video to text (Whisper / Gemini)</td></tr>
+      <tr><td>/speak &lt;text&gt; <span class="tag tag-n">new</span></td><td>Convert text to speech audio (OpenAI TTS)</td></tr>
+      <tr><td>/vision &lt;image&gt; [prompt] <span class="tag tag-n">new</span></td><td>Analyze or describe an image (Gemini / GPT-4o / Claude)</td></tr>
+      <tr><td>/diagram &lt;desc&gt; <span class="tag tag-n">new</span></td><td>Generate a Mermaid diagram from description</td></tr>
+      <tr><td>/translate &lt;lang&gt; &lt;text&gt; <span class="tag tag-n">new</span></td><td>Translate text to any language</td></tr>
+      <tr><td>/tokens [text] <span class="tag tag-n">new</span></td><td>Estimate token count for text or a file</td></tr>
+
+      <tr><td colspan="2" class="cmd-cat">Web</td></tr>
+      <tr><td>/scrape &lt;url&gt; [selector] <span class="tag tag-n">new</span></td><td>Fetch a URL and extract text content</td></tr>
+      <tr><td>/json &lt;url&gt; <span class="tag tag-n">new</span></td><td>Fetch JSON API endpoint and pretty-print</td></tr>
+      <tr><td>/diff-review [file] <span class="tag tag-n">new</span></td><td>AI-powered review of current git diff</td></tr>
 
       <tr><td colspan="2" class="cmd-cat">Extensions</td></tr>
-      <tr><td>/agents <span class="tag tag-r">resume</span></td><td>List configured agents</td></tr>
-      <tr><td>/skills <span class="tag tag-r">resume</span></td><td>List available skills</td></tr>
+      <tr><td>/agents</td><td>List configured agents</td></tr>
+      <tr><td>/skills</td><td>List available skills</td></tr>
       <tr><td>/plugin [list|install|enable|disable]</td><td>Manage plugins</td></tr>
     </table>
   </div>
@@ -266,6 +282,13 @@
       <div class="fc"><div class="fn">TodoWrite</div><div class="fd">Track tasks and progress within a session</div></div>
       <div class="fc"><div class="fn">NotebookEdit</div><div class="fd">Edit Jupyter notebook cells</div></div>
       <div class="fc"><div class="fn">Skill</div><div class="fd">Invoke registered skills and workflows</div></div>
+      <div class="fc"><div class="fn">ToolSearch</div><div class="fd">Search for deferred and specialized tools</div></div>
+      <div class="fc"><div class="fn">REPL</div><div class="fd">Execute code in subprocess (Python, Node, etc.)</div></div>
+      <div class="fc"><div class="fn">PowerShell</div><div class="fd">Execute PowerShell commands on Windows</div></div>
+      <div class="fc"><div class="fn">Config</div><div class="fd">Get/set OpenAnalyst settings programmatically</div></div>
+      <div class="fc"><div class="fn">Sleep</div><div class="fd">Wait for a duration between operations</div></div>
+      <div class="fc"><div class="fn">StructuredOutput</div><div class="fd">Return structured JSON responses</div></div>
+      <div class="fc"><div class="fn">SendUserMessage</div><div class="fd">Send messages to the user during execution</div></div>
     </div>
   </div>
 
@@ -286,6 +309,10 @@
       <div class="fc"><div class="fn">Plugin System</div><div class="fd">Install, enable, and manage custom tool plugins.</div></div>
       <div class="fc"><div class="fn">Cost Tracking</div><div class="fd">Per-turn and cumulative token usage and cost display.</div></div>
       <div class="fc"><div class="fn">Cross-Platform</div><div class="fd">Native binaries for macOS, Linux, and Windows.</div></div>
+      <div class="fc"><div class="fn">Full Ratatui TUI</div><div class="fd">Scrollable chat, inline tool cards, status bar, vim-mode input, permission dialogs. Default mode.</div></div>
+      <div class="fc"><div class="fn">Multi-Agent Orchestrator</div><div class="fd">Spawn parallel sub-agents with independent tool permissions and real-time status tracking.</div></div>
+      <div class="fc"><div class="fn">Multimedia Commands</div><div class="fd">Generate images, transcribe audio, text-to-speech, image analysis, Mermaid diagrams.</div></div>
+      <div class="fc"><div class="fn">7 LLM Providers</div><div class="fd">OpenAnalyst, Anthropic, OpenAI, Google Gemini, xAI, OpenRouter, Amazon Bedrock.</div></div>
     </div>
   </div>
 
@@ -306,9 +333,24 @@
     </table>
   </div>
 
+  <!-- Credits -->
+  <div class="card" style="border-color:rgba(255,255,255,0.1)">
+    <h2 style="font-size:16px"><span class="ic gn">&#9733;</span> Credits &amp; Trademarks</h2>
+    <p style="color:var(--muted);font-size:13px;line-height:1.8">
+      <strong style="color:var(--text)">OpenAnalyst CLI</strong> is an independent, open-source product by OpenAnalyst Inc.<br>
+      All provider trademarks belong to their respective owners:<br>
+      <strong style="color:var(--dim)">Claude</strong> &mdash; Anthropic, PBC &middot;
+      <strong style="color:var(--dim)">GPT, DALL-E, Whisper, Codex</strong> &mdash; OpenAI, Inc &middot;
+      <strong style="color:var(--dim)">Gemini, Imagen</strong> &mdash; Google LLC &middot;
+      <strong style="color:var(--dim)">Grok</strong> &mdash; xAI Corp &middot;
+      <strong style="color:var(--dim)">Bedrock</strong> &mdash; Amazon Web Services, Inc &middot;
+      <strong style="color:var(--dim)">OpenRouter</strong> &mdash; OpenRouter, Inc
+    </p>
+  </div>
+
   <div class="ft">
-    <p><strong style="color:var(--text)">OpenAnalyst CLI v1.0.1</strong> &middot; OpenAnalyst Inc</p>
-    <p style="margin-top:4px">Questions? <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a></p>
+    <p><strong style="color:var(--text)">OpenAnalyst CLI v1.0.1</strong> &middot; An independent, open-source AI agent for the terminal</p>
+    <p style="margin-top:4px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a></p>
   </div>
 
 </div>
