@@ -246,7 +246,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(139,92,246,0.15);color:var(--purple)">&#9608;</div><div class="acc-title">Full Terminal UI (Ratatui TUI)</div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Default mode is a full Ratatui-based TUI with scrollable chat, <strong>interactive sidebar</strong> (agents, files, routing table, activity &mdash; navigate with j/k, expand with Enter), inline tool call cards, animated status bar, vim-mode input, permission dialogs as real modals, input queue (type while streaming), slash command autocomplete with descriptions, input history (Ctrl+Up/Down), <strong>voice input</strong> (Space bar), paste/drag-drop for file paths, and session auto-save.</div></div>
+    <div class="acc-body"><div class="acc-content">Default mode is a full Ratatui-based TUI with scrollable chat (unlimited scroll, u32 offset), <strong>interactive sidebar</strong> (agents, files, routing table, activity &mdash; navigate with j/k, expand with Enter), <strong>rich diff rendering</strong> in tool call cards (green added lines, red removed lines, line numbers, context), animated status bar, vim-mode input, permission dialogs as real modals, input queue (type while streaming), slash command autocomplete with descriptions, input history (Ctrl+Up/Down), <strong>voice input</strong> (Space bar), paste/drag-drop for file paths, custom keybindings via <code style="color:var(--cyan)">.openanalyst/keybindings.json</code>, and session auto-save.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(34,197,94,0.15);color:var(--green)">&#9881;</div><div class="acc-title">Multi-Agent Orchestrator</div><div class="acc-arrow">&#9654;</div></div>
@@ -278,7 +278,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(239,68,68,0.15);color:var(--red)">&#9888;</div><div class="acc-title">Production-Grade Reliability <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content"><strong>Stream timeout</strong> &mdash; 30s per-event timeout detects hung connections and provider stalls<br><strong>Retry with backoff</strong> &mdash; Exponential backoff (1s&rarr;2s&rarr;4s&rarr;8s, max 32s) on transient errors<br><strong>Zero unsafe code</strong> &mdash; <code>unsafe_code = "forbid"</code> enforced at workspace level<br><strong>273+ tests</strong> &mdash; Unit, integration, and mock-server tests across all crates<br><strong>No panics</strong> &mdash; All unwrap() in critical paths replaced with proper error handling<br><strong>Crash recovery</strong> &mdash; Panic handler restores terminal and saves crash marker. Session auto-saves every 60s<br><strong>Bracketed paste</strong> &mdash; Multi-line paste handled as single event, no corruption<br><strong>Permission timeouts</strong> &mdash; 120s timeout on permission dialogs, proper cleanup on expiry<br><strong>Zero silent failures</strong> &mdash; All 32 async channel sends now log on failure (no more <code>let _ =</code>)<br><strong>MCP process guards</strong> &mdash; RAII ChildGuard prevents zombie processes on init failure<br><strong>Thread cleanup</strong> &mdash; Crossterm event thread properly joined on shutdown<br><strong>Custom keybindings</strong> &mdash; All keys remappable via <code>.openanalyst/keybindings.json</code></div></div>
+    <div class="acc-body"><div class="acc-content"><strong>Stream timeout</strong> &mdash; 30s per-event timeout detects hung connections and provider stalls<br><strong>Retry with backoff</strong> &mdash; Exponential backoff (1s&rarr;2s&rarr;4s&rarr;8s, max 32s) on transient errors<br><strong>Zero unsafe code</strong> &mdash; <code>unsafe_code = "forbid"</code> enforced at workspace level<br><strong>340+ tests</strong> &mdash; Unit, integration, edge-case, and mock-server tests across all crates<br><strong>No panics</strong> &mdash; All unwrap() in critical paths replaced with proper error handling<br><strong>Crash recovery</strong> &mdash; Panic handler restores terminal and saves crash marker. Session auto-saves every 60s<br><strong>Format-on-save resilience</strong> &mdash; Detects external file changes between consecutive edits (formatters, linters)<br><strong>Bracketed paste</strong> &mdash; Multi-line paste handled as single event, no corruption<br><strong>Zero silent failures</strong> &mdash; All async channel sends log on failure instead of silently dropping events<br><strong>Hook system</strong> &mdash; 9 events: PreToolUse, PostToolUse, CwdChanged, FileChanged, SessionStart, SessionEnd, TaskCreated, Notification, Stop &mdash; all with allow/deny/warn. Manage via <code>/hooks</code><br><strong>Custom keybindings</strong> &mdash; All keys remappable via <code>.openanalyst/keybindings.json</code></div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(14,165,233,0.15);color:var(--accent)">&#9881;</div><div class="acc-title">Cross-Platform Native Binary</div><div class="acc-arrow">&#9654;</div></div>
@@ -291,7 +291,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <section id="commands" style="background:var(--bg2)">
 <div class="wrap">
   <div class="section-label">Reference</div>
-  <div class="section-title">58 slash commands</div>
+  <div class="section-title">59 slash commands</div>
   <div class="section-sub">All commands work identically regardless of which LLM provider you use. Every command is fully functional &mdash; zero stubs.</div>
 
   <div class="tabs">
@@ -387,6 +387,17 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/plugin [list|install|enable|disable]</td><td>Manage plugins</td></tr>
       <tr><td>/mcp [list|restart|add] <span class="tag tag-n">NEW</span></td><td>Manage MCP servers</td></tr>
       <tr><td>/add-dir &lt;path&gt; <span class="tag tag-n">NEW</span></td><td>Add directory tree to conversation context</td></tr>
+      <tr class="cmd-cat"><td colspan="2">Hooks</td></tr>
+      <tr><td>PreToolUse <span class="tag tag-n">NEW</span></td><td>Runs before each tool execution &mdash; can allow, deny, or warn</td></tr>
+      <tr><td>PostToolUse <span class="tag tag-n">NEW</span></td><td>Runs after each tool &mdash; format-on-save resilience built in</td></tr>
+      <tr><td>CwdChanged <span class="tag tag-n">NEW</span></td><td>Fires when working directory changes (direnv, monorepo navigation)</td></tr>
+      <tr><td>FileChanged <span class="tag tag-n">NEW</span></td><td>Fires when a file is modified externally after write/edit</td></tr>
+      <tr><td>SessionEnd <span class="tag tag-n">NEW</span></td><td>Fires on session close for cleanup, logging, or archival</td></tr>
+      <tr><td>TaskCreated <span class="tag tag-n">NEW</span></td><td>Fires when a task is created for external tracking systems</td></tr>
+      <tr><td>SessionStart <span class="tag tag-n">NEW</span></td><td>Fires when a session begins &mdash; initialize environment, logging</td></tr>
+      <tr><td>Notification <span class="tag tag-n">NEW</span></td><td>Fires when the agent wants to notify the user externally</td></tr>
+      <tr><td>Stop <span class="tag tag-n">NEW</span></td><td>Fires when the agent stops execution &mdash; post-run cleanup</td></tr>
+      <tr><td>/hooks [list|add|remove|test] <span class="tag tag-n">NEW</span></td><td>Manage hooks interactively from the TUI</td></tr>
     </table>
   </div>
 
@@ -448,7 +459,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">rust/crates/</span></div></div>
 <pre class="code"><span class="c-c">api/</span>                 <span class="c-d"># Multi-provider API client (7 providers)</span>
-<span class="c-c">commands/</span>            <span class="c-d"># 58 slash commands</span>
+<span class="c-c">commands/</span>            <span class="c-d"># 59 slash commands</span>
 <span class="c-c">events/</span>              <span class="c-d"># Shared TUI &harr; backend event types</span>
 <span class="c-c">orchestrator/</span>        <span class="c-d"># Multi-agent lifecycle + channel bridge</span>
 <span class="c-c">tui/</span>                 <span class="c-d"># Ratatui full-screen TUI application</span>
@@ -478,7 +489,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <div style="font-size:13px;color:var(--muted);line-height:1.8">
         <strong style="color:var(--text)">14</strong> crates in workspace<br>
         <strong style="color:var(--text)">7</strong> LLM providers<br>
-        <strong style="color:var(--text)">58</strong> slash commands<br>
+        <strong style="color:var(--text)">59</strong> slash commands<br>
         <strong style="color:var(--text)">22</strong> built-in tools<br>
         <strong style="color:var(--text)">340+</strong> tests<br>
         <strong style="color:var(--text)">MIT</strong> license

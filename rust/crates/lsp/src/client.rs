@@ -254,7 +254,9 @@ impl LspClient {
                         };
 
                         if let Some(sender) = pending_requests.lock().await.remove(&id) {
-                            let _ = sender.send(response);
+                            if sender.send(response).is_err() {
+                                eprintln!("[lsp] Response dropped — request timed out or was cancelled");
+                            }
                         }
                         continue;
                     }
@@ -287,7 +289,8 @@ impl LspClient {
                     .collect::<Vec<_>>();
                 for id in drained {
                     if let Some(sender) = pending.remove(&id) {
-                        let _ = sender.send(Err(LspError::Protocol(error.to_string())));
+                        // Best-effort — receiver may have timed out
+                        drop(sender.send(Err(LspError::Protocol(error.to_string()))));
                     }
                 }
             }
