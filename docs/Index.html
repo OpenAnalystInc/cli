@@ -552,7 +552,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 <!-- ═══ 11. FOOTER ═══ -->
 <div class="footer" style="padding:40px 24px">
-  <p><strong>OpenAnalyst CLI v1.0.89</strong></p>
+  <p><strong>OpenAnalyst CLI <span class="oa-version-full">v1.0.91</span></strong></p>
   <p style="margin-top:6px">An independent, open-source AI agent for the terminal</p>
   <p style="margin-top:12px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a> &middot; <a href="https://github.com/AnitChaudhry/openanalyst-cli" target="_blank">GitHub</a></p>
 </div>
@@ -606,5 +606,6 @@ const statuses=["Ready","Thinking...","Reading file...","Editing...","Searching.
 let si=0;const st=document.getElementById('status-text');
 setInterval(()=>{si=(si+1)%statuses.length;st.textContent=statuses[si]},2e3);
 </script>
+<script src="version.js"></script>
 </body>
 </html>
