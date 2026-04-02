@@ -149,14 +149,27 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
 
         SlashCommand::Bughunter { scope } => {
             let prompt = format!(
-                "Inspect the codebase for likely bugs{}. Focus on correctness, edge cases, and error handling.",
+                "You are a senior security and reliability engineer. Systematically inspect the codebase{} for:\n\
+                 1. Logic bugs — off-by-one, incorrect conditionals, wrong operator precedence\n\
+                 2. Error handling gaps — unwrap on fallible ops, swallowed errors, missing edge cases\n\
+                 3. Security issues — injection, XSS, path traversal, hardcoded secrets\n\
+                 4. Concurrency bugs — data races, deadlocks, missing synchronization\n\
+                 5. Resource leaks — unclosed files/connections, missing cleanup\n\n\
+                 For each bug: state file, line, severity (critical/high/medium/low), root cause, and fix.",
                 scope.map_or(String::new(), |s| format!(" in scope: {s}"))
             );
             app.submit_prompt_internal(prompt);
         }
         SlashCommand::Ultraplan { task } => {
             let prompt = format!(
-                "Create a detailed, multi-step implementation plan for: {}",
+                "Create a comprehensive implementation plan for: {}\n\n\
+                 Structure your plan as:\n\
+                 1. **Goal** — one sentence summary of the outcome\n\
+                 2. **Constraints** — what must be preserved, what can't break\n\
+                 3. **Architecture** — key files, modules, data flow changes\n\
+                 4. **Steps** — ordered list of atomic, testable implementation steps\n\
+                 5. **Risks** — what could go wrong, mitigation for each\n\
+                 6. **Verification** — how to confirm each step succeeded",
                 task.unwrap_or_else(|| "the current task".to_string())
             );
             app.submit_prompt_internal(prompt);
@@ -189,7 +202,9 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
         }
         SlashCommand::DiffReview { file } => {
             let prompt = format!(
-                "Review the current git diff{} for bugs, style issues, and improvements.",
+                "You are a senior code reviewer. Review the current git diff{} with a critical eye.\n\
+                 Check for: bugs, security issues, performance, error handling, API contract breaks.\n\
+                 For each issue: state file, line, severity, and fix. If clean, say LGTM with summary.",
                 file.map_or(String::new(), |f| format!(" for file: {f}"))
             );
             app.submit_prompt_internal(prompt);
