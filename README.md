@@ -24,7 +24,7 @@ OpenAnalyst CLI is an **independent, open-source AI coding agent** that connects
 | **TUI** | Full Ratatui-based terminal UI (default) | Most use basic REPL |
 | **Multi-agent orchestrator** | Built-in parallel agent spawning | Limited or none |
 | **Multimedia** | /image, /voice, /speak, /vision, /diagram | Rarely supported |
-| **38 slash commands** | Git, AI planning, multimedia, web scraping | 5-15 typical |
+| **49 slash commands** | Git, AI planning, multimedia, web scraping | 5-15 typical |
 | **Single binary** | Native Rust, no runtime dependencies | Often needs Node/Python |
 
 ---
@@ -103,15 +103,16 @@ All providers are first-class citizens with live model discovery, streaming, and
 - Agent lifecycle events displayed in real-time
 - Channel-based async bridge (sync runtime ↔ async TUI)
 
-### 38 Slash Commands
+### 49 Slash Commands
 
-**Session:** /help, /status, /cost, /model, /clear, /compact, /session, /export, /resume, /version
-**Code & Git:** /diff, /commit, /commit-push-pr, /pr, /issue, /branch, /worktree, /teleport, /diff-review
-**Analysis:** /bughunter, /ultraplan, /debug-tool-call
+**Session:** /help, /status, /cost, /model, /clear, /compact, /session, /export, /resume, /version, /login, /logout, /context, /vim
+**Code & Git:** /diff, /commit, /commit-push-pr, /pr, /issue, /branch, /worktree, /teleport, /diff-review, /changelog
+**Analysis:** /bughunter, /ultraplan, /debug-tool-call, /think, /doctor
 **Multimedia:** /image, /voice, /speak, /vision, /diagram
 **Web:** /scrape, /json
 **AI:** /translate, /tokens
-**Config:** /config, /memory, /init, /permissions, /plugins, /agents, /skills
+**Config:** /config, /memory, /init, /permissions, /plugins, /agents, /skills, /mcp, /add-dir
+**Dev Tools:** /dev (install, open, screenshot, snap, click, type, test, codegen, stop, status)
 
 ### 19 Built-in Tools
 Bash, ReadFile, WriteFile, EditFile, GlobSearch, GrepSearch, WebSearch, WebFetch, Agent, TodoWrite, NotebookEdit, Skill, ToolSearch, Sleep, SendUserMessage, Config, StructuredOutput, REPL, PowerShell
@@ -125,7 +126,7 @@ OpenAnalyst CLI is a **14-crate Rust workspace**:
 ```text
 rust/crates/
 ├── api/                   # Multi-provider API client (7 providers)
-├── commands/              # 38 slash commands
+├── commands/              # 49 slash commands
 ├── events/                # Shared TUI ↔ backend event types
 ├── orchestrator/          # Multi-agent lifecycle + channel bridge
 ├── tui/                   # Ratatui full-screen TUI application
