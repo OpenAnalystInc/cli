@@ -247,6 +247,77 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: None,
         resume_supported: true,
     },
+    // ── Multimedia & AI Commands ──
+    SlashCommandSpec {
+        name: "image",
+        aliases: &["img"],
+        summary: "Generate an image from a text prompt",
+        argument_hint: Some("<prompt>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "voice",
+        aliases: &["transcribe", "whisper"],
+        summary: "Transcribe audio/video file to text",
+        argument_hint: Some("<file-path>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "speak",
+        aliases: &["tts"],
+        summary: "Convert text to speech audio file",
+        argument_hint: Some("<text>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "vision",
+        aliases: &["describe-image"],
+        summary: "Analyze or describe an image file",
+        argument_hint: Some("<image-path> [prompt]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "diagram",
+        aliases: &["mermaid"],
+        summary: "Generate a Mermaid diagram from a description",
+        argument_hint: Some("<description>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "translate",
+        aliases: &["tr"],
+        summary: "Translate text to a target language",
+        argument_hint: Some("<language> <text>"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "tokens",
+        aliases: &["count-tokens"],
+        summary: "Estimate token count for text or a file",
+        argument_hint: Some("[file-path or text]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "diff-review",
+        aliases: &["review"],
+        summary: "AI-powered review of current git diff",
+        argument_hint: Some("[file]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "scrape",
+        aliases: &[],
+        summary: "Fetch a URL and extract its text content",
+        argument_hint: Some("<url> [css-selector]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "json",
+        aliases: &["api"],
+        summary: "Fetch a JSON API endpoint and pretty-print the response",
+        argument_hint: Some("<url>"),
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -319,6 +390,40 @@ pub enum SlashCommand {
     },
     Skills {
         args: Option<String>,
+    },
+    // ── Multimedia & AI Commands ──
+    Image {
+        prompt: Option<String>,
+    },
+    Voice {
+        file_path: Option<String>,
+    },
+    Speak {
+        text: Option<String>,
+    },
+    Vision {
+        image_path: Option<String>,
+        prompt: Option<String>,
+    },
+    Diagram {
+        description: Option<String>,
+    },
+    Translate {
+        language: Option<String>,
+        text: Option<String>,
+    },
+    Tokens {
+        target: Option<String>,
+    },
+    DiffReview {
+        file: Option<String>,
+    },
+    Scrape {
+        url: Option<String>,
+        selector: Option<String>,
+    },
+    Json {
+        url: Option<String>,
     },
     Unknown(String),
 }
@@ -405,6 +510,49 @@ impl SlashCommand {
             },
             "skills" => Self::Skills {
                 args: remainder_after_command(trimmed, command),
+            },
+            // ── Multimedia & AI Commands ──
+            "image" | "img" => Self::Image {
+                prompt: remainder_after_command(trimmed, command),
+            },
+            "voice" | "transcribe" | "whisper" => Self::Voice {
+                file_path: parts.next().map(ToOwned::to_owned),
+            },
+            "speak" | "tts" => Self::Speak {
+                text: remainder_after_command(trimmed, command),
+            },
+            "vision" | "describe-image" => Self::Vision {
+                image_path: parts.next().map(ToOwned::to_owned),
+                prompt: {
+                    let rest = parts.collect::<Vec<_>>().join(" ");
+                    (!rest.is_empty()).then_some(rest)
+                },
+            },
+            "diagram" | "mermaid" => Self::Diagram {
+                description: remainder_after_command(trimmed, command),
+            },
+            "translate" | "tr" => Self::Translate {
+                language: parts.next().map(ToOwned::to_owned),
+                text: {
+                    let rest = parts.collect::<Vec<_>>().join(" ");
+                    (!rest.is_empty()).then_some(rest)
+                },
+            },
+            "tokens" | "count-tokens" => Self::Tokens {
+                target: remainder_after_command(trimmed, command),
+            },
+            "diff-review" | "review" => Self::DiffReview {
+                file: parts.next().map(ToOwned::to_owned),
+            },
+            "scrape" => Self::Scrape {
+                url: parts.next().map(ToOwned::to_owned),
+                selector: {
+                    let rest = parts.collect::<Vec<_>>().join(" ");
+                    (!rest.is_empty()).then_some(rest)
+                },
+            },
+            "json" | "api" => Self::Json {
+                url: parts.next().map(ToOwned::to_owned),
             },
             other => Self::Unknown(other.to_string()),
         })
@@ -1640,6 +1788,16 @@ pub fn handle_slash_command(
         | SlashCommand::Plugins { .. }
         | SlashCommand::Agents { .. }
         | SlashCommand::Skills { .. }
+        | SlashCommand::Image { .. }
+        | SlashCommand::Voice { .. }
+        | SlashCommand::Speak { .. }
+        | SlashCommand::Vision { .. }
+        | SlashCommand::Diagram { .. }
+        | SlashCommand::Translate { .. }
+        | SlashCommand::Tokens { .. }
+        | SlashCommand::DiffReview { .. }
+        | SlashCommand::Scrape { .. }
+        | SlashCommand::Json { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -1996,7 +2154,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 28);
+        assert_eq!(slash_command_specs().len(), 38);
         assert_eq!(resume_supported_slash_commands().len(), 13);
     }
 
