@@ -54,7 +54,13 @@ cd rust && cargo build --release
 openanalyst login
 ```
 
-Interactive provider picker — select provider with arrow keys, enter API key, connection tested automatically.
+Interactive provider picker — select your LLM provider, authenticate via browser OAuth or API key, credentials saved automatically. For Claude, Codex, and Gemini you can login directly through your provider account.
+
+Alternatively, edit `~/.openanalyst/.env` (created during install) and add your API keys directly.
+
+```bash
+openanalyst whoami              # See all logged-in providers
+```
 
 ### 3. Start
 
