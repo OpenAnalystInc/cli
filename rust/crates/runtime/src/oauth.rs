@@ -520,8 +520,8 @@ const DOTENV_TEMPLATE: &str = r#"# ═══════════════
 # STABILITY_API_KEY=sk-...
 
 # ── OAuth Client IDs (for browser login) ──────────────────────────
-# Required only if you want `openanalyst login` to use browser OAuth
-# instead of API key paste. Register your app with each provider.
+# Optional overrides — the CLI ships with built-in client IDs.
+# Only set these if you registered your own OAuth app with a provider.
 
 # OPENANALYST_ANTHROPIC_CLIENT_ID=
 # OPENANALYST_OPENAI_CLIENT_ID=
