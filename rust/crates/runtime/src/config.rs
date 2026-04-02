@@ -422,7 +422,7 @@ impl RuntimePluginConfig {
 pub fn default_config_home() -> PathBuf {
     std::env::var_os("OPENANALYST_CONFIG_HOME")
         .map(PathBuf::from)
-        .or_else(|| std::env::var_os("HOME").map(|home| PathBuf::from(home).join(".openanalyst")))
+        .or_else(|| std::env::var_os("HOME").or_else(|| std::env::var_os("USERPROFILE")).map(|home| PathBuf::from(home).join(".openanalyst")))
         .unwrap_or_else(|| PathBuf::from(".openanalyst"))
 }
 
