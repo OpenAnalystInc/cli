@@ -19,12 +19,12 @@ Clear-Host
 
 Write-Host ""
 Write-Host ""
-Write-Host "     ██████╗   █████╗ " -ForegroundColor Blue
-Write-Host "    ██╔═══██╗ ██╔══██╗" -ForegroundColor Cyan
-Write-Host "    ██║   ██║ ███████║" -ForegroundColor Cyan
-Write-Host "    ██║   ██║ ██╔══██║" -ForegroundColor Cyan
-Write-Host "    ╚██████╔╝ ██║  ██║" -ForegroundColor Blue
-Write-Host "     ╚═════╝  ╚═╝  ╚═╝" -ForegroundColor DarkGray
+Write-Host "    ████████    ████   " -ForegroundColor Blue
+Write-Host "    ██    ██   ██  ██  " -ForegroundColor Cyan
+Write-Host "    ██    ██  ██    ██ " -ForegroundColor Cyan
+Write-Host "    ██    ██  ████████ " -ForegroundColor Cyan
+Write-Host "    ██    ██  ██    ██ " -ForegroundColor Blue
+Write-Host "    ████████  ██    ██ " -ForegroundColor Blue
 Write-Host ""
 Write-Host "   OpenAnalyst CLI  " -ForegroundColor White -NoNewline
 Write-Host "v1.0.2" -ForegroundColor DarkGray
