@@ -45,6 +45,43 @@ pub enum AgentStatus {
     Failed,
 }
 
+// ── Diff information for tool call cards ──
+
+/// A single line in a diff hunk.
+#[derive(Debug, Clone)]
+pub enum DiffLine {
+    /// Unchanged context line.
+    Context(String),
+    /// Added line (shown in green).
+    Added(String),
+    /// Removed line (shown in red).
+    Removed(String),
+}
+
+/// A contiguous diff hunk with line numbers and changes.
+#[derive(Debug, Clone)]
+pub struct DiffHunk {
+    /// Starting line number in the new file.
+    pub new_start: usize,
+    /// Starting line number in the old file.
+    pub old_start: usize,
+    /// Lines in this hunk.
+    pub lines: Vec<DiffLine>,
+}
+
+/// Structured diff information for Edit/Write tool calls.
+#[derive(Debug, Clone)]
+pub struct DiffInfo {
+    /// File path that was modified.
+    pub file_path: String,
+    /// Total number of lines added.
+    pub added: usize,
+    /// Total number of lines removed.
+    pub removed: usize,
+    /// Diff hunks with context.
+    pub hunks: Vec<DiffHunk>,
+}
+
 // ── Panel identification ──
 
 /// Identifies a focusable panel in the TUI.
@@ -87,6 +124,8 @@ pub enum UiEvent {
         output: String,
         is_error: bool,
         duration: Duration,
+        /// Structured diff info for Edit/Write tools (renders as rich diff in TUI).
+        diff: Option<DiffInfo>,
     },
 
     // ── Permissions ──

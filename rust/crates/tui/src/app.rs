@@ -515,6 +515,7 @@ impl App {
                         elapsed: Duration::ZERO,
                     },
                     output: None,
+                    diff: None,
                     expanded: false,
                 });
                 self.sidebar_state.tool_call_count += 1;
@@ -537,6 +538,7 @@ impl App {
                 output,
                 is_error,
                 duration,
+                diff,
                 ..
             } => {
                 for msg in self.chat.messages.iter_mut().rev() {
@@ -548,6 +550,7 @@ impl App {
                                 ToolCallStatus::Completed { duration }
                             };
                             card.output = Some(output.clone());
+                            card.diff = diff.clone();
                             break;
                         }
                     }

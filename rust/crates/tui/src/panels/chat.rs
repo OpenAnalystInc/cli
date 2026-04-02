@@ -6,6 +6,7 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap};
 
+use events::DiffLine;
 use tui_widgets::{MarkdownStream, ToolCallCard};
 
 /// Type of file output from multimedia commands.
@@ -65,7 +66,8 @@ pub enum ChatMessage {
 /// The main chat panel state.
 pub struct ChatPanel {
     pub messages: Vec<ChatMessage>,
-    pub scroll_offset: u16,
+    /// Scroll offset in lines — u32 for unlimited downward scrolling.
+    pub scroll_offset: u32,
     pub auto_scroll: bool,
     /// Index of the currently focused message (for scroll mode navigation).
     pub focused_message: Option<usize>,
@@ -141,19 +143,19 @@ impl ChatPanel {
         }
     }
 
-    /// Scroll to the bottom.
+    /// Scroll to the bottom (unlimited).
     pub fn scroll_to_bottom(&mut self) {
-        self.scroll_offset = u16::MAX;
+        self.scroll_offset = u32::MAX;
     }
 
     /// Scroll up by `n` lines.
-    pub fn scroll_up(&mut self, n: u16) {
+    pub fn scroll_up(&mut self, n: u32) {
         self.auto_scroll = false;
         self.scroll_offset = self.scroll_offset.saturating_sub(n);
     }
 
     /// Scroll down by `n` lines.
-    pub fn scroll_down(&mut self, n: u16) {
+    pub fn scroll_down(&mut self, n: u32) {
         self.scroll_offset = self.scroll_offset.saturating_add(n);
     }
 
@@ -220,14 +222,18 @@ impl ChatPanel {
             }
         }
 
-        let total_lines = all_lines.len() as u16;
-        let visible_height = area.height;
+        let total_lines = all_lines.len() as u32;
+        let visible_height = area.height as u32;
         let max_scroll = total_lines.saturating_sub(visible_height);
         let scroll = self.scroll_offset.min(max_scroll);
 
-        let paragraph = Paragraph::new(Text::from(all_lines))
-            .wrap(Wrap { trim: false })
-            .scroll((scroll, 0));
+        // Slice lines manually to support unlimited scroll (beyond u16::MAX).
+        let start = scroll as usize;
+        let end = (start + visible_height as usize).min(all_lines.len());
+        let visible_lines: Vec<Line<'_>> = all_lines.into_iter().skip(start).take(end - start).collect();
+
+        let paragraph = Paragraph::new(Text::from(visible_lines))
+            .wrap(Wrap { trim: false });
         paragraph.render(area, buf);
 
         // Scrollbar
@@ -242,7 +248,9 @@ impl ChatPanel {
 }
 
 /// Render a tool call card as text lines with proper formatting.
-fn render_tool_card_lines<'a>(card: &'a ToolCallCard, is_focused: bool, lines: &mut Vec<Line<'a>>) {
+/// For Edit/Write tools with diff data, renders a rich diff view with
+/// green added lines, red removed lines, line numbers, and a summary.
+fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: &mut Vec<Line<'a>>) {
     let status_icon = match &card.status {
         tui_widgets::ToolCallStatus::Running { .. } => "⠋",
         tui_widgets::ToolCallStatus::Completed { .. } => "✓",
@@ -253,90 +261,157 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, is_focused: bool, lines: &
         tui_widgets::ToolCallStatus::Completed { .. } => Color::Green,
         tui_widgets::ToolCallStatus::Failed { .. } => Color::Red,
     };
-    let border_color = if is_focused {
-        Color::Cyan
+
+    let has_diff = card.diff.is_some();
+
+    // For edit/write tools with diff, show "Update(file_path)" style title
+    let display_name = if has_diff {
+        let diff = card.diff.as_ref().unwrap();
+        let short_path = shorten_path(&diff.file_path);
+        format!("Update({})", short_path)
     } else {
-        Color::Indexed(245)
+        card.tool_name.clone()
     };
-    let duration = card.status.duration_label();
 
-    // Calculate inner width based on all content
-    let title_inner = 1 + 1 + card.tool_name.chars().count() + 4 + duration.chars().count() + 1;
-    let mut max_content = card.input_preview.chars().count();
-    if card.expanded {
-        if let Some(ref output) = card.output {
-            for line in output.lines().take(20) {
-                max_content = max_content.max(line.chars().count());
-            }
-        }
-    }
-    let inner_width = title_inner.max(max_content + 1).max(10);
-
-    // Top border: ╭─ ✓ Read ── 340ms ────╮
-    let top_pad = inner_width.saturating_sub(title_inner);
+    // Title line: ● Update(crates/orchestrator/src/worker.rs)
     lines.push(Line::from(vec![
-        Span::styled(if is_focused { "▸ " } else { "  " }, Style::default().fg(Color::Cyan)),
-        Span::styled("╭─ ", Style::default().fg(border_color)),
-        Span::styled(status_icon, Style::default().fg(status_color)),
-        Span::raw(" "),
-        Span::styled(&card.tool_name, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-        Span::styled(format!(" ── {duration} "), Style::default().fg(border_color)),
-        Span::styled(format!("{}╮", "─".repeat(top_pad)), Style::default().fg(border_color)),
-    ]));
-
-    // Input preview: │ src/auth.rs              │
-    let preview_pad = inner_width.saturating_sub(card.input_preview.chars().count());
-    lines.push(Line::from(vec![
-        Span::raw("  "),
-        Span::styled("│ ", Style::default().fg(border_color)),
-        Span::styled(&card.input_preview, Style::default().fg(Color::Indexed(252))),
-        Span::raw(" ".repeat(preview_pad)),
-        Span::styled("│", Style::default().fg(border_color)),
-    ]));
-
-    // Expanded output
-    if card.expanded {
-        if let Some(ref output) = card.output {
-            lines.push(Line::from(vec![
-                Span::raw("  "),
-                Span::styled("│ ", Style::default().fg(border_color)),
-                Span::styled("─".repeat(inner_width), Style::default().fg(Color::Indexed(238))),
-                Span::styled("│", Style::default().fg(border_color)),
-            ]));
-            let max_lines = 20;
-            let output_lines: Vec<&str> = output.lines().collect();
-            for (i, line) in output_lines.iter().enumerate() {
-                if i >= max_lines {
-                    let msg = format!("... ({} more lines)", output_lines.len() - max_lines);
-                    let msg_pad = inner_width.saturating_sub(msg.chars().count());
-                    lines.push(Line::from(vec![
-                        Span::raw("  "),
-                        Span::styled("│ ", Style::default().fg(border_color)),
-                        Span::styled(msg, Style::default().fg(Color::DarkGray)),
-                        Span::raw(" ".repeat(msg_pad)),
-                        Span::styled("│", Style::default().fg(border_color)),
-                    ]));
-                    break;
-                }
-                let line_str = line.to_string();
-                let line_pad = inner_width.saturating_sub(line_str.chars().count());
-                lines.push(Line::from(vec![
-                    Span::raw("  "),
-                    Span::styled("│ ", Style::default().fg(border_color)),
-                    Span::raw(line_str),
-                    Span::raw(" ".repeat(line_pad)),
-                    Span::styled("│", Style::default().fg(border_color)),
-                ]));
-            }
-        }
-    }
-
-    // Bottom border: ╰──────────────────────╯
-    lines.push(Line::from(vec![
-        Span::raw("  "),
         Span::styled(
-            format!("╰{}╯", "─".repeat(inner_width + 1)),
-            Style::default().fg(border_color),
+            format!("{status_icon} "),
+            Style::default().fg(status_color),
+        ),
+        Span::styled(
+            display_name,
+            Style::default()
+                .fg(Color::Cyan)
+                .add_modifier(Modifier::BOLD),
         ),
     ]));
+
+    // For diff cards, show summary and diff lines
+    if let Some(ref diff) = card.diff {
+        // Summary: └  Added 38 lines, removed 3 lines
+        let summary = match (diff.added, diff.removed) {
+            (a, 0) => format!("└  Added {a} lines"),
+            (0, r) => format!("└  Removed {r} lines"),
+            (a, r) => format!("└  Added {a} lines, removed {r} lines"),
+        };
+        lines.push(Line::from(Span::styled(
+            summary,
+            Style::default().fg(Color::DarkGray),
+        )));
+
+        // Render diff hunks with line numbers and colors
+        if card.expanded {
+            for hunk in &diff.hunks {
+                let mut old_line = hunk.old_start;
+                let mut new_line = hunk.new_start;
+
+                for diff_line in &hunk.lines {
+                    match diff_line {
+                        DiffLine::Context(text) => {
+                            let line_num = format!("{:>5}  ", new_line);
+                            lines.push(Line::from(vec![
+                                Span::styled(
+                                    line_num,
+                                    Style::default().fg(Color::DarkGray),
+                                ),
+                                Span::styled(
+                                    format!("  {text}"),
+                                    Style::default().fg(Color::Indexed(252)),
+                                ),
+                            ]));
+                            old_line += 1;
+                            new_line += 1;
+                        }
+                        DiffLine::Added(text) => {
+                            let line_num = format!("{:>5} +", new_line);
+                            lines.push(Line::from(vec![
+                                Span::styled(
+                                    line_num,
+                                    Style::default().fg(Color::Green),
+                                ),
+                                Span::styled(
+                                    format!("  {text}"),
+                                    Style::default()
+                                        .fg(Color::Green)
+                                        .bg(Color::Rgb(0, 40, 0)),
+                                ),
+                            ]));
+                            new_line += 1;
+                        }
+                        DiffLine::Removed(text) => {
+                            let line_num = format!("{:>5} -", old_line);
+                            lines.push(Line::from(vec![
+                                Span::styled(
+                                    line_num,
+                                    Style::default().fg(Color::Red),
+                                ),
+                                Span::styled(
+                                    format!("  {text}"),
+                                    Style::default()
+                                        .fg(Color::Red)
+                                        .bg(Color::Rgb(40, 0, 0)),
+                                ),
+                            ]));
+                            old_line += 1;
+                        }
+                    }
+                }
+            }
+        }
+
+        lines.push(Line::from(""));
+    } else {
+        // Non-diff tool card — input preview + optional raw output
+        lines.push(Line::from(Span::styled(
+            format!("  {}", card.input_preview),
+            Style::default().fg(Color::Indexed(252)),
+        )));
+
+        if card.expanded {
+            if let Some(ref output) = card.output {
+                let max_lines = 20;
+                let output_lines: Vec<&str> = output.lines().collect();
+                for (i, line) in output_lines.iter().enumerate() {
+                    if i >= max_lines {
+                        lines.push(Line::from(Span::styled(
+                            format!("  ... ({} more lines)", output_lines.len() - max_lines),
+                            Style::default().fg(Color::DarkGray),
+                        )));
+                        break;
+                    }
+                    lines.push(Line::from(Span::styled(
+                        format!("  {line}"),
+                        Style::default().fg(Color::Indexed(245)),
+                    )));
+                }
+            }
+        }
+
+        lines.push(Line::from(""));
+    }
+}
+
+/// Shorten a file path for display — keep only the last 4 path segments.
+fn shorten_path(path: &str) -> &str {
+    let separators: &[char] = &['/', '\\'];
+    let segments: Vec<&str> = path.split(separators).filter(|s| !s.is_empty()).collect();
+    if segments.len() <= 4 {
+        return path;
+    }
+    // Walk from the end to find the start of the 4th-to-last segment
+    let target = &segments[segments.len() - 4..];
+    let search = target.last().unwrap_or(&"");
+    if let Some(pos) = path.rfind(search) {
+        let mut count = 0;
+        for (i, c) in path[..=pos].char_indices().rev() {
+            if c == '/' || c == '\\' {
+                count += 1;
+                if count == 3 {
+                    return &path[i + 1..];
+                }
+            }
+        }
+    }
+    path
 }
