@@ -24,7 +24,7 @@ OpenAnalyst CLI is an **independent, open-source AI coding agent** that connects
 | **TUI** | Full Ratatui-based terminal UI (default) | Most use basic REPL |
 | **Multi-agent orchestrator** | Built-in parallel agent spawning | Limited or none |
 | **Multimedia** | /image, /voice, /speak, /vision, /diagram | Rarely supported |
-| **49 slash commands** | Git, AI planning, multimedia, web scraping | 5-15 typical |
+| **51+ slash commands** | Git, AI planning, multimedia, web scraping | 5-15 typical |
 | **Single binary** | Native Rust, no runtime dependencies | Often needs Node/Python |
 
 ---
@@ -83,7 +83,7 @@ All providers are first-class citizens with live model discovery, streaming, and
 |----------|--------------|--------|
 | **OpenAnalyst** (default) | `OPENANALYST_AUTH_TOKEN` | Fetched live from API |
 | **Anthropic / Claude** | `ANTHROPIC_API_KEY` | opus, sonnet, haiku — fetched live |
-| **OpenAI / GPT** | `OPENAI_API_KEY` | gpt-4o, o3, codex — fetched live |
+| **OpenAI / Codex** | `OPENAI_API_KEY` | gpt-4o, o3, codex-mini — direct API |
 | **Google Gemini** | `GEMINI_API_KEY` | gemini-2.5-pro, gemini-2.5-flash — fetched live |
 | **xAI / Grok** | `XAI_API_KEY` | grok-3, grok-mini — fetched live |
 | **OpenRouter** | `OPENROUTER_API_KEY` | 350+ models from any provider |
@@ -132,7 +132,7 @@ OpenAnalyst CLI is a **14-crate Rust workspace**:
 ```text
 rust/crates/
 ├── api/                   # Multi-provider API client (7 providers)
-├── commands/              # 49 slash commands
+├── commands/              # 51+ slash commands
 ├── events/                # Shared TUI ↔ backend event types
 ├── orchestrator/          # Multi-agent lifecycle + channel bridge
 ├── tui/                   # Ratatui full-screen TUI application

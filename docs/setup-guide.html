@@ -166,19 +166,27 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
     <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Login &mdash; Interactive Provider Picker</span></div></div>
 <pre class="code"><span class="c-g">$</span> openanalyst login
 
-  Select your LLM provider:
+  Select your LLM provider to authenticate:
 
-  <span class="c-g">&gt;</span> <span class="c-c">OpenAnalyst</span>          OpenAnalyst API (default)
-    Anthropic / Claude
-    OpenAI / GPT
-    Google Gemini
+  <span class="c-g">&gt;</span> <span class="c-c">Anthropic / Claude</span>  opus, sonnet, haiku &mdash; browser login
+    OpenAI / Codex      gpt-4o, o3, codex-mini &mdash; browser login
+    Google Gemini       gemini-2.5-pro, flash &mdash; browser login
+    OpenAnalyst         OpenAnalyst API (default)
     xAI / Grok
     OpenRouter
     Amazon Bedrock
 
-  Enter your API key: <span class="c-d">sk-oa-...</span>
-  <span class="c-g">Testing connection... Connected</span>
-  Login complete</pre></div>
+  How would you like to authenticate?
+
+  <span class="c-g">&gt;</span> <span class="c-c">Login with browser</span>  sign in with your account (recommended)
+    Use API key         paste an API key manually
+
+  <span class="c-d">Step 1</span>  Opening Anthropic / Claude login in your browser...
+  <span class="c-d">Step 2</span>  Waiting for authentication... <span class="c-g">&#10003; Received</span>
+  <span class="c-d">Step 3</span>  Exchanging authorization code... <span class="c-g">&#10003; Authenticated</span>
+  <span class="c-d">Step 4</span>  Fetching available models... <span class="c-c">12 models</span>
+
+  <span class="c-g">&#10003; Login complete</span></pre></div>
   </div>
 </div>
 </section>
@@ -188,12 +196,12 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <div class="wrap">
   <div class="section-label">Multi-Provider</div>
   <div class="section-title">7 LLM providers. One interface.</div>
-  <div class="section-sub">Switch models mid-conversation. Session persists across providers. No other CLI does this.</div>
+  <div class="section-sub">Switch models mid-conversation. Session persists across providers. Login via browser OAuth or API key. No other CLI does this.</div>
 
   <div class="pgrid">
     <div class="pcard df"><div class="pcard-name">OpenAnalyst <span class="pcard-badge">DEFAULT</span></div><div class="pcard-env">OPENANALYST_AUTH_TOKEN</div><div class="pcard-desc">Models fetched live from API</div></div>
-    <div class="pcard"><div class="pcard-name">Anthropic / Claude</div><div class="pcard-env">ANTHROPIC_API_KEY</div><div class="pcard-desc">opus, sonnet, haiku &mdash; fetched live</div></div>
-    <div class="pcard"><div class="pcard-name">OpenAI / GPT</div><div class="pcard-env">OPENAI_API_KEY</div><div class="pcard-desc">gpt-4o, o3, codex &mdash; fetched live</div></div>
+    <div class="pcard"><div class="pcard-name">Anthropic / Claude</div><div class="pcard-env">ANTHROPIC_API_KEY</div><div class="pcard-desc">opus, sonnet, haiku &mdash; direct API</div></div>
+    <div class="pcard"><div class="pcard-name">OpenAI / Codex</div><div class="pcard-env">OPENAI_API_KEY</div><div class="pcard-desc">gpt-4o, o3, codex-mini &mdash; direct API</div></div>
     <div class="pcard"><div class="pcard-name">Google Gemini</div><div class="pcard-env">GEMINI_API_KEY</div><div class="pcard-desc">gemini-2.5-pro, flash &mdash; fetched live</div></div>
     <div class="pcard"><div class="pcard-name">xAI / Grok</div><div class="pcard-env">XAI_API_KEY</div><div class="pcard-desc">grok-3, grok-mini &mdash; fetched live</div></div>
     <div class="pcard"><div class="pcard-name">OpenRouter</div><div class="pcard-env">OPENROUTER_API_KEY</div><div class="pcard-desc">350+ models via one key</div></div>
@@ -237,7 +245,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
     <div class="acc-body"><div class="acc-content">Spawn parallel sub-agents for complex tasks. Each agent has its own conversation runtime, tool permissions, and lifecycle. The orchestrator bridges sync execution to the async TUI via channels. Watch agents work in real-time.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
-    <div class="acc-header"><div class="acc-icon" style="background:rgba(244,114,182,0.15);color:var(--pink)">&#9998;</div><div class="acc-title">49 Slash Commands</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(244,114,182,0.15);color:var(--pink)">&#9998;</div><div class="acc-title">51+ Slash Commands</div><div class="acc-arrow">&#9654;</div></div>
     <div class="acc-body"><div class="acc-content">Session management, git integration, AI planning, multimedia generation, web scraping, code analysis, plugin management, and more. Every command works with every provider. Type <code style="color:var(--cyan)">/help</code> to see them all.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
@@ -263,7 +271,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <section id="commands" style="background:var(--bg2)">
 <div class="wrap">
   <div class="section-label">Reference</div>
-  <div class="section-title">49 slash commands</div>
+  <div class="section-title">51+ slash commands</div>
   <div class="section-sub">All commands work identically regardless of which LLM provider you use.</div>
 
   <div class="tabs">
@@ -292,6 +300,9 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/logout <span class="tag tag-n">NEW</span></td><td>Clear all saved credentials</td></tr>
       <tr><td>/context <span class="tag tag-n">NEW</span></td><td>Show context window usage, token counts, model</td></tr>
       <tr><td>/vim <span class="tag tag-n">NEW</span></td><td>Toggle vim keybinding mode</td></tr>
+      <tr><td>/whoami <span class="tag tag-n">NEW</span></td><td>Show all logged-in providers and their status</td></tr>
+      <tr><td>/knowledge &lt;query&gt; <span class="tag tag-n">NEW</span></td><td>Search the OpenAnalyst knowledge base</td></tr>
+      <tr><td>/explore &lt;url&gt; <span class="tag tag-n">NEW</span></td><td>Smart-explore a GitHub repo from its history</td></tr>
     </table>
   </div>
 
@@ -410,7 +421,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">rust/crates/</span></div></div>
 <pre class="code"><span class="c-c">api/</span>                 <span class="c-d"># Multi-provider API client (7 providers)</span>
-<span class="c-c">commands/</span>            <span class="c-d"># 49 slash commands</span>
+<span class="c-c">commands/</span>            <span class="c-d"># 51+ slash commands</span>
 <span class="c-c">events/</span>              <span class="c-d"># Shared TUI &harr; backend event types</span>
 <span class="c-c">orchestrator/</span>        <span class="c-d"># Multi-agent lifecycle + channel bridge</span>
 <span class="c-c">tui/</span>                 <span class="c-d"># Ratatui full-screen TUI application</span>
@@ -440,7 +451,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <div style="font-size:13px;color:var(--muted);line-height:1.8">
         <strong style="color:var(--text)">14</strong> crates in workspace<br>
         <strong style="color:var(--text)">7</strong> LLM providers<br>
-        <strong style="color:var(--text)">49</strong> slash commands<br>
+        <strong style="color:var(--text)">51+</strong> slash commands<br>
         <strong style="color:var(--text)">19</strong> built-in tools<br>
         <strong style="color:var(--text)">MIT</strong> license
       </div>
@@ -459,6 +470,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
     <tr><td>.openanalyst.json</td><td>Shared project defaults (permissions, model, tools)</td></tr>
     <tr><td>.openanalyst/settings.json</td><td>Project-level settings</td></tr>
     <tr><td>.openanalyst/settings.local.json</td><td>Machine-local overrides (gitignored)</td></tr>
+    <tr><td>~/.openanalyst/.env</td><td>Provider API keys and environment config (auto-created)</td></tr>
     <tr><td>~/.openanalyst/credentials.json</td><td>Saved provider API keys</td></tr>
     <tr><td>.openanalyst/sessions/</td><td>Saved conversation sessions</td></tr>
     <tr><td>.openanalyst/skills/</td><td>Custom skill definitions</td></tr>
@@ -493,7 +505,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 <!-- ═══ 11. FOOTER ═══ -->
 <div class="footer" style="padding:40px 24px">
-  <p><strong>OpenAnalyst CLI v1.0.1</strong></p>
+  <p><strong>OpenAnalyst CLI v1.0.2</strong></p>
   <p style="margin-top:6px">An independent, open-source AI agent for the terminal</p>
   <p style="margin-top:12px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a> &middot; <a href="https://github.com/AnitChaudhry/openanalyst-cli" target="_blank">GitHub</a></p>
 </div>
