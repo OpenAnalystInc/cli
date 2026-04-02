@@ -325,6 +325,8 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/whoami <span class="tag tag-n">NEW</span></td><td>Show all logged-in providers and their status</td></tr>
       <tr><td>/knowledge &lt;query&gt; <span class="tag tag-n">NEW</span></td><td>Search the OpenAnalyst knowledge base</td></tr>
       <tr><td>/explore &lt;url&gt; <span class="tag tag-n">NEW</span></td><td>Smart-explore a GitHub repo from its history</td></tr>
+      <tr><td>/ask &lt;question&gt; <span class="tag tag-n">NEW</span></td><td>Quick question &mdash; no tools, fast response (alias: /btw)</td></tr>
+      <tr><td>/user-prompt &lt;msg&gt; <span class="tag tag-n">NEW</span></td><td>Inject a message with full tool access (alias: /up)</td></tr>
     </table>
   </div>
 
@@ -445,7 +447,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">rust/crates/</span></div></div>
 <pre class="code"><span class="c-c">api/</span>                 <span class="c-d"># Multi-provider API client (7 providers)</span>
-<span class="c-c">commands/</span>            <span class="c-d"># 56 slash commands</span>
+<span class="c-c">commands/</span>            <span class="c-d"># 58 slash commands</span>
 <span class="c-c">events/</span>              <span class="c-d"># Shared TUI &harr; backend event types</span>
 <span class="c-c">orchestrator/</span>        <span class="c-d"># Multi-agent lifecycle + channel bridge</span>
 <span class="c-c">tui/</span>                 <span class="c-d"># Ratatui full-screen TUI application</span>
@@ -475,9 +477,9 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <div style="font-size:13px;color:var(--muted);line-height:1.8">
         <strong style="color:var(--text)">14</strong> crates in workspace<br>
         <strong style="color:var(--text)">7</strong> LLM providers<br>
-        <strong style="color:var(--text)">56</strong> slash commands<br>
+        <strong style="color:var(--text)">58</strong> slash commands<br>
         <strong style="color:var(--text)">22</strong> built-in tools<br>
-        <strong style="color:var(--text)">309+</strong> tests<br>
+        <strong style="color:var(--text)">340+</strong> tests<br>
         <strong style="color:var(--text)">MIT</strong> license
       </div>
     </div>
