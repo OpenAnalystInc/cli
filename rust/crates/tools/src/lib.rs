@@ -240,7 +240,7 @@ impl GlobalToolRegistry {
     }
 
     /// Execute an MCP tool by calling the MCP server.
-    fn execute_mcp_tool(&self, tool: &McpRegisteredTool, input: &Value) -> Result<String, String> {
+    fn execute_mcp_tool(&self, tool: &McpRegisteredTool, _input: &Value) -> Result<String, String> {
         // MCP execution is handled via the bridge at call sites that have
         // access to the MCP connections. The tool registry stores the metadata;
         // actual execution is dispatched by the ChannelToolExecutor which holds

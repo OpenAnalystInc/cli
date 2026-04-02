@@ -604,10 +604,13 @@ impl App {
         if let Some(sidebar_area) = layout.sidebar {
             let elapsed_secs = self.status_bar.elapsed.as_secs();
             let tokens = self.status_bar.total_tokens;
+            self.sidebar_state.has_focus = self.focus == PanelId::Sidebar;
             sidebar::render_sidebar(
                 &self.sidebar_state,
                 tokens,
                 elapsed_secs,
+                &self.permission_mode,
+                &self.router,
                 sidebar_area,
                 buf,
             );
