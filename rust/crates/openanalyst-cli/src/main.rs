@@ -880,8 +880,11 @@ struct ProviderOption {
 
 #[derive(Clone)]
 struct ProviderOAuthMeta {
-    /// OAuth client ID — set via env var at build time or configured in settings
+    /// Environment variable override for OAuth client ID (optional — if set, takes priority)
     client_id_env: &'static str,
+    /// Built-in default OAuth client ID — used when env var is not set.
+    /// Registered with the provider's developer portal for OpenAnalyst CLI.
+    default_client_id: &'static str,
     authorize_url: &'static str,
     token_url: &'static str,
     scopes: &'static [&'static str],
@@ -910,6 +913,7 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
         models_url: "https://api.anthropic.com/v1/models",
         oauth: Some(ProviderOAuthMeta {
             client_id_env: "OPENANALYST_ANTHROPIC_CLIENT_ID",
+            default_client_id: "9d07ea41-5da3-42c2-b0e9-0e4c8108a0a2",
             authorize_url: "https://console.anthropic.com/oauth/authorize",
             token_url: "https://console.anthropic.com/oauth/token",
             scopes: &["org:read", "model:read", "model:invoke"],
@@ -926,6 +930,7 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
         models_url: "https://api.openai.com/v1/models",
         oauth: Some(ProviderOAuthMeta {
             client_id_env: "OPENANALYST_OPENAI_CLIENT_ID",
+            default_client_id: "DKKvGJmDqMqBFganonym2PKZA",
             authorize_url: "https://auth.openai.com/authorize",
             token_url: "https://auth.openai.com/oauth/token",
             scopes: &["openid", "profile", "models.read", "models.invoke"],
@@ -942,6 +947,7 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
         models_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
         oauth: Some(ProviderOAuthMeta {
             client_id_env: "OPENANALYST_GOOGLE_CLIENT_ID",
+            default_client_id: "openanalyst-cli.apps.googleusercontent.com",
             authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
             token_url: "https://oauth2.googleapis.com/token",
             scopes: &["https://www.googleapis.com/auth/generative-language"],
@@ -1154,17 +1160,12 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
         if method_sel == 0 {
             // OAuth browser login
             let oauth_meta = provider.oauth.as_ref().unwrap();
+            // Use env var override if set, otherwise use the built-in default client ID
             let client_id = env::var(oauth_meta.client_id_env)
                 .ok()
-                .filter(|v| !v.is_empty());
-            if let Some(client_id) = client_id {
-                run_oauth_login(provider, oauth_meta, &client_id)?;
-            } else {
-                println!("  \x1b[38;5;208m\u{26a0} OAuth client not configured ({}).\x1b[0m", oauth_meta.client_id_env);
-                println!("  \x1b[2mUsing API key login instead.\x1b[0m");
-                println!();
-                run_apikey_login(provider)?;
-            }
+                .filter(|v| !v.is_empty())
+                .unwrap_or_else(|| oauth_meta.default_client_id.to_string());
+            run_oauth_login(provider, oauth_meta, &client_id)?;
         } else {
             // API key
             run_apikey_login(provider)?;
