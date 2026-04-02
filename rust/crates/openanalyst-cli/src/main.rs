@@ -896,7 +896,7 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
         env_var: "OPENANALYST_AUTH_TOKEN",
         test_url: "https://api.openanalyst.com/api/health",
         test_header: "bearer",
-        dashboard_url: "https://console.openanalyst.com/api-keys",
+        dashboard_url: "https://10x.in/dashboard",
         models_url: "",
         oauth: None,
     },
