@@ -343,6 +343,36 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system("Debug: no recent tool call to replay.".to_string());
         }
 
+        SlashCommand::Dev { action, target } => {
+            let msg = match action.as_deref() {
+                None => "Usage: /dev <install|start|open URL|screenshot|click SEL|type SEL TEXT|eval JS|test DESC|stop|status>".to_string(),
+                Some("install") => {
+                    app.chat.push_system("Installing Playwright...".to_string());
+                    capture_command_output("npm", &["install", "-g", "playwright@latest"])
+                }
+                Some("status") => capture_command_output("npx", &["playwright", "--version"]),
+                Some("start") => "Use /dev start in the REPL (browser control requires interactive mode).".to_string(),
+                Some("stop") => "Use /dev stop in the REPL.".to_string(),
+                Some("open") => {
+                    if let Some(url) = target {
+                        format!("Navigate to: {url} (use REPL for live browser control)")
+                    } else {
+                        "Usage: /dev open <url>".to_string()
+                    }
+                }
+                Some("test") => {
+                    let description = target.unwrap_or_else(|| "the current page".to_string());
+                    let prompt = format!(
+                        "Write a Playwright test for: {description}. Use `const {{ test, expect }} = require('@playwright/test');` format. Return only the test code."
+                    );
+                    app.submit_prompt_internal(prompt);
+                    return true;
+                }
+                Some(other) => format!("/dev {other}: use REPL mode for live browser control"),
+            };
+            app.chat.push_system(msg);
+        }
+
         SlashCommand::Unknown(name) => {
             app.chat.push_system(format!("Unknown command: /{name}. Type /help for available commands."));
         }
