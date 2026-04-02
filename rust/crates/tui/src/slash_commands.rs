@@ -928,11 +928,11 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                 }
             } else {
                 app.chat.push_system(
-                    "Usage: /open-analyst <task> [--goal <text>] [--criteria <cmd>] [--max-turns N]\n\n\
+                    "Usage: /openanalyst <task> [--goal <text>] [--criteria <cmd>] [--max-turns N]\n\n\
                      Examples:\n\
-                     /open-analyst fix all failing tests --criteria \"cargo test\"\n\
+                     /openanalyst fix all failing tests --criteria \"cargo test\"\n\
                      /oa refactor auth to async --goal \"all auth fns are async\" --criteria \"cargo build\"\n\
-                     /auto add caching layer --max-turns 20".to_string()
+                     /openanalyst add caching layer --max-turns 20".to_string()
                 );
             }
         }
