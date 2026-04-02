@@ -109,16 +109,28 @@ fn load_saved_provider_credentials() {
 }
 
 fn main() {
-    // Load saved credentials from ~/.openanalyst/credentials.json into env vars
+    // 1. Create ~/.openanalyst/.env template on first run (if missing)
+    let _ = runtime::create_dotenv_template();
+    // 2. Load ~/.openanalyst/.env into process env (won't override existing vars)
+    let _ = runtime::load_dotenv();
+    // 3. Load saved credentials from ~/.openanalyst/credentials.json into env vars
     load_saved_provider_credentials();
     // Prune old/empty sessions in the background (non-blocking)
     std::thread::spawn(cleanup_old_sessions);
 
     if let Err(error) = run() {
-        // Check if this is a credentials error — show a friendly message, not --help
         let msg = error.to_string();
-        if msg.contains("credentials") || msg.contains("API_KEY") {
-            eprintln!("\n  \x1b[38;5;208m{msg}\x1b[0m\n");
+        if msg.contains("credentials") || msg.contains("API_KEY") || msg.contains("missing") {
+            eprintln!();
+            eprintln!("  \x1b[38;5;208mNo API credentials found.\x1b[0m");
+            eprintln!();
+            eprintln!("  Get started with one of:");
+            eprintln!("    \x1b[1mopenanalyst login\x1b[0m          Interactive login (browser or API key)");
+            eprintln!("    \x1b[1medit ~/.openanalyst/.env\x1b[0m   Add your API keys to the config file");
+            eprintln!();
+            eprintln!("  \x1b[2mOnce logged in, just run \x1b[0m\x1b[1mopenanalyst\x1b[0m\x1b[2m to start a new session.\x1b[0m");
+            eprintln!("  \x1b[2mYour credentials are saved and remembered across sessions.\x1b[0m");
+            eprintln!();
         } else {
             eprintln!(
                 "error: {error}\n\nRun `openanalyst --help` for usage."
@@ -1458,8 +1470,13 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
         fs::remove_file(&creds_path)?;
     }
 
-    println!("  \x1b[38;5;45mAll credentials cleared.\x1b[0m");
-    println!("  Removed: {}", creds_path.display());
+    println!();
+    println!("  \x1b[38;5;45m\u{2713} All credentials cleared.\x1b[0m");
+    println!("  \x1b[2mRemoved:\x1b[0m {}", creds_path.display());
+    println!();
+    println!("  \x1b[2mNote: Keys in \x1b[0m~/.openanalyst/.env\x1b[2m are not removed.\x1b[0m");
+    println!("  \x1b[2mRun \x1b[0m\x1b[1mopenanalyst login\x1b[0m\x1b[2m to authenticate with a different provider.\x1b[0m");
+    println!();
     Ok(())
 }
 
@@ -1527,7 +1544,8 @@ fn run_whoami() -> Result<(), Box<dyn std::error::Error>> {
 
     println!();
     if logged_in == 0 {
-        println!("  \x1b[2mNo providers logged in. Run \x1b[0m\x1b[1mopenanalyst login\x1b[0m\x1b[2m to authenticate.\x1b[0m");
+        println!("  \x1b[2mNo providers logged in.\x1b[0m");
+        println!("  \x1b[2mRun \x1b[0m\x1b[1mopenanalyst login\x1b[0m\x1b[2m or edit \x1b[0m\x1b[1m~/.openanalyst/.env\x1b[0m\x1b[2m to add your API keys.\x1b[0m");
     } else {
         println!("  \x1b[2m{} provider(s) authenticated.\x1b[0m", logged_in);
         println!("  \x1b[2mSwitch models with\x1b[0m /model <name> \x1b[2min the REPL.\x1b[0m");

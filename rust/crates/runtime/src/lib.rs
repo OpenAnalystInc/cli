@@ -61,8 +61,9 @@ pub use mcp_stdio::{
     McpToolCallContent, McpToolCallParams, McpToolCallResult, UnsupportedMcpServer,
 };
 pub use oauth::{
-    clear_oauth_credentials, code_challenge_s256, credentials_config_home, credentials_path,
-    generate_pkce_pair, generate_state, load_oauth_credentials, load_provider_oauth_token,
+    clear_oauth_credentials, code_challenge_s256, create_dotenv_template,
+    credentials_config_home, credentials_path, generate_pkce_pair, generate_state,
+    load_dotenv, load_dotenv_from, load_oauth_credentials, load_provider_oauth_token,
     loopback_redirect_uri, parse_oauth_callback_query, parse_oauth_callback_request_target,
     save_oauth_credentials, save_provider_oauth_token, start_oauth_callback_server,
     OAuthAuthorizationRequest, OAuthCallbackParams, OAuthRefreshRequest,

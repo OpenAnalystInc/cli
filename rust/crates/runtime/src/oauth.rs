@@ -417,6 +417,141 @@ pub fn credentials_config_home() -> io::Result<PathBuf> {
     credentials_home_dir()
 }
 
+/// Load environment variables from `~/.openanalyst/.env`.
+/// Only sets vars that are NOT already set in the process environment.
+/// Supports `KEY=VALUE`, `KEY="VALUE"`, comments (`#`), and blank lines.
+/// Returns the number of variables loaded.
+pub fn load_dotenv() -> io::Result<usize> {
+    let env_path = credentials_home_dir()?.join(".env");
+    load_dotenv_from(&env_path)
+}
+
+/// Load environment variables from a specific `.env` file path.
+pub fn load_dotenv_from(path: &std::path::Path) -> io::Result<usize> {
+    let content = match fs::read_to_string(path) {
+        Ok(c) => c,
+        Err(e) if e.kind() == io::ErrorKind::NotFound => return Ok(0),
+        Err(e) => return Err(e),
+    };
+    let mut count = 0;
+    for line in content.lines() {
+        let trimmed = line.trim();
+        // Skip empty lines and comments
+        if trimmed.is_empty() || trimmed.starts_with('#') {
+            continue;
+        }
+        let Some((key, raw_value)) = trimmed.split_once('=') else {
+            continue;
+        };
+        let key = key.trim();
+        if key.is_empty() {
+            continue;
+        }
+        // Strip surrounding quotes from value
+        let value = raw_value.trim();
+        let value = if (value.starts_with('"') && value.ends_with('"'))
+            || (value.starts_with('\'') && value.ends_with('\''))
+        {
+            &value[1..value.len() - 1]
+        } else {
+            value
+        };
+        // Don't override existing env vars
+        if std::env::var(key).ok().filter(|v| !v.is_empty()).is_none() {
+            std::env::set_var(key, value);
+            count += 1;
+        }
+    }
+    Ok(count)
+}
+
+/// Generate the default `.env` template at `~/.openanalyst/.env` if it doesn't exist.
+/// Returns the path to the file, or None if it already exists.
+pub fn create_dotenv_template() -> io::Result<Option<PathBuf>> {
+    let config_dir = credentials_home_dir()?;
+    fs::create_dir_all(&config_dir)?;
+    let env_path = config_dir.join(".env");
+    if env_path.exists() {
+        return Ok(None);
+    }
+    fs::write(&env_path, DOTENV_TEMPLATE)?;
+    Ok(Some(env_path))
+}
+
+const DOTENV_TEMPLATE: &str = r#"# ═══════════════════════════════════════════════════════════════════
+#  OpenAnalyst CLI — Environment Configuration
+# ═══════════════════════════════════════════════════════════════════
+#
+#  Add your API keys here. The CLI loads this file on startup.
+#  Only uncomment and fill in the providers you want to use.
+#  You can also use `openanalyst login` for interactive setup.
+#
+#  Docs: https://github.com/AnitChaudhry/openanalyst-cli
+# ═══════════════════════════════════════════════════════════════════
+
+# ── Provider API Keys ─────────────────────────────────────────────
+# Uncomment and add your key for each provider you want to use.
+
+# OpenAnalyst (default provider)
+# OPENANALYST_API_KEY=
+# OPENANALYST_AUTH_TOKEN=
+
+# Anthropic / Claude (opus, sonnet, haiku)
+# ANTHROPIC_API_KEY=sk-ant-...
+
+# OpenAI / Codex (gpt-4o, o3, codex-mini)
+# OPENAI_API_KEY=sk-...
+
+# Google Gemini (gemini-2.5-pro, flash)
+# GEMINI_API_KEY=AIza...
+
+# xAI / Grok (grok-3, grok-mini)
+# XAI_API_KEY=xai-...
+
+# OpenRouter (350+ models via one key)
+# OPENROUTER_API_KEY=sk-or-...
+
+# Amazon Bedrock
+# BEDROCK_API_KEY=
+
+# Stability AI (image generation via /image)
+# STABILITY_API_KEY=sk-...
+
+# ── OAuth Client IDs (for browser login) ──────────────────────────
+# Required only if you want `openanalyst login` to use browser OAuth
+# instead of API key paste. Register your app with each provider.
+
+# OPENANALYST_ANTHROPIC_CLIENT_ID=
+# OPENANALYST_OPENAI_CLIENT_ID=
+# OPENANALYST_GOOGLE_CLIENT_ID=
+
+# ── Base URL Overrides (optional) ─────────────────────────────────
+# Use these to point to custom/proxy endpoints.
+
+# OPENANALYST_BASE_URL=https://api.openanalyst.com/api
+# ANTHROPIC_BASE_URL=https://api.anthropic.com
+# OPENAI_BASE_URL=https://api.openai.com/v1
+# GEMINI_BASE_URL=https://generativelanguage.googleapis.com/v1beta/openai
+# XAI_BASE_URL=https://api.x.ai/v1
+# OPENROUTER_BASE_URL=https://openrouter.ai/api/v1
+# BEDROCK_BASE_URL=https://bedrock-runtime.us-east-1.amazonaws.com/v1
+
+# ── Model Configuration ──────────────────────────────────────────
+# Override the default model used by the CLI.
+
+# OPENANALYST_MODEL=claude-sonnet-4-6
+# OPENANALYST_DEFAULT_MODEL=claude-sonnet-4-6
+
+# ── Feature Configuration ────────────────────────────────────────
+# Custom paths for data storage.
+
+# OPENANALYST_CONFIG_HOME=~/.openanalyst
+# OPENANALYST_TODO_STORE=
+# OPENANALYST_AGENT_STORE=
+# OPENANALYST_KB_URL=
+# OPENANALYST_WEB_SEARCH_BASE_URL=
+"#;
+
 fn credentials_home_dir() -> io::Result<PathBuf> {
     if let Some(path) = std::env::var_os("OPENANALYST_CONFIG_HOME") {
         return Ok(PathBuf::from(path));
