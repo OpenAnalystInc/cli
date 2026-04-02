@@ -96,20 +96,31 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
 
         SlashCommand::Model { model } => {
             if let Some(new_model) = model {
-                // Update display
-                app.status_bar.model_name = new_model.clone();
-                // Update the router so future prompts use the new model
-                app.router = orchestrator::router::ModelRouter::from_default_model(&new_model);
-                // Notify orchestrator to update its config
-                let tx = app.action_tx.clone();
-                let m = new_model.clone();
-                tokio::spawn(async move {
-                    let _ = tx.send(Action::UpdateModel(m)).await;
-                });
-                let table = app.router.render_table();
-                app.chat.push_system(format!(
-                    "Model switched to: {new_model}\nRouting table updated:\n{table}"
-                ));
+                // Validate: can we build a ProviderClient for this model?
+                match api::ProviderClient::from_model(&new_model) {
+                    Ok(_) => {
+                        // Update display
+                        app.status_bar.model_name = new_model.clone();
+                        // Update the router so future prompts use the new model
+                        app.router = orchestrator::router::ModelRouter::from_default_model(&new_model);
+                        // Notify orchestrator to update its config
+                        let tx = app.action_tx.clone();
+                        let m = new_model.clone();
+                        tokio::spawn(async move {
+                            let _ = tx.send(Action::UpdateModel(m)).await;
+                        });
+                        let table = app.router.render_table();
+                        app.chat.push_system(format!(
+                            "Model switched to: {new_model}\nRouting table updated:\n{table}"
+                        ));
+                    }
+                    Err(e) => {
+                        app.chat.push_system(format!(
+                            "Cannot switch to {new_model}: {e}\n\
+                             Check that the provider's API key is set in your environment."
+                        ));
+                    }
+                }
             } else {
                 let current = if app.status_bar.model_name.is_empty() {
                     "default"
@@ -1163,27 +1174,14 @@ fn load_session_into_chat(app: &mut crate::app::App, path: &str) -> Result<usize
     app.chat.scroll_offset = 0;
     app.chat.focused_message = None;
 
-    // Load messages from session
-    let messages = session.get("messages")
-        .and_then(|m| m.as_array())
-        .cloned()
-        .unwrap_or_default();
+    // Session migration: detect version and normalize
+    let version = session.get("version").and_then(|v| v.as_u64()).unwrap_or(1);
+    let messages = migrate_session_messages(&session, version);
 
     let count = messages.len();
     for msg in &messages {
         let role = msg.get("role").and_then(|r| r.as_str()).unwrap_or("system");
-        let text = msg.get("content")
-            .and_then(|c| {
-                c.as_str().map(ToOwned::to_owned).or_else(|| {
-                    c.as_array().map(|blocks| {
-                        blocks.iter()
-                            .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
-                            .collect::<Vec<_>>()
-                            .join("\n")
-                    })
-                })
-            })
-            .unwrap_or_default();
+        let text = extract_message_text(msg);
         if text.is_empty() { continue; }
         match role {
             "user" => app.chat.push_user(text),
@@ -1192,11 +1190,70 @@ fn load_session_into_chat(app: &mut crate::app::App, path: &str) -> Result<usize
                 app.chat.push_delta(&text);
                 app.chat.finish_assistant();
             }
+            "tool_call" => {
+                let tool = msg.get("tool_name").and_then(|t| t.as_str()).unwrap_or("tool");
+                let input = msg.get("input").and_then(|i| i.as_str()).unwrap_or("");
+                app.chat.push_system(format!("[{tool}] {input}"));
+            }
             _ => app.chat.push_system(text),
         }
     }
 
+    // Restore token count if available
+    if let Some(tokens) = session.get("tokens").and_then(|t| t.as_u64()) {
+        app.status_bar.total_tokens = tokens;
+    }
+
     Ok(count)
+}
+
+/// Migrate session messages across versions.
+/// v1: flat array of {role, content} — content may be string or object
+/// v2: same but with tool_call role and structured fields
+/// Future: any new fields get defaults
+fn migrate_session_messages(session: &serde_json::Value, version: u64) -> Vec<serde_json::Value> {
+    let messages = session.get("messages")
+        .and_then(|m| m.as_array())
+        .cloned()
+        .unwrap_or_default();
+
+    if version >= 2 {
+        return messages;
+    }
+
+    // v1 migration: normalize content formats
+    messages.into_iter().map(|mut msg| {
+        // v1 might have "content" as an array of content blocks (Anthropic format)
+        if let Some(content) = msg.get("content") {
+            if content.is_array() {
+                // Flatten content blocks to text
+                let text = content.as_array().unwrap().iter()
+                    .filter_map(|b| {
+                        b.get("text").and_then(|t| t.as_str()).map(ToOwned::to_owned)
+                    })
+                    .collect::<Vec<_>>()
+                    .join("\n");
+                msg.as_object_mut().unwrap().insert("content".to_string(), serde_json::Value::String(text));
+            }
+        }
+        msg
+    }).collect()
+}
+
+/// Extract text from a message, handling both string and array content formats.
+fn extract_message_text(msg: &serde_json::Value) -> String {
+    msg.get("content")
+        .and_then(|c| {
+            c.as_str().map(ToOwned::to_owned).or_else(|| {
+                c.as_array().map(|blocks| {
+                    blocks.iter()
+                        .filter_map(|b| b.get("text").and_then(|t| t.as_str()))
+                        .collect::<Vec<_>>()
+                        .join("\n")
+                })
+            })
+        })
+        .unwrap_or_default()
 }
 
 /// /export — write chat messages to a markdown file.
