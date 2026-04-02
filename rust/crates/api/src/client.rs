@@ -37,11 +37,19 @@ impl ProviderClient {
     ) -> Result<Self, ApiError> {
         let resolved_model = providers::resolve_model_alias(model);
         match providers::detect_provider_kind(&resolved_model) {
-            // Anthropic-format providers
-            ProviderKind::OpenAnalystApi | ProviderKind::Anthropic => {
+            // OpenAnalyst API (Anthropic-compatible, proxied)
+            ProviderKind::OpenAnalystApi => {
                 Ok(Self::OpenAnalystApi(match default_auth {
                     Some(auth) => OpenAnalystApiClient::from_auth(auth),
                     None => OpenAnalystApiClient::from_env()?,
+                }))
+            }
+            // Anthropic direct (user's own ANTHROPIC_API_KEY → api.anthropic.com)
+            ProviderKind::Anthropic => {
+                Ok(Self::OpenAnalystApi(match default_auth {
+                    Some(auth) => OpenAnalystApiClient::from_auth(auth)
+                        .with_base_url(openanalyst_provider::DEFAULT_ANTHROPIC_BASE_URL),
+                    None => OpenAnalystApiClient::from_anthropic_env()?,
                 }))
             }
             // OpenAI-format providers
@@ -157,7 +165,7 @@ mod tests {
         assert_eq!(detect_provider_kind("gemini-2.5-pro"), ProviderKind::Gemini);
         assert_eq!(
             detect_provider_kind("claude-sonnet-4-6"),
-            ProviderKind::OpenAnalystApi
+            ProviderKind::Anthropic
         );
     }
 }

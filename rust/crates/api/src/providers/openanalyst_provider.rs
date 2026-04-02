@@ -14,6 +14,7 @@ use crate::sse::SseParser;
 use crate::types::{MessageRequest, MessageResponse, StreamEvent};
 
 pub const DEFAULT_BASE_URL: &str = "https://api.openanalyst.com/api";
+pub const DEFAULT_ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 const REQUEST_ID_HEADER: &str = "request-id";
 const ALT_REQUEST_ID_HEADER: &str = "x-request-id";
@@ -34,11 +35,8 @@ pub enum AuthSource {
 
 impl AuthSource {
     pub fn from_env() -> Result<Self, ApiError> {
-        // Try OpenAnalyst credentials first, then fall back to Anthropic credentials
-        let api_key = read_env_non_empty("OPENANALYST_API_KEY")?
-            .or(read_env_non_empty("ANTHROPIC_API_KEY")?);
-        let auth_token = read_env_non_empty("OPENANALYST_AUTH_TOKEN")?
-            .or(read_env_non_empty("ANTHROPIC_AUTH_TOKEN")?);
+        let api_key = read_env_non_empty("OPENANALYST_API_KEY")?;
+        let auth_token = read_env_non_empty("OPENANALYST_AUTH_TOKEN")?;
         match (api_key, auth_token) {
             (Some(api_key), Some(bearer_token)) => Ok(Self::ApiKeyAndBearer {
                 api_key,
@@ -51,8 +49,6 @@ impl AuthSource {
                 &[
                     "OPENANALYST_AUTH_TOKEN",
                     "OPENANALYST_API_KEY",
-                    "ANTHROPIC_AUTH_TOKEN",
-                    "ANTHROPIC_API_KEY",
                 ],
             )),
         }
@@ -150,6 +146,24 @@ impl OpenAnalystApiClient {
 
     pub fn from_env() -> Result<Self, ApiError> {
         Ok(Self::from_auth(AuthSource::from_env_or_saved()?).with_base_url(read_base_url()))
+    }
+
+    /// Create a client that calls Anthropic's API directly using the user's own key.
+    pub fn from_anthropic_env() -> Result<Self, ApiError> {
+        let api_key = read_env_non_empty("ANTHROPIC_API_KEY")?
+            .ok_or_else(|| ApiError::missing_credentials("Anthropic", &["ANTHROPIC_API_KEY"]))?;
+        let base_url = std::env::var("ANTHROPIC_BASE_URL")
+            .ok()
+            .filter(|v| !v.is_empty())
+            .unwrap_or_else(|| DEFAULT_ANTHROPIC_BASE_URL.to_string());
+        Ok(Self {
+            http: reqwest::Client::new(),
+            auth: AuthSource::ApiKey(api_key),
+            base_url,
+            max_retries: DEFAULT_MAX_RETRIES,
+            initial_backoff: DEFAULT_INITIAL_BACKOFF,
+            max_backoff: DEFAULT_MAX_BACKOFF,
+        })
     }
 
     #[must_use]
@@ -351,11 +365,8 @@ impl OpenAnalystApiClient {
 
 impl AuthSource {
     pub fn from_env_or_saved() -> Result<Self, ApiError> {
-        // Try OpenAnalyst credentials first, then fall back to Anthropic credentials
-        let api_key = read_env_non_empty("OPENANALYST_API_KEY")?
-            .or(read_env_non_empty("ANTHROPIC_API_KEY")?);
-        let auth_token = read_env_non_empty("OPENANALYST_AUTH_TOKEN")?
-            .or(read_env_non_empty("ANTHROPIC_AUTH_TOKEN")?);
+        let api_key = read_env_non_empty("OPENANALYST_API_KEY")?;
+        let auth_token = read_env_non_empty("OPENANALYST_AUTH_TOKEN")?;
         if let Some(api_key) = api_key {
             return match auth_token {
                 Some(bearer_token) => Ok(Self::ApiKeyAndBearer {
@@ -385,8 +396,6 @@ impl AuthSource {
                 &[
                     "OPENANALYST_AUTH_TOKEN",
                     "OPENANALYST_API_KEY",
-                    "ANTHROPIC_AUTH_TOKEN",
-                    "ANTHROPIC_API_KEY",
                 ],
             )),
             Err(error) => Err(error),
@@ -411,8 +420,6 @@ pub fn resolve_saved_oauth_token(config: &OAuthConfig) -> Result<Option<OAuthTok
 pub fn has_auth_from_env_or_saved() -> Result<bool, ApiError> {
     Ok(read_env_non_empty("OPENANALYST_API_KEY")?.is_some()
         || read_env_non_empty("OPENANALYST_AUTH_TOKEN")?.is_some()
-        || read_env_non_empty("ANTHROPIC_API_KEY")?.is_some()
-        || read_env_non_empty("ANTHROPIC_AUTH_TOKEN")?.is_some()
         || load_saved_oauth_token()?.is_some())
 }
 
@@ -420,11 +427,8 @@ pub fn resolve_startup_auth_source<F>(load_oauth_config: F) -> Result<AuthSource
 where
     F: FnOnce() -> Result<Option<OAuthConfig>, ApiError>,
 {
-    // Try OpenAnalyst credentials first, then fall back to Anthropic credentials
-    let api_key = read_env_non_empty("OPENANALYST_API_KEY")?
-        .or(read_env_non_empty("ANTHROPIC_API_KEY")?);
-    let auth_token = read_env_non_empty("OPENANALYST_AUTH_TOKEN")?
-        .or(read_env_non_empty("ANTHROPIC_AUTH_TOKEN")?);
+    let api_key = read_env_non_empty("OPENANALYST_API_KEY")?;
+    let auth_token = read_env_non_empty("OPENANALYST_AUTH_TOKEN")?;
 
     if let Some(api_key) = api_key {
         return match auth_token {
@@ -445,8 +449,6 @@ where
             &[
                 "OPENANALYST_AUTH_TOKEN",
                 "OPENANALYST_API_KEY",
-                "ANTHROPIC_AUTH_TOKEN",
-                "ANTHROPIC_API_KEY",
             ],
         ));
     };

@@ -29,9 +29,11 @@ use init::initialize_repo;
 use plugins::{PluginManager, PluginManagerConfig};
 use render::{MarkdownStreamState, Spinner, TerminalRenderer};
 use runtime::{
-    clear_oauth_credentials, load_system_prompt, ApiClient, ApiRequest,
-    AssistantEvent, CompactionConfig, ConfigLoader, ConfigSource, ContentBlock,
-    ConversationMessage, ConversationRuntime, MessageRole,
+    clear_oauth_credentials, generate_pkce_pair, generate_state, load_system_prompt,
+    loopback_redirect_uri, save_provider_oauth_token, start_oauth_callback_server,
+    ApiClient, ApiRequest, AssistantEvent, CompactionConfig, ConfigLoader,
+    ConfigSource, ContentBlock, ConversationMessage, ConversationRuntime, MessageRole,
+    OAuthAuthorizationRequest, OAuthConfig, OAuthTokenExchangeRequest,
     PermissionMode, PermissionPolicy, ProjectContext, RuntimeError,
     Session, TokenUsage, ToolError, ToolExecutor, UsageTracker,
 };
@@ -149,6 +151,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             .run_turn_with_output(&prompt, output_format)?,
         CliAction::Login => run_login()?,
         CliAction::Logout => run_logout()?,
+        CliAction::WhoAmI => run_whoami()?,
         CliAction::Init => run_init()?,
         CliAction::Agent {
             task,
@@ -204,6 +207,7 @@ enum CliAction {
     },
     Login,
     Logout,
+    WhoAmI,
     Init,
     Repl {
         model: String,
@@ -374,6 +378,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
         "agent" => parse_agent_args(&rest[1..], &model, permission_mode, &allowed_tool_values),
         "login" => Ok(CliAction::Login),
         "logout" => Ok(CliAction::Logout),
+        "whoami" => Ok(CliAction::WhoAmI),
         "init" => Ok(CliAction::Init),
         "prompt" => {
             let prompt = rest[1..].join(" ");
@@ -696,7 +701,22 @@ struct ProviderOption {
     env_var: &'static str,
     test_url: &'static str,
     test_header: &'static str, // "bearer" or "x-api-key"
-    placeholder: &'static str,
+    dashboard_url: &'static str, // URL to open in browser for key generation
+    models_url: &'static str,    // URL to fetch available models after login
+    /// OAuth config for providers that support browser-based login.
+    /// When set, `openanalyst login` will use the OAuth flow instead of API key paste.
+    oauth: Option<ProviderOAuthMeta>,
+}
+
+#[derive(Clone)]
+struct ProviderOAuthMeta {
+    /// OAuth client ID — set via env var at build time or configured in settings
+    client_id_env: &'static str,
+    authorize_url: &'static str,
+    token_url: &'static str,
+    scopes: &'static [&'static str],
+    /// The env var to store the resulting API key / bearer token
+    token_env_var: &'static str,
 }
 
 const LOGIN_PROVIDERS: &[ProviderOption] = &[
@@ -706,39 +726,77 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
         env_var: "OPENANALYST_AUTH_TOKEN",
         test_url: "https://api.openanalyst.com/api/health",
         test_header: "bearer",
-        placeholder: "sk-oa-...",
+        dashboard_url: "https://console.openanalyst.com/api-keys",
+        models_url: "",
+        oauth: None,
     },
     ProviderOption {
         name: "Anthropic / Claude",
-        description: "Anthropic Claude API",
+        description: "opus, sonnet, haiku — browser login",
         env_var: "ANTHROPIC_API_KEY",
         test_url: "https://api.anthropic.com/v1/messages",
         test_header: "x-api-key",
-        placeholder: "sk-ant-...",
+        dashboard_url: "https://console.anthropic.com/settings/keys",
+        models_url: "https://api.anthropic.com/v1/models",
+        oauth: Some(ProviderOAuthMeta {
+            client_id_env: "OPENANALYST_ANTHROPIC_CLIENT_ID",
+            authorize_url: "https://console.anthropic.com/oauth/authorize",
+            token_url: "https://console.anthropic.com/oauth/token",
+            scopes: &["org:read", "model:read", "model:invoke"],
+            token_env_var: "ANTHROPIC_API_KEY",
+        }),
     },
     ProviderOption {
-        name: "OpenAI / GPT",
-        description: "OpenAI ChatGPT & Codex",
+        name: "OpenAI / Codex",
+        description: "gpt-4o, o3, codex-mini — browser login",
         env_var: "OPENAI_API_KEY",
         test_url: "https://api.openai.com/v1/models",
         test_header: "bearer",
-        placeholder: "sk-...",
+        dashboard_url: "https://platform.openai.com/api-keys",
+        models_url: "https://api.openai.com/v1/models",
+        oauth: Some(ProviderOAuthMeta {
+            client_id_env: "OPENANALYST_OPENAI_CLIENT_ID",
+            authorize_url: "https://auth.openai.com/authorize",
+            token_url: "https://auth.openai.com/oauth/token",
+            scopes: &["openid", "profile", "models.read", "models.invoke"],
+            token_env_var: "OPENAI_API_KEY",
+        }),
+    },
+    ProviderOption {
+        name: "Google Gemini",
+        description: "gemini-2.5-pro, flash — browser login",
+        env_var: "GEMINI_API_KEY",
+        test_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
+        test_header: "bearer",
+        dashboard_url: "https://aistudio.google.com/apikey",
+        models_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
+        oauth: Some(ProviderOAuthMeta {
+            client_id_env: "OPENANALYST_GOOGLE_CLIENT_ID",
+            authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
+            token_url: "https://oauth2.googleapis.com/token",
+            scopes: &["https://www.googleapis.com/auth/generative-language"],
+            token_env_var: "GEMINI_API_KEY",
+        }),
     },
     ProviderOption {
         name: "xAI / Grok",
-        description: "xAI Grok models",
+        description: "grok-3, grok-mini",
         env_var: "XAI_API_KEY",
         test_url: "https://api.x.ai/v1/models",
         test_header: "bearer",
-        placeholder: "xai-...",
+        dashboard_url: "https://console.x.ai",
+        models_url: "https://api.x.ai/v1/models",
+        oauth: None,
     },
     ProviderOption {
         name: "OpenRouter",
-        description: "Access any model via OpenRouter",
+        description: "350+ models via one key",
         env_var: "OPENROUTER_API_KEY",
         test_url: "https://openrouter.ai/api/v1/models",
         test_header: "bearer",
-        placeholder: "sk-or-...",
+        dashboard_url: "https://openrouter.ai/keys",
+        models_url: "https://openrouter.ai/api/v1/models",
+        oauth: None,
     },
     ProviderOption {
         name: "Amazon Bedrock",
@@ -746,25 +804,31 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
         env_var: "BEDROCK_API_KEY",
         test_url: "",
         test_header: "bearer",
-        placeholder: "...",
-    },
-    ProviderOption {
-        name: "Google Gemini",
-        description: "Gemini 2.5 Pro, Flash & more",
-        env_var: "GEMINI_API_KEY",
-        test_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
-        test_header: "bearer",
-        placeholder: "AIza...",
+        dashboard_url: "",
+        models_url: "",
+        oauth: None,
     },
     ProviderOption {
         name: "Stability AI",
-        description: "Stable Diffusion image generation (/image)",
+        description: "Stable Diffusion (/image)",
         env_var: "STABILITY_API_KEY",
         test_url: "",
         test_header: "bearer",
-        placeholder: "sk-...",
+        dashboard_url: "https://platform.stability.ai/account/keys",
+        models_url: "",
+        oauth: None,
     },
 ];
+
+/// Open a URL in the default browser (cross-platform).
+fn open_browser(url: &str) -> bool {
+    #[cfg(target_os = "windows")]
+    { std::process::Command::new("cmd").args(["/C", "start", "", url]).spawn().is_ok() }
+    #[cfg(target_os = "macos")]
+    { std::process::Command::new("open").arg(url).spawn().is_ok() }
+    #[cfg(target_os = "linux")]
+    { std::process::Command::new("xdg-open").arg(url).spawn().is_ok() }
+}
 
 fn run_login() -> Result<(), Box<dyn std::error::Error>> {
     use crossterm::{
@@ -779,7 +843,7 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
     // ── Show header ──
     println!();
     println!("  \x1b[38;5;45m\x1b[1mOpenAnalyst CLI \x1b[0m\x1b[2m— Login\x1b[0m");
-    println!("  \x1b[2mSelect your LLM provider:\x1b[0m");
+    println!("  \x1b[2mSelect your LLM provider to authenticate:\x1b[0m");
     println!();
 
     // ── Interactive arrow-key selector ──
@@ -787,7 +851,6 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
     terminal::enable_raw_mode()?;
     execute!(stdout, cursor::Hide)?;
 
-    // Draw initial menu
     let draw_menu = |sel: usize, out: &mut io::Stdout| -> io::Result<()> {
         for (i, provider) in LOGIN_PROVIDERS.iter().enumerate() {
             let prefix = if i == sel { "\x1b[38;5;45m  > " } else { "    " };
@@ -814,7 +877,6 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
                 match code {
                     KeyCode::Up if selected > 0 => {
                         selected -= 1;
-                        // Move cursor up to redraw
                         let _ = write!(stdout, "\x1b[{}A", LOGIN_PROVIDERS.len());
                         draw_menu(selected, &mut stdout)?;
                     }
@@ -848,41 +910,372 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
     let provider = &LOGIN_PROVIDERS[selected];
     println!();
     println!(
-        "  \x1b[38;5;45m\x1b[1m{}\x1b[0m selected",
+        "  \x1b[38;5;45m\x1b[1m{}\x1b[0m",
         provider.name
     );
     println!();
 
-    // ── Prompt for API key ──
-    print!("  Enter your API key ({}): \x1b[38;5;45m", provider.placeholder);
+    // ── For Claude/Codex/Gemini: ask OAuth vs API key ──
+    if provider.oauth.is_some() {
+        let auth_methods = [
+            ("Login with browser", "sign in with your account (recommended)"),
+            ("Use API key", "paste an API key manually"),
+        ];
+
+        println!("  \x1b[2mHow would you like to authenticate?\x1b[0m");
+        println!();
+
+        // Mini selector for auth method
+        let mut method_sel: usize = 0;
+        {
+            use crossterm::{cursor, event::{self, Event, KeyCode, KeyEvent, KeyModifiers}, execute, terminal};
+            terminal::enable_raw_mode()?;
+            execute!(stdout, cursor::Hide)?;
+
+            let draw = |sel: usize, out: &mut io::Stdout| -> io::Result<()> {
+                for (i, (name, desc)) in auth_methods.iter().enumerate() {
+                    let prefix = if i == sel { "\x1b[38;5;45m  > " } else { "    " };
+                    let style = if i == sel { "\x1b[1m" } else { "\x1b[2m" };
+                    let hint = if i == sel { format!("  \x1b[2m{desc}\x1b[0m") } else { String::new() };
+                    let _ = write!(out, "\r\x1b[2K{prefix}{style}{name}{hint}\x1b[0m\r\n");
+                }
+                out.flush()
+            };
+            draw(method_sel, &mut stdout)?;
+
+            loop {
+                if event::poll(Duration::from_millis(100))? {
+                    if let Event::Key(KeyEvent { code, modifiers, .. }) = event::read()? {
+                        match code {
+                            KeyCode::Up if method_sel > 0 => {
+                                method_sel -= 1;
+                                let _ = write!(stdout, "\x1b[{}A", auth_methods.len());
+                                draw(method_sel, &mut stdout)?;
+                            }
+                            KeyCode::Down if method_sel < auth_methods.len() - 1 => {
+                                method_sel += 1;
+                                let _ = write!(stdout, "\x1b[{}A", auth_methods.len());
+                                draw(method_sel, &mut stdout)?;
+                            }
+                            KeyCode::Enter => break,
+                            KeyCode::Char('c') if modifiers.contains(KeyModifiers::CONTROL) => {
+                                terminal::disable_raw_mode()?;
+                                execute!(stdout, cursor::Show)?;
+                                println!();
+                                return Ok(());
+                            }
+                            KeyCode::Esc => {
+                                terminal::disable_raw_mode()?;
+                                execute!(stdout, cursor::Show)?;
+                                println!();
+                                return Ok(());
+                            }
+                            _ => {}
+                        }
+                    }
+                }
+            }
+
+            terminal::disable_raw_mode()?;
+            execute!(stdout, cursor::Show)?;
+        }
+        println!();
+
+        if method_sel == 0 {
+            // OAuth browser login
+            let oauth_meta = provider.oauth.as_ref().unwrap();
+            let client_id = env::var(oauth_meta.client_id_env)
+                .ok()
+                .filter(|v| !v.is_empty());
+            if let Some(client_id) = client_id {
+                run_oauth_login(provider, oauth_meta, &client_id)?;
+            } else {
+                println!("  \x1b[38;5;208m\u{26a0} OAuth client not configured ({}).\x1b[0m", oauth_meta.client_id_env);
+                println!("  \x1b[2mUsing API key login instead.\x1b[0m");
+                println!();
+                run_apikey_login(provider)?;
+            }
+        } else {
+            // API key
+            run_apikey_login(provider)?;
+        }
+    } else {
+        // Non-OAuth providers: straight to API key
+        run_apikey_login(provider)?;
+    }
+
+    println!();
+    println!("  Run \x1b[1mopenanalyst\x1b[0m to start, or \x1b[1mopenanalyst login\x1b[0m to add another provider.");
+    println!("  Use \x1b[1mopenanalyst whoami\x1b[0m to see all logged-in providers.");
+    println!();
+    Ok(())
+}
+
+/// OAuth browser login: start callback server → open browser → wait for redirect → exchange code → save token.
+fn run_oauth_login(
+    provider: &ProviderOption,
+    oauth_meta: &ProviderOAuthMeta,
+    client_id: &str,
+) -> Result<(), Box<dyn std::error::Error>> {
+    // 1. Start local callback server
+    let (port, callback_rx) = start_oauth_callback_server()?;
+    let redirect_uri = loopback_redirect_uri(port);
+
+    // 2. Generate PKCE + state
+    let pkce = generate_pkce_pair()?;
+    let state = generate_state()?;
+
+    // 3. Build OAuth config
+    let oauth_config = OAuthConfig {
+        client_id: client_id.to_string(),
+        authorize_url: oauth_meta.authorize_url.to_string(),
+        token_url: oauth_meta.token_url.to_string(),
+        callback_port: Some(port),
+        manual_redirect_url: None,
+        scopes: oauth_meta.scopes.iter().map(|s| s.to_string()).collect(),
+    };
+
+    // 4. Build authorization URL
+    let auth_request = OAuthAuthorizationRequest::from_config(
+        &oauth_config,
+        &redirect_uri,
+        &state,
+        &pkce,
+    );
+    let auth_url = auth_request.build_url();
+
+    // 5. Open browser
+    println!("  \x1b[1mStep 1\x1b[0m  Opening {} login in your browser...", provider.name);
+    println!("  \x1b[2m{}\x1b[0m", &auth_url[..auth_url.find('?').unwrap_or(auth_url.len())]);
+    println!();
+
+    if !open_browser(&auth_url) {
+        println!("  \x1b[38;5;208mCould not open browser automatically.\x1b[0m");
+        println!("  \x1b[2mOpen this URL manually:\x1b[0m");
+        println!("  {auth_url}");
+        println!();
+    }
+
+    // 6. Wait for callback (with timeout)
+    print!("  \x1b[1mStep 2\x1b[0m  Waiting for authentication... ");
+    io::stdout().flush()?;
+
+    let callback_result = callback_rx.recv_timeout(Duration::from_secs(120));
+
+    match callback_result {
+        Ok(Ok(params)) => {
+            // Check for errors
+            if let Some(error) = &params.error {
+                let desc = params.error_description.as_deref().unwrap_or("unknown error");
+                println!("\x1b[38;5;196m\u{2717} Failed\x1b[0m");
+                println!("  \x1b[38;5;196m{error}: {desc}\x1b[0m");
+                return Ok(());
+            }
+
+            // Validate state
+            let callback_state = params.state.as_deref().unwrap_or("");
+            if callback_state != state {
+                println!("\x1b[38;5;196m\u{2717} State mismatch (possible CSRF)\x1b[0m");
+                return Ok(());
+            }
+
+            let Some(code) = params.code else {
+                println!("\x1b[38;5;196m\u{2717} No authorization code received\x1b[0m");
+                return Ok(());
+            };
+
+            println!("\x1b[38;5;46m\u{2713} Received\x1b[0m");
+
+            // 7. Exchange code for token
+            print!("  \x1b[1mStep 3\x1b[0m  Exchanging authorization code... ");
+            io::stdout().flush()?;
+
+            let exchange_request = OAuthTokenExchangeRequest::from_config(
+                &oauth_config,
+                &code,
+                &state,
+                &pkce.verifier,
+                &redirect_uri,
+            );
+
+            let rt = tokio::runtime::Runtime::new()?;
+            let token_result = rt.block_on(async {
+                let client = reqwest::Client::builder()
+                    .timeout(Duration::from_secs(10))
+                    .build()?;
+                let resp = client
+                    .post(&oauth_config.token_url)
+                    .header("content-type", "application/x-www-form-urlencoded")
+                    .form(&exchange_request.form_params())
+                    .send()
+                    .await?;
+                let status = resp.status();
+                let body = resp.text().await?;
+                if !status.is_success() {
+                    return Err(format!("token exchange failed ({status}): {body}").into());
+                }
+                // Try standard OAuth response first, then Anthropic-style
+                let token_set: serde_json::Value = serde_json::from_str(&body)?;
+                let access_token = token_set.get("access_token")
+                    .or_else(|| token_set.get("accessToken"))
+                    .and_then(|v| v.as_str())
+                    .ok_or("no access_token in response")?
+                    .to_string();
+                let refresh_token = token_set.get("refresh_token")
+                    .or_else(|| token_set.get("refreshToken"))
+                    .and_then(|v| v.as_str())
+                    .map(ToOwned::to_owned);
+                let expires_in = token_set.get("expires_in")
+                    .or_else(|| token_set.get("expiresIn"))
+                    .and_then(|v| v.as_u64());
+                let expires_at = expires_in.map(|ei| {
+                    SystemTime::now()
+                        .duration_since(UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_secs()
+                        + ei
+                });
+                Ok::<_, Box<dyn std::error::Error>>(runtime::OAuthTokenSet {
+                    access_token,
+                    refresh_token,
+                    expires_at,
+                    scopes: oauth_meta.scopes.iter().map(|s| s.to_string()).collect(),
+                })
+            });
+
+            match token_result {
+                Ok(token_set) => {
+                    println!("\x1b[38;5;46m\u{2713} Authenticated\x1b[0m");
+
+                    // 8. Save OAuth token per provider
+                    let provider_key = provider.name.replace([' ', '/'], "_").to_lowercase();
+                    save_provider_oauth_token(&provider_key, &token_set)?;
+
+                    // 9. Also save as regular credential so /model switching works
+                    let api_key = &token_set.access_token;
+                    save_provider_credential(provider, api_key)?;
+                    env::set_var(oauth_meta.token_env_var, api_key);
+
+                    // 10. Fetch models
+                    let models = if !provider.models_url.is_empty() {
+                        print!("  \x1b[1mStep 4\x1b[0m  Fetching available models... ");
+                        io::stdout().flush()?;
+                        let fetched = fetch_provider_models(
+                            provider.models_url,
+                            api_key,
+                            provider.test_header,
+                        );
+                        if fetched.is_empty() {
+                            println!("\x1b[2m(none fetched)\x1b[0m");
+                        } else {
+                            println!("\x1b[38;5;46m{} models\x1b[0m", fetched.len());
+                        }
+                        fetched
+                    } else {
+                        Vec::new()
+                    };
+
+                    // Summary
+                    print_login_summary(provider, api_key, &models);
+                }
+                Err(err) => {
+                    println!("\x1b[38;5;196m\u{2717} Failed\x1b[0m");
+                    println!("  \x1b[38;5;196m{err}\x1b[0m");
+                    println!();
+                    println!("  \x1b[2mFalling back to API key login...\x1b[0m");
+                    println!();
+                    run_apikey_login(provider)?;
+                }
+            }
+        }
+        Ok(Err(err)) => {
+            println!("\x1b[38;5;196m\u{2717} Callback error: {err}\x1b[0m");
+            println!();
+            println!("  \x1b[2mFalling back to API key login...\x1b[0m");
+            println!();
+            run_apikey_login(provider)?;
+        }
+        Err(_) => {
+            println!("\x1b[38;5;208m\u{26a0} Timed out (2 min)\x1b[0m");
+            println!();
+            println!("  \x1b[2mFalling back to API key login...\x1b[0m");
+            println!();
+            run_apikey_login(provider)?;
+        }
+    }
+
+    Ok(())
+}
+
+/// API key login: open dashboard → paste key → validate → save.
+fn run_apikey_login(provider: &ProviderOption) -> Result<(), Box<dyn std::error::Error>> {
+    // Step 1: Open dashboard
+    if !provider.dashboard_url.is_empty() {
+        println!("  \x1b[1mStep 1\x1b[0m  Opening {} dashboard in your browser...", provider.name);
+        println!("  \x1b[2m{}\x1b[0m", provider.dashboard_url);
+        println!();
+        if !open_browser(provider.dashboard_url) {
+            println!("  \x1b[38;5;208mCould not open browser. Visit the URL above manually.\x1b[0m");
+        }
+        println!("  \x1b[2mCreate or copy your API key from the dashboard, then paste it below.\x1b[0m");
+        println!();
+    }
+
+    // Step 2: Prompt for key
+    println!("  \x1b[1mStep 2\x1b[0m  Paste your API key");
+    print!("\x1b[38;5;45m  > \x1b[0m");
     io::stdout().flush()?;
     let mut api_key = String::new();
     io::stdin().read_line(&mut api_key)?;
     let api_key = api_key.trim().to_string();
-    print!("\x1b[0m");
 
     if api_key.is_empty() {
         println!("  \x1b[38;5;196mNo key entered. Aborted.\x1b[0m");
         return Ok(());
     }
 
-    // ── Test connection ──
-    print!("  Testing connection... ");
+    // Step 3: Validate
+    println!();
+    print!("  \x1b[1mStep 3\x1b[0m  Authenticating with {}... ", provider.name);
     io::stdout().flush()?;
 
     let key_valid = if provider.test_url.is_empty() {
-        true // Skip test for providers without a test endpoint
+        true
     } else {
         test_api_key(provider.test_url, &api_key, provider.test_header)
     };
 
     if key_valid {
-        println!("\x1b[38;5;46m\x1b[1mConnected\x1b[0m");
+        println!("\x1b[38;5;46m\u{2713} Authenticated\x1b[0m");
     } else {
-        println!("\x1b[38;5;208mKey accepted (could not verify — endpoint may require a request body)\x1b[0m");
+        println!("\x1b[38;5;208m\u{26a0} Could not verify (key saved anyway)\x1b[0m");
     }
 
-    // ── Save credentials ──
+    // Step 4: Fetch models
+    let models = if !provider.models_url.is_empty() {
+        print!("  \x1b[1mStep 4\x1b[0m  Fetching available models... ");
+        io::stdout().flush()?;
+        let fetched = fetch_provider_models(provider.models_url, &api_key, provider.test_header);
+        if fetched.is_empty() {
+            println!("\x1b[2m(none fetched)\x1b[0m");
+        } else {
+            println!("\x1b[38;5;46m{} models\x1b[0m", fetched.len());
+        }
+        fetched
+    } else {
+        Vec::new()
+    };
+
+    // Step 5: Save
+    save_provider_credential(provider, &api_key)?;
+    env::set_var(provider.env_var, &api_key);
+
+    print_login_summary(provider, &api_key, &models);
+    Ok(())
+}
+
+/// Save a provider's API key to ~/.openanalyst/credentials.json.
+fn save_provider_credential(provider: &ProviderOption, api_key: &str) -> Result<(), Box<dyn std::error::Error>> {
     let config_dir = runtime::credentials_config_home()
         .unwrap_or_else(|_| {
             let home = env::var("HOME")
@@ -900,7 +1293,6 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
         json!({})
     };
 
-    // Store the selected provider and key
     creds["active_provider"] = json!(provider.name);
     creds["providers"] = creds.get("providers").cloned().unwrap_or_else(|| json!({}));
     creds["providers"][provider.name] = json!({
@@ -909,20 +1301,37 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
     });
 
     fs::write(&creds_path, serde_json::to_string_pretty(&creds)?)?;
+    Ok(())
+}
 
-    // ── Also set the env var for current process ──
-    env::set_var(provider.env_var, &api_key);
+/// Print login success summary.
+fn print_login_summary(provider: &ProviderOption, api_key: &str, models: &[String]) {
+    let creds_path = runtime::credentials_config_home()
+        .map(|d| d.join("credentials.json"))
+        .unwrap_or_else(|_| PathBuf::from("~/.openanalyst/credentials.json"));
 
     println!();
-    println!("  \x1b[38;5;45m\x1b[1mLogin complete\x1b[0m");
+    println!("  \x1b[38;5;45m\x1b[1m\u{2713} Login complete\x1b[0m");
     println!();
     println!("  \x1b[2mProvider\x1b[0m     {}", provider.name);
-    println!("  \x1b[2mCredentials\x1b[0m  {}", creds_path.display());
     println!("  \x1b[2mEnv var\x1b[0m      {}", provider.env_var);
-    println!();
-    println!("  Run \x1b[1mopenanalyst\x1b[0m to start.");
-    println!();
-    Ok(())
+
+    let masked = if api_key.len() > 8 {
+        format!("{}...{}", &api_key[..4], &api_key[api_key.len()-4..])
+    } else {
+        "****".to_string()
+    };
+    println!("  \x1b[2mAPI key\x1b[0m      {}", masked);
+
+    if !models.is_empty() {
+        let display_models: Vec<&str> = models.iter().take(8).map(|s| s.as_str()).collect();
+        println!("  \x1b[2mModels\x1b[0m       {}", display_models.join(", "));
+        if models.len() > 8 {
+            println!("               \x1b[2m...and {} more\x1b[0m", models.len() - 8);
+        }
+    }
+
+    println!("  \x1b[2mSaved to\x1b[0m     {}", creds_path.display());
 }
 
 struct ProviderModelsConfig {
@@ -1051,6 +1460,80 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("  \x1b[38;5;45mAll credentials cleared.\x1b[0m");
     println!("  Removed: {}", creds_path.display());
+    Ok(())
+}
+
+fn run_whoami() -> Result<(), Box<dyn std::error::Error>> {
+    let config_dir = runtime::credentials_config_home()
+        .unwrap_or_else(|_| {
+            let home = env::var("HOME")
+                .or_else(|_| env::var("USERPROFILE"))
+                .unwrap_or_else(|_| ".".to_string());
+            PathBuf::from(home).join(".openanalyst")
+        });
+    let creds_path = config_dir.join("credentials.json");
+
+    println!();
+    println!("  \x1b[38;5;45m\x1b[1mOpenAnalyst CLI \x1b[0m\x1b[2m— Provider Status\x1b[0m");
+    println!();
+
+    let creds: serde_json::Value = if creds_path.exists() {
+        let content = fs::read_to_string(&creds_path)?;
+        serde_json::from_str(&content).unwrap_or_else(|_| json!({}))
+    } else {
+        println!("  \x1b[2mNo providers configured. Run \x1b[0m\x1b[1mopenanalyst login\x1b[0m\x1b[2m to get started.\x1b[0m");
+        println!();
+        return Ok(());
+    };
+
+    let active = creds.get("active_provider").and_then(|v| v.as_str()).unwrap_or("");
+    let providers = creds.get("providers").and_then(|v| v.as_object());
+
+    let mut logged_in = 0u32;
+
+    for provider_opt in LOGIN_PROVIDERS {
+        // Check env var (loaded from credentials.json at startup)
+        let has_key = env::var(provider_opt.env_var).ok().filter(|v| !v.is_empty()).is_some();
+        // Also check credentials.json
+        let saved_key = providers.and_then(|p| {
+            p.get(provider_opt.name)
+                .and_then(|v| v.get("api_key"))
+                .and_then(|v| v.as_str())
+                .filter(|k| !k.is_empty())
+        });
+
+        let is_active = provider_opt.name == active;
+
+        if has_key || saved_key.is_some() {
+            logged_in += 1;
+            let key_display = saved_key
+                .map(ToOwned::to_owned)
+                .or_else(|| env::var(provider_opt.env_var).ok().filter(|v| !v.is_empty()))
+                .unwrap_or_default();
+            let masked = if key_display.len() > 8 {
+                format!("{}...{}", &key_display[..4], &key_display[key_display.len()-4..])
+            } else if !key_display.is_empty() {
+                "****".to_string()
+            } else {
+                String::new()
+            };
+            let active_badge = if is_active { " \x1b[38;5;46m[active]\x1b[0m" } else { "" };
+            println!("  \x1b[38;5;46m\u{2713}\x1b[0m \x1b[1m{}\x1b[0m{}", provider_opt.name, active_badge);
+            println!("    \x1b[2mKey:\x1b[0m  {}  \x1b[2m({})\x1b[0m", masked, provider_opt.env_var);
+        } else {
+            println!("  \x1b[2m\u{2717} {}\x1b[0m", provider_opt.name);
+        }
+    }
+
+    println!();
+    if logged_in == 0 {
+        println!("  \x1b[2mNo providers logged in. Run \x1b[0m\x1b[1mopenanalyst login\x1b[0m\x1b[2m to authenticate.\x1b[0m");
+    } else {
+        println!("  \x1b[2m{} provider(s) authenticated.\x1b[0m", logged_in);
+        println!("  \x1b[2mSwitch models with\x1b[0m /model <name> \x1b[2min the REPL.\x1b[0m");
+        println!("  \x1b[2mAdd more with\x1b[0m openanalyst login\x1b[2m.\x1b[0m");
+    }
+    println!();
     Ok(())
 }
 
@@ -1434,6 +1917,8 @@ fn run_resume_command(
         | SlashCommand::Json { .. }
         | SlashCommand::Dev { .. }
         | SlashCommand::Mcp { .. }
+        | SlashCommand::Knowledge { .. }
+        | SlashCommand::Explore { .. }
         | SlashCommand::Doctor
         | SlashCommand::Login
         | SlashCommand::Logout
@@ -2003,6 +2488,15 @@ impl LiveCli {
             }
             SlashCommand::Mcp { action, args } => {
                 Self::run_mcp(action.as_deref(), args.as_deref())?;
+                false
+            }
+            // ── Knowledge & Exploration commands ──
+            SlashCommand::Knowledge { query } => {
+                self.run_knowledge(query.as_deref())?;
+                false
+            }
+            SlashCommand::Explore { target } => {
+                self.run_explore(target.as_deref())?;
                 false
             }
             // ── Claude Code parity commands ──
@@ -3472,6 +3966,427 @@ impl LiveCli {
     // ════════════════════════════════════════════════════════════════════
     //  /mcp — MCP Server Management
     // ════════════════════════════════════════════════════════════════════
+
+    // ════════════════════════════════════════════════════════════════════
+    //  /knowledge — OpenAnalyst Knowledge Base (stub — backend TBD)
+    // ════════════════════════════════════════════════════════════════════
+
+    fn run_knowledge(&mut self, query: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(query) = query else {
+            println!("  \x1b[1mOpenAnalyst Knowledge Base\x1b[0m\n");
+            println!("  Usage: /knowledge <query>");
+            println!("  Example: /knowledge how to create Meta Ads strategy for D2C\n");
+            println!("  Searches the hosted OpenAnalyst knowledge base for expert");
+            println!("  strategies, course insights, and actionable guidance.\n");
+            println!("  \x1b[2mRequires OPENANALYST_API_KEY environment variable.\x1b[0m");
+            return Ok(());
+        };
+
+        // Check for API key
+        let api_key = env::var("OPENANALYST_API_KEY").or_else(|_| env::var("OA_API_KEY"));
+        let Ok(api_key) = api_key else {
+            println!("  \x1b[33m[!]\x1b[0m OPENANALYST_API_KEY not set.\n");
+            println!("  Set your key to access the knowledge base:");
+            println!("    export OPENANALYST_API_KEY=oa_...");
+            println!("  Or: set OPENANALYST_API_KEY=oa_...\n");
+            println!("  Get your key at: https://openanalyst.com/keys");
+            return Ok(());
+        };
+
+        let kb_endpoint = env::var("OPENANALYST_KB_URL")
+            .unwrap_or_else(|_| "https://kb.openanalyst.com/v1/knowledge/query".to_string());
+
+        println!("  \x1b[38;5;45m[>]\x1b[0m Searching knowledge base...");
+        println!("  \x1b[2mQuery: {}\x1b[0m\n", truncate_for_prompt(query, 80));
+
+        // Phase 1: metadata scan → Phase 2: auto-deep transcript search
+        let rt = tokio::runtime::Runtime::new()?;
+        let result = rt.block_on(async {
+            let client = reqwest::Client::builder()
+                .timeout(std::time::Duration::from_secs(60))
+                .user_agent("openanalyst-cli/1.0")
+                .build()?;
+
+            let payload = serde_json::json!({
+                "query": query,
+                "mode": "progressive",
+                "max_results": 10
+            });
+
+            let resp = client.post(&kb_endpoint)
+                .header("Authorization", format!("Bearer {api_key}"))
+                .header("Content-Type", "application/json")
+                .json(&payload)
+                .send()
+                .await?;
+
+            let status = resp.status();
+            let body = resp.text().await?;
+            Ok::<_, Box<dyn std::error::Error>>((status, body))
+        });
+
+        match result {
+            Ok((status, body)) => {
+                if status.is_success() {
+                    // Parse the response and pass through LLM for synthesis
+                    let prompt = format!(
+                        "The user asked: \"{query}\"\n\n\
+                         The knowledge base returned these results:\n\
+                         ```json\n{body}\n```\n\n\
+                         Synthesize a comprehensive, actionable answer from these results. \
+                         Include source citations. Be specific and practical."
+                    );
+                    self.run_turn(&prompt)?;
+                } else if status.as_u16() == 401 {
+                    println!("  \x1b[31m[x]\x1b[0m Authentication failed. Check your OPENANALYST_API_KEY.");
+                } else if status.as_u16() == 503 {
+                    println!("  \x1b[33m[!]\x1b[0m Knowledge base is not yet available.");
+                    println!("  \x1b[2mThe hosted KB backend is under development.\x1b[0m");
+                    println!("  \x1b[2mFalling back to AI-only answer...\x1b[0m\n");
+                    // Fallback: answer from LLM's own knowledge
+                    let fallback = format!(
+                        "Answer this query as an expert consultant. Be specific and actionable:\n\n{query}"
+                    );
+                    self.run_turn(&fallback)?;
+                } else {
+                    println!("  \x1b[31m[x]\x1b[0m KB request failed (HTTP {status})");
+                    println!("  \x1b[2m{}\x1b[0m", truncate_for_prompt(&body, 200));
+                }
+            }
+            Err(e) => {
+                // Network error — fall back gracefully
+                println!("  \x1b[33m[!]\x1b[0m Could not reach knowledge base: {e}");
+                println!("  \x1b[2mFalling back to AI-only answer...\x1b[0m\n");
+                let fallback = format!(
+                    "Answer this query as an expert consultant. Be specific and actionable:\n\n{query}"
+                );
+                self.run_turn(&fallback)?;
+            }
+        }
+        Ok(())
+    }
+
+    // ════════════════════════════════════════════════════════════════════
+    //  /explore — Smart GitHub Repo Explorer
+    // ════════════════════════════════════════════════════════════════════
+
+    fn run_explore(&mut self, target: Option<&str>) -> Result<(), Box<dyn std::error::Error>> {
+        let Some(target) = target else {
+            println!("  \x1b[1mSmart Repo Explorer\x1b[0m\n");
+            println!("  Usage: /explore <github-url-or-local-path>");
+            println!("  Examples:");
+            println!("    /explore https://github.com/rust-lang/rust");
+            println!("    /explore owner/repo");
+            println!("    /explore .                     (current directory)\n");
+            println!("  Analyzes a repository from its git history to produce:");
+            println!("    - Architecture overview & tech stack");
+            println!("    - Commit patterns & active areas");
+            println!("    - Key contributors & development velocity");
+            println!("    - File change heatmap & module structure");
+            return Ok(());
+        };
+
+        let is_local = target == "." || Path::new(target).is_dir();
+        let is_short_form = !target.contains("://") && target.contains('/') && !Path::new(target).exists();
+
+        if is_local {
+            self.explore_local(target)?;
+        } else if is_short_form {
+            // owner/repo shorthand → use gh api
+            self.explore_github(target)?;
+        } else if target.contains("github.com") {
+            // Full URL — extract owner/repo
+            let repo_slug = target
+                .trim_end_matches('/')
+                .trim_end_matches(".git")
+                .rsplit("github.com/")
+                .next()
+                .unwrap_or(target);
+            self.explore_github(repo_slug)?;
+        } else {
+            // Try as local path
+            if Path::new(target).is_dir() {
+                self.explore_local(target)?;
+            } else {
+                println!("  \x1b[31m[x]\x1b[0m Not a valid GitHub URL, owner/repo, or local path: {target}");
+            }
+        }
+        Ok(())
+    }
+
+    fn explore_local(&mut self, path: &str) -> Result<(), Box<dyn std::error::Error>> {
+        println!("  \x1b[38;5;45m[>]\x1b[0m Exploring local repository: {path}\n");
+
+        // Gather git log
+        let log_output = Command::new("git")
+            .args(["-C", path, "log", "--oneline", "--no-merges", "-50"])
+            .output()?;
+        let log = String::from_utf8_lossy(&log_output.stdout).to_string();
+
+        // Gather file stats
+        let stat_output = Command::new("git")
+            .args(["-C", path, "log", "--oneline", "--stat", "--no-merges", "-30"])
+            .output()?;
+        let stats = String::from_utf8_lossy(&stat_output.stdout).to_string();
+
+        // Gather contributor info
+        let authors_output = Command::new("git")
+            .args(["-C", path, "shortlog", "-sn", "--no-merges", "-20"])
+            .output()?;
+        let authors = String::from_utf8_lossy(&authors_output.stdout).to_string();
+
+        // Get branch info
+        let branch_output = Command::new("git")
+            .args(["-C", path, "branch", "-a", "--no-color"])
+            .output()?;
+        let branches = String::from_utf8_lossy(&branch_output.stdout).to_string();
+
+        // Detect tech stack from file extensions
+        let ls_output = Command::new("git")
+            .args(["-C", path, "ls-files"])
+            .output()?;
+        let files = String::from_utf8_lossy(&ls_output.stdout).to_string();
+        let file_stats = Self::compute_file_type_stats(&files);
+
+        // Get repo age and activity
+        let first_commit = Command::new("git")
+            .args(["-C", path, "log", "--reverse", "--format=%ci", "-1"])
+            .output()?;
+        let first_date = String::from_utf8_lossy(&first_commit.stdout).trim().to_string();
+
+        let last_commit = Command::new("git")
+            .args(["-C", path, "log", "--format=%ci", "-1"])
+            .output()?;
+        let last_date = String::from_utf8_lossy(&last_commit.stdout).trim().to_string();
+
+        let total_commits = Command::new("git")
+            .args(["-C", path, "rev-list", "--count", "HEAD"])
+            .output()?;
+        let commit_count = String::from_utf8_lossy(&total_commits.stdout).trim().to_string();
+
+        // Print structured analysis
+        println!("  \x1b[1;38;5;45m== Repository Analysis ==\x1b[0m\n");
+
+        println!("  \x1b[1mTimeline:\x1b[0m");
+        println!("    First commit:  {first_date}");
+        println!("    Latest commit: {last_date}");
+        println!("    Total commits: {commit_count}\n");
+
+        println!("  \x1b[1mTech Stack (by file count):\x1b[0m");
+        for (ext, count) in file_stats.iter().take(10) {
+            let bar_len = (*count as usize).min(30);
+            let bar: String = std::iter::repeat_n('#', bar_len).collect();
+            println!("    {ext:>8}  {bar} ({count})");
+        }
+        println!();
+
+        if !authors.trim().is_empty() {
+            println!("  \x1b[1mTop Contributors:\x1b[0m");
+            for line in authors.lines().take(5) {
+                println!("    {}", line.trim());
+            }
+            println!();
+        }
+
+        let branch_count = branches.lines().count();
+        println!("  \x1b[1mBranches:\x1b[0m {branch_count}");
+        for line in branches.lines().take(5) {
+            println!("    {}", line.trim());
+        }
+        if branch_count > 5 {
+            println!("    ... and {} more", branch_count - 5);
+        }
+        println!();
+
+        // Now pass everything through LLM for intelligent summary
+        let prompt = format!(
+            "You are analyzing a repository. Based on the following data, provide:\n\
+             1. **Architecture Overview** — key modules, crate/package structure, entry points\n\
+             2. **Tech Stack** — languages, frameworks, build tools detected\n\
+             3. **Development Patterns** — what areas are most active, what's stable\n\
+             4. **Key Features** — what this project does based on commit messages\n\
+             5. **Health Assessment** — commit frequency, contributor diversity, code hygiene\n\n\
+             Be concise and specific. No generic filler.\n\n\
+             --- RECENT COMMITS (newest first) ---\n```\n{log}\n```\n\n\
+             --- FILE CHANGE PATTERNS (last 30 commits) ---\n```\n{stats}\n```\n\n\
+             --- CONTRIBUTORS ---\n```\n{authors}\n```"
+        );
+        self.run_turn(&prompt)?;
+        Ok(())
+    }
+
+    fn explore_github(&mut self, repo_slug: &str) -> Result<(), Box<dyn std::error::Error>> {
+        println!("  \x1b[38;5;45m[>]\x1b[0m Exploring GitHub repository: {repo_slug}\n");
+
+        // Use gh CLI to fetch repo info
+        let repo_info = Command::new("gh")
+            .args(["api", &format!("repos/{repo_slug}"), "--jq",
+                   "[.full_name, .description, .language, .stargazers_count, .forks_count, .open_issues_count, .created_at, .pushed_at, .default_branch, .topics] | @tsv"])
+            .output();
+
+        let repo_meta = match repo_info {
+            Ok(output) if output.status.success() => {
+                String::from_utf8_lossy(&output.stdout).trim().to_string()
+            }
+            _ => {
+                println!("  \x1b[33m[!]\x1b[0m gh CLI not available or repo not found. Trying git clone...");
+                return self.explore_github_via_clone(repo_slug);
+            }
+        };
+
+        if !repo_meta.is_empty() {
+            println!("  \x1b[2mFetched repo metadata via GitHub API\x1b[0m");
+        }
+
+        // Fetch recent commits via API
+        let commits_output = Command::new("gh")
+            .args(["api", &format!("repos/{repo_slug}/commits?per_page=50"),
+                   "--jq", ".[] | \"\\(.sha[0:7]) \\(.commit.message | split(\"\\n\") | .[0])\""])
+            .output()?;
+        let commits = String::from_utf8_lossy(&commits_output.stdout).to_string();
+
+        // Fetch commit activity stats
+        let stats_output = Command::new("gh")
+            .args(["api", &format!("repos/{repo_slug}/stats/contributors"),
+                   "--jq", ".[] | \"\\(.author.login) \\(.total)\""])
+            .output()?;
+        let contributor_stats = String::from_utf8_lossy(&stats_output.stdout).to_string();
+
+        // Fetch languages
+        let lang_output = Command::new("gh")
+            .args(["api", &format!("repos/{repo_slug}/languages")])
+            .output()?;
+        let languages = String::from_utf8_lossy(&lang_output.stdout).to_string();
+
+        // Fetch recent releases
+        let release_output = Command::new("gh")
+            .args(["api", &format!("repos/{repo_slug}/releases?per_page=5"),
+                   "--jq", ".[] | \"\\(.tag_name) \\(.published_at[0:10]) \\(.name)\""])
+            .output()?;
+        let releases = String::from_utf8_lossy(&release_output.stdout).to_string();
+
+        // Fetch directory structure (root level)
+        let tree_output = Command::new("gh")
+            .args(["api", &format!("repos/{repo_slug}/git/trees/HEAD"),
+                   "--jq", ".tree[] | \"\\(.type) \\(.path)\""])
+            .output()?;
+        let tree = String::from_utf8_lossy(&tree_output.stdout).to_string();
+
+        // Print quick stats
+        println!("  \x1b[1;38;5;45m== Repository Analysis: {repo_slug} ==\x1b[0m\n");
+
+        if !languages.trim().is_empty() && languages.trim() != "{}" {
+            println!("  \x1b[1mLanguages:\x1b[0m");
+            if let Ok(lang_map) = serde_json::from_str::<serde_json::Value>(&languages) {
+                if let Some(obj) = lang_map.as_object() {
+                    let total: f64 = obj.values().filter_map(|v| v.as_f64()).sum();
+                    for (lang, bytes) in obj.iter().take(8) {
+                        let pct = bytes.as_f64().unwrap_or(0.0) / total * 100.0;
+                        let bar_len = (pct / 3.0) as usize;
+                        let bar: String = std::iter::repeat_n('#', bar_len).collect();
+                        println!("    {lang:>12}  {bar} ({pct:.1}%)");
+                    }
+                }
+            }
+            println!();
+        }
+
+        if !tree.trim().is_empty() {
+            println!("  \x1b[1mRoot Structure:\x1b[0m");
+            for line in tree.lines().take(20) {
+                let icon = if line.starts_with("tree") { "+" } else { " " };
+                let name = line.split_whitespace().nth(1).unwrap_or(line);
+                println!("    {icon} {name}");
+            }
+            println!();
+        }
+
+        if !releases.trim().is_empty() {
+            println!("  \x1b[1mRecent Releases:\x1b[0m");
+            for line in releases.lines().take(5) {
+                println!("    {line}");
+            }
+            println!();
+        }
+
+        // Pass through LLM for full analysis
+        let prompt = format!(
+            "You are analyzing the GitHub repository **{repo_slug}**. Based on the data below, provide:\n\
+             1. **What This Project Does** — purpose, key features, target users\n\
+             2. **Architecture** — module structure, entry points, key directories\n\
+             3. **Tech Stack** — languages, frameworks, tools\n\
+             4. **Development Activity** — active areas, commit patterns, release cadence\n\
+             5. **Community** — contributors, stars/forks context, health\n\n\
+             Be concise and specific. Focus on actionable insights.\n\n\
+             --- REPO METADATA ---\n{repo_meta}\n\n\
+             --- LANGUAGES ---\n{languages}\n\n\
+             --- ROOT TREE ---\n{tree}\n\n\
+             --- RECENT COMMITS (last 50) ---\n```\n{commits}\n```\n\n\
+             --- CONTRIBUTORS ---\n```\n{contributor_stats}\n```\n\n\
+             --- RELEASES ---\n{releases}"
+        );
+        self.run_turn(&prompt)?;
+        Ok(())
+    }
+
+    fn explore_github_via_clone(&mut self, repo_slug: &str) -> Result<(), Box<dyn std::error::Error>> {
+        // Fallback: bare clone to temp dir, then analyze locally
+        let temp_dir = env::temp_dir().join(format!("oa-explore-{}", repo_slug.replace('/', "-")));
+        let url = format!("https://github.com/{repo_slug}.git");
+
+        println!("  Cloning (bare) {url}...");
+        let clone_result = Command::new("git")
+            .args(["clone", "--bare", "--depth=50", &url, &temp_dir.display().to_string()])
+            .output()?;
+
+        if !clone_result.status.success() {
+            let err = String::from_utf8_lossy(&clone_result.stderr);
+            println!("  \x1b[31m[x]\x1b[0m Clone failed: {err}");
+            return Ok(());
+        }
+
+        // Get log from bare repo
+        let log_output = Command::new("git")
+            .args(["--git-dir", &temp_dir.display().to_string(),
+                   "log", "--oneline", "--no-merges", "-50"])
+            .output()?;
+        let log = String::from_utf8_lossy(&log_output.stdout).to_string();
+
+        let authors_output = Command::new("git")
+            .args(["--git-dir", &temp_dir.display().to_string(),
+                   "shortlog", "-sn", "--no-merges", "-20"])
+            .output()?;
+        let authors = String::from_utf8_lossy(&authors_output.stdout).to_string();
+
+        // Clean up temp dir
+        let _ = std::fs::remove_dir_all(&temp_dir);
+
+        let prompt = format!(
+            "You are analyzing the GitHub repository **{repo_slug}** from its commit history. Provide:\n\
+             1. **What This Project Does** — purpose and key features\n\
+             2. **Architecture** — module structure based on file paths in commits\n\
+             3. **Development Patterns** — active areas, commit themes\n\
+             4. **Key Features** — what capabilities the commits reveal\n\n\
+             Be concise and specific.\n\n\
+             --- RECENT COMMITS ---\n```\n{log}\n```\n\n\
+             --- CONTRIBUTORS ---\n```\n{authors}\n```"
+        );
+        self.run_turn(&prompt)?;
+        Ok(())
+    }
+
+    fn compute_file_type_stats(file_listing: &str) -> Vec<(String, u32)> {
+        let mut counts: std::collections::HashMap<String, u32> = std::collections::HashMap::new();
+        for line in file_listing.lines() {
+            let ext = line.rsplit('.').next().unwrap_or("(none)");
+            if ext != line && ext.len() < 10 {
+                *counts.entry(ext.to_lowercase()).or_default() += 1;
+            }
+        }
+        let mut sorted: Vec<(String, u32)> = counts.into_iter().collect();
+        sorted.sort_by(|a, b| b.1.cmp(&a.1));
+        sorted
+    }
 
     // ════════════════════════════════════════════════════════════════════
     //  Claude Code Parity Commands
@@ -6191,6 +7106,7 @@ fn print_help_to(out: &mut impl Write) -> io::Result<()> {
     )?;
     writeln!(out, "  openanalyst login")?;
     writeln!(out, "  openanalyst logout")?;
+    writeln!(out, "  openanalyst whoami")?;
     writeln!(out, "  openanalyst init")?;
     writeln!(out)?;
     writeln!(out, "Flags:")?;
@@ -6463,6 +7379,10 @@ mod tests {
         assert_eq!(
             parse_args(&["logout".to_string()]).expect("logout should parse"),
             CliAction::Logout
+        );
+        assert_eq!(
+            parse_args(&["whoami".to_string()]).expect("whoami should parse"),
+            CliAction::WhoAmI
         );
         assert_eq!(
             parse_args(&["init".to_string()]).expect("init should parse"),

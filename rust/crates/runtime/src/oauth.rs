@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 use std::fs;
 use std::io;
+use std::net::TcpListener;
 use std::path::PathBuf;
 
 use serde::{Deserialize, Serialize};
@@ -253,6 +254,94 @@ pub fn code_challenge_s256(verifier: &str) -> String {
 #[must_use]
 pub fn loopback_redirect_uri(port: u16) -> String {
     format!("http://localhost:{port}/callback")
+}
+
+/// Start a local HTTP server on a random port to receive the OAuth callback.
+/// Returns `(port, receiver)` — the receiver resolves with `OAuthCallbackParams`
+/// once the provider redirects the browser back to `http://localhost:{port}/callback`.
+pub fn start_oauth_callback_server() -> io::Result<(u16, std::sync::mpsc::Receiver<Result<OAuthCallbackParams, String>>)> {
+    let listener = TcpListener::bind("127.0.0.1:0")?;
+    let port = listener.local_addr()?.port();
+    let (tx, rx) = std::sync::mpsc::channel();
+
+    std::thread::spawn(move || {
+        use std::io::{Read, Write};
+        // Accept one connection (the browser redirect)
+        let result = (|| -> Result<OAuthCallbackParams, String> {
+            listener.set_nonblocking(false).ok();
+            let (mut stream, _) = listener.accept().map_err(|e| e.to_string())?;
+            let mut buffer = [0_u8; 4096];
+            let n = stream.read(&mut buffer).map_err(|e| e.to_string())?;
+            let request = String::from_utf8_lossy(&buffer[..n]);
+
+            // Extract request target from "GET /callback?code=...&state=... HTTP/1.1"
+            let first_line = request.lines().next().unwrap_or("");
+            let target = first_line.split_whitespace().nth(1).unwrap_or("/");
+
+            let params = parse_oauth_callback_request_target(target)?;
+
+            // Serve a success page to the browser
+            let (status, body) = if params.error.is_some() {
+                ("400 Bad Request", format!(
+                    "<html><body style='font-family:system-ui;text-align:center;padding:60px'>\
+                     <h2 style='color:#e74c3c'>\u{2717} Authentication failed</h2>\
+                     <p>{}</p>\
+                     <p style='color:#888'>You can close this tab.</p></body></html>",
+                    params.error_description.as_deref().unwrap_or("Unknown error")
+                ))
+            } else {
+                ("200 OK", "\
+                    <html><body style='font-family:system-ui;text-align:center;padding:60px'>\
+                    <h2 style='color:#2ecc71'>\u{2713} Authenticated successfully</h2>\
+                    <p style='color:#888'>You can close this tab and return to the terminal.</p>\
+                    </body></html>".to_string())
+            };
+
+            let response = format!(
+                "HTTP/1.1 {status}\r\nContent-Type: text/html\r\nConnection: close\r\n\r\n{body}"
+            );
+            let _ = stream.write_all(response.as_bytes());
+            let _ = stream.flush();
+            Ok(params)
+        })();
+
+        let _ = tx.send(result);
+    });
+
+    Ok((port, rx))
+}
+
+/// Per-provider OAuth token storage — stored under `oauth_providers.{provider_key}` in credentials.json.
+pub fn save_provider_oauth_token(provider_key: &str, token_set: &OAuthTokenSet) -> io::Result<()> {
+    let path = credentials_path()?;
+    let mut root = read_credentials_root(&path)?;
+    let oauth_providers = root.entry("oauth_providers").or_insert_with(|| Value::Object(Map::new()));
+    if let Some(obj) = oauth_providers.as_object_mut() {
+        obj.insert(
+            provider_key.to_string(),
+            serde_json::to_value(StoredOAuthCredentials::from(token_set.clone()))
+                .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?,
+        );
+    }
+    write_credentials_root(&path, &root)
+}
+
+/// Load a provider-specific OAuth token from credentials.json.
+pub fn load_provider_oauth_token(provider_key: &str) -> io::Result<Option<OAuthTokenSet>> {
+    let path = credentials_path()?;
+    let root = read_credentials_root(&path)?;
+    let Some(providers) = root.get("oauth_providers").and_then(|v| v.as_object()) else {
+        return Ok(None);
+    };
+    let Some(stored) = providers.get(provider_key) else {
+        return Ok(None);
+    };
+    if stored.is_null() {
+        return Ok(None);
+    }
+    let creds = serde_json::from_value::<StoredOAuthCredentials>(stored.clone())
+        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    Ok(Some(creds.into()))
 }
 
 pub fn credentials_path() -> io::Result<PathBuf> {
