@@ -104,7 +104,9 @@ pub fn connect_stdio(bootstrap: &McpClientBootstrap) -> Option<McpConnection> {
         "jsonrpc": "2.0",
         "method": "notifications/initialized"
     });
-    let _ = send_jsonrpc(stdin, &initialized);
+    if send_jsonrpc(stdin, &initialized).is_err() {
+        eprintln!("[mcp] Failed to send initialized notification to {}", bootstrap.server_name);
+    }
 
     // Query tools list
     let tools_request = serde_json::json!({
@@ -385,7 +387,9 @@ fn connect_http(server_name: &str, remote: &McpRemoteTransport) -> Option<McpCon
     for (key, value) in &headers {
         req = req.header(key.as_str(), value.as_str());
     }
-    let _ = req.send();
+    if req.send().is_err() {
+        eprintln!("[mcp-http] Failed to send initialized notification to {server_name}");
+    }
 
     // Query tools
     let tools_request = serde_json::json!({

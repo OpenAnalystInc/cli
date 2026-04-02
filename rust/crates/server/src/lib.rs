@@ -212,10 +212,12 @@ async fn send_message(
         session.events.clone()
     };
 
-    let _ = broadcaster.send(SessionEvent::Message {
+    if broadcaster.send(SessionEvent::Message {
         session_id: id,
         message,
-    });
+    }).is_err() {
+        eprintln!("[server] No active SSE subscribers — event dropped");
+    }
 
     Ok(StatusCode::NO_CONTENT)
 }

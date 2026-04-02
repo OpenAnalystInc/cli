@@ -92,8 +92,10 @@ pub async fn run_event_loop(
         if app.should_quit {
             // Final save before exit
             app.auto_save_session();
-            let _ = app.action_tx.try_send(events::Action::Quit);
-            // Disable bracketed paste before exiting
+            if app.action_tx.try_send(events::Action::Quit).is_err() {
+                eprintln!("[tui] Orchestrator already shut down");
+            }
+            // Disable bracketed paste before exiting (best-effort terminal restore)
             let _ = execute!(io::stdout(), DisableBracketedPaste);
             break;
         }

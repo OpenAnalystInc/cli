@@ -305,7 +305,9 @@ pub fn start_oauth_callback_server() -> io::Result<(u16, std::sync::mpsc::Receiv
             Ok(params)
         })();
 
-        let _ = tx.send(result);
+        if tx.send(result).is_err() {
+            eprintln!("[oauth] Callback receiver dropped — login may have timed out");
+        }
     });
 
     Ok((port, rx))

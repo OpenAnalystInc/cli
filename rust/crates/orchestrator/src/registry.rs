@@ -74,7 +74,9 @@ impl AgentRegistry {
     pub fn resolve_permission(&mut self, request_id: &str, allow: bool) {
         if let Some(tx) = self.permission_pending.remove(request_id) {
             // Send the decision — if the receiver was dropped, the error is harmless.
-            let _ = tx.send(allow);
+            if tx.send(allow).is_err() {
+                eprintln!("[registry] Permission response dropped — worker thread may have been cancelled");
+            }
         }
     }
 

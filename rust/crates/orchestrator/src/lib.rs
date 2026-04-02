@@ -450,7 +450,9 @@ impl AgentOrchestrator {
 
             // Wait for all agents in this wave to complete
             for handle in handles {
-                let _ = handle.await;
+                if let Err(e) = handle.await {
+                    eprintln!("[moe] Agent task panicked: {e}");
+                }
             }
         }
 
