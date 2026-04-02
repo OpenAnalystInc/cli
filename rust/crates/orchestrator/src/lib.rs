@@ -9,6 +9,7 @@
 pub mod agent;
 pub mod autonomous;
 pub mod context;
+pub mod moe;
 pub mod registry;
 pub mod router;
 pub mod worker;
@@ -90,6 +91,13 @@ impl AgentOrchestrator {
                             if let Some(pm) = parse_permission_mode(&mode) {
                                 self.config.permission_mode = pm;
                             }
+                        }
+                        Some(Action::MoeDispatch { commands }) => {
+                            self.handle_moe_dispatch(commands).await;
+                        }
+                        Some(Action::InjectSkill(command)) => {
+                            // Mid-task skill injection: spawn a new agent for this command
+                            self.handle_skill_injection(command).await;
                         }
                         Some(Action::Quit) | None => break,
                         Some(Action::SlashCommand(_)) => {}
@@ -289,6 +297,205 @@ impl AgentOrchestrator {
                 error: "Cancelled by user".to_string(),
             })
             .await;
+    }
+
+    /// Handle MOE dispatch — parse chained commands, build execution plan, spawn agents.
+    async fn handle_moe_dispatch(&self, raw_commands: Vec<String>) {
+        use moe::{parse_command_chain, build_execution_plan, command_to_prompt, ChainParseResult};
+
+        // Re-join commands for parsing
+        let input = raw_commands.join(" ");
+        let chain = parse_command_chain(&input);
+
+        let commands = match chain {
+            ChainParseResult::Single(text) => {
+                // Fell through — just submit as regular prompt
+                self.submit_to_primary(text, None, None).await;
+                return;
+            }
+            ChainParseResult::Sequential(cmds) => cmds,
+            ChainParseResult::MoeDispatch(cmds) => cmds,
+        };
+
+        let plan = build_execution_plan(commands);
+        let total = plan.commands.len();
+
+        // Announce MOE dispatch
+        let _ = self.ui_tx.send(UiEvent::StreamDelta {
+            agent_id: "moe".to_string(),
+            text: format!("\n[MOE] Dispatching {total} agents across {} waves\n", plan.waves.len()),
+        }).await;
+
+        // Execute waves sequentially (agents within each wave run in parallel)
+        for (wave_idx, wave) in plan.waves.iter().enumerate() {
+            let _ = self.ui_tx.send(UiEvent::StreamDelta {
+                agent_id: "moe".to_string(),
+                text: format!("[MOE] Wave {}/{} — {} agent(s)\n", wave_idx + 1, plan.waves.len(), wave.len()),
+            }).await;
+
+            let mut handles = Vec::new();
+
+            for &cmd_idx in wave {
+                let cmd = &plan.commands[cmd_idx];
+                let prompt = command_to_prompt(cmd);
+
+                // Create agent for this command
+                let agent_id = {
+                    let mut registry = self.registry.lock().await;
+                    registry.create_agent(
+                        cmd.agent_type.clone(),
+                        format!("/{}: {}", cmd.name, cmd.args),
+                        None,
+                    )
+                };
+
+                let _ = self.ui_tx.send(UiEvent::AgentSpawned {
+                    agent_id: agent_id.clone(),
+                    parent_id: None,
+                    agent_type: cmd.agent_type.clone(),
+                    task: format!("/{} {}", cmd.name, cmd.args),
+                }).await;
+
+                // Route to optimal model via the routing table
+                let route = self.router.route_prompt(&prompt);
+                let mut config = self.config.clone();
+                config.model = route.model;
+
+                let ui_tx = self.ui_tx.clone();
+                let registry = self.registry.clone();
+                let effort = Some(route.effort_budget);
+
+                let handle = tokio::spawn(async move {
+                    let _ = ui_tx.send(UiEvent::AgentStatusChanged {
+                        agent_id: agent_id.clone(),
+                        status: AgentStatus::Running,
+                    }).await;
+
+                    let result = worker::run_agent_turn(
+                        agent_id.clone(),
+                        prompt,
+                        config,
+                        ui_tx.clone(),
+                        effort,
+                        registry.clone(),
+                    ).await;
+
+                    match result {
+                        Ok(()) => {
+                            let _ = ui_tx.send(UiEvent::AgentCompleted {
+                                agent_id: agent_id.clone(),
+                                result: "completed".to_string(),
+                            }).await;
+                            let mut reg = registry.lock().await;
+                            reg.set_status(&agent_id, AgentStatus::Completed);
+                        }
+                        Err(err) => {
+                            let _ = ui_tx.send(UiEvent::AgentFailed {
+                                agent_id: agent_id.clone(),
+                                error: err,
+                            }).await;
+                            let mut reg = registry.lock().await;
+                            reg.set_status(&agent_id, AgentStatus::Failed);
+                        }
+                    }
+                });
+
+                handles.push(handle);
+            }
+
+            // Wait for all agents in this wave to complete
+            for handle in handles {
+                let _ = handle.await;
+            }
+        }
+
+        // Signal MOE completion
+        let _ = self.ui_tx.send(UiEvent::StreamDelta {
+            agent_id: "moe".to_string(),
+            text: format!("\n[MOE] All {total} agents completed.\n"),
+        }).await;
+        let _ = self.ui_tx.send(UiEvent::StreamEnd {
+            agent_id: "moe".to_string(),
+        }).await;
+    }
+
+    /// Handle mid-task skill injection — spawn a new agent for a command while others are running.
+    async fn handle_skill_injection(&self, command: String) {
+        use moe::command_to_prompt;
+
+        // Provide a function that parses a single command (exposed for this purpose)
+        let trimmed = command.trim();
+        let stripped = trimmed.strip_prefix('/').unwrap_or(trimmed);
+        let mut parts = stripped.splitn(2, char::is_whitespace);
+        let name = parts.next().unwrap_or("").to_string();
+        let args = parts.next().unwrap_or("").trim().to_string();
+
+        let (category, agent_type) = moe::classify_command_pub(&name);
+
+        let cmd = moe::ChainedCommand {
+            raw: trimmed.to_string(),
+            name: name.clone(),
+            args,
+            category,
+            agent_type: agent_type.clone(),
+            depends_on: None,
+        };
+
+        let prompt = command_to_prompt(&cmd);
+
+        let agent_id = {
+            let mut registry = self.registry.lock().await;
+            registry.create_agent(agent_type.clone(), format!("[injected] /{name}"), None)
+        };
+
+        let _ = self.ui_tx.send(UiEvent::AgentSpawned {
+            agent_id: agent_id.clone(),
+            parent_id: None,
+            agent_type,
+            task: format!("[skill injection] /{name}"),
+        }).await;
+
+        let route = self.router.route_prompt(&prompt);
+        let mut config = self.config.clone();
+        config.model = route.model;
+
+        let ui_tx = self.ui_tx.clone();
+        let registry = self.registry.clone();
+        let agent_id_for_handle = agent_id.clone();
+
+        let handle = tokio::spawn(async move {
+            let _ = ui_tx.send(UiEvent::AgentStatusChanged {
+                agent_id: agent_id.clone(),
+                status: AgentStatus::Running,
+            }).await;
+
+            let result = worker::run_agent_turn(
+                agent_id.clone(), prompt, config, ui_tx.clone(),
+                Some(route.effort_budget), registry.clone(),
+            ).await;
+
+            match result {
+                Ok(()) => {
+                    let _ = ui_tx.send(UiEvent::AgentCompleted {
+                        agent_id: agent_id.clone(),
+                        result: "completed".to_string(),
+                    }).await;
+                    let mut reg = registry.lock().await;
+                    reg.set_status(&agent_id, AgentStatus::Completed);
+                }
+                Err(err) => {
+                    let _ = ui_tx.send(UiEvent::AgentFailed {
+                        agent_id: agent_id.clone(),
+                        error: err,
+                    }).await;
+                    let mut reg = registry.lock().await;
+                    reg.set_status(&agent_id, AgentStatus::Failed);
+                }
+            }
+        });
+
+        let mut reg = self.registry.lock().await;
+        reg.set_handle(&agent_id_for_handle, handle);
     }
 }
 

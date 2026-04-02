@@ -337,11 +337,52 @@ impl App {
         // Dismiss autocomplete
         self.suggestions.dismiss();
 
-        // Slash commands always execute immediately — even mid-stream
+        // Detect chained slash commands (e.g., "/bughunter /commit /pr")
         if text.starts_with('/') {
+            let slash_count = text.matches(" /").count() + 1;
+            if slash_count >= 2 {
+                // Multiple commands — route to MOE or sequential
+                self.chat.push_user(text.clone());
+                let commands: Vec<String> = text.split(" /")
+                    .enumerate()
+                    .map(|(i, part)| if i == 0 { part.to_string() } else { format!("/{part}") })
+                    .collect();
+                if commands.len() >= 3 {
+                    self.chat.push_system(format!(
+                        "[MOE] Dispatching {} commands as parallel agents...", commands.len()
+                    ));
+                } else {
+                    self.chat.push_system(format!(
+                        "Running {} commands sequentially...", commands.len()
+                    ));
+                }
+                let tx = self.action_tx.clone();
+                tokio::spawn(async move {
+                    let _ = tx.send(Action::MoeDispatch { commands }).await;
+                });
+                self.is_streaming = true;
+                self.turn_start = Some(Instant::now());
+                self.status_bar.phase = AgentPhase::Thinking;
+                return;
+            }
+
+            // Single slash command — handle normally
             if crate::slash_commands::handle_slash_command(self, &text) {
                 return;
             }
+        }
+
+        // Mid-task skill injection: slash command while agents are running
+        if self.is_streaming && text.starts_with('/') {
+            // Inject as a new skill agent
+            self.chat.push_user(text.clone());
+            self.chat.push_system(format!("[skill injection] {}", &text));
+            let tx = self.action_tx.clone();
+            let cmd = text.clone();
+            tokio::spawn(async move {
+                let _ = tx.send(Action::InjectSkill(cmd)).await;
+            });
+            return;
         }
 
         // Regular prompts: queue if streaming, send immediately otherwise

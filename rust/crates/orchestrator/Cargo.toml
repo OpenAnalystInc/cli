@@ -12,7 +12,10 @@ api = { path = "../api" }
 tools = { path = "../tools" }
 plugins = { path = "../plugins" }
 serde_json = { workspace = true }
+serde = { version = "1", features = ["derive"] }
 tokio = { workspace = true }
+rusqlite = { version = "0.32", features = ["bundled"] }
+chrono = "0.4"
 
 [lints]
 workspace = true
