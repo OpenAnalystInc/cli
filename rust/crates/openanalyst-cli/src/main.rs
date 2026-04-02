@@ -165,6 +165,7 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             if use_tui {
                 run_tui(model, allowed_tools, permission_mode)?;
             } else {
+                // Legacy REPL mode (--no-tui)
                 run_repl(model, allowed_tools, permission_mode)?;
             }
         }
@@ -244,7 +245,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
     let mut output_format = CliOutputFormat::Text;
     let mut permission_mode = default_permission_mode();
     let mut wants_version = false;
-    let mut wants_tui = false;
+    let mut wants_no_tui = false;
     let mut allowed_tool_values = Vec::new();
     let mut rest = Vec::new();
     let mut index = 0;
@@ -255,8 +256,8 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
                 wants_version = true;
                 index += 1;
             }
-            "--tui" => {
-                wants_tui = true;
+            "--no-tui" => {
+                wants_no_tui = true;
                 index += 1;
             }
             "--model" => {
@@ -348,7 +349,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
             model,
             allowed_tools,
             permission_mode,
-            use_tui: wants_tui,
+            use_tui: !wants_no_tui,
         });
     }
     if matches!(rest.first().map(String::as_str), Some("--help" | "-h")) {
@@ -5427,7 +5428,7 @@ mod tests {
                 model: DEFAULT_MODEL.to_string(),
                 allowed_tools: None,
                 permission_mode: PermissionMode::DangerFullAccess,
-                use_tui: false,
+                use_tui: true,
             }
         );
     }
@@ -5521,6 +5522,7 @@ mod tests {
                 model: DEFAULT_MODEL.to_string(),
                 allowed_tools: None,
                 permission_mode: PermissionMode::ReadOnly,
+                use_tui: true,
             }
         );
     }
@@ -5543,6 +5545,7 @@ mod tests {
                         .collect()
                 ),
                 permission_mode: PermissionMode::DangerFullAccess,
+                use_tui: true,
             }
         );
     }
