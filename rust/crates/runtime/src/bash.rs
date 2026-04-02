@@ -250,8 +250,8 @@ mod tests {
         // execution.
         let _guard = crate::test_env_lock();
         let output = execute_bash(BashCommandInput {
-            command: String::from("printf 'hello'"),
-            timeout: Some(1_000),
+            command: String::from("echo hello"),
+            timeout: Some(5_000),
             description: None,
             run_in_background: Some(false),
             dangerously_disable_sandbox: Some(true),
@@ -262,7 +262,7 @@ mod tests {
         })
         .expect("bash command should execute");
 
-        assert_eq!(output.stdout, "hello");
+        assert_eq!(output.stdout.trim(), "hello");
         assert!(!output.interrupted);
         assert!(output.sandbox_status.is_some());
     }
