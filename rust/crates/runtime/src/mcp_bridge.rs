@@ -11,6 +11,30 @@ use std::process::{Child, Command, Stdio};
 use crate::mcp::mcp_tool_name;
 use crate::mcp_client::{McpClientBootstrap, McpClientTransport, McpRemoteTransport, McpStdioTransport};
 
+/// Guard that kills a child process on drop.
+/// Used to prevent process leaks when initialization fails partway through.
+/// Call `disarm()` to take ownership of the child without killing it.
+struct ChildGuard(Option<Child>);
+
+impl ChildGuard {
+    fn new(child: Child) -> Self {
+        Self(Some(child))
+    }
+
+    /// Disarm the guard and return the child without killing it.
+    fn disarm(&mut self) -> Child {
+        self.0.take().expect("ChildGuard already disarmed")
+    }
+}
+
+impl Drop for ChildGuard {
+    fn drop(&mut self) {
+        if let Some(ref mut child) = self.0 {
+            let _ = child.kill();
+        }
+    }
+}
+
 /// An active MCP server connection (stdio or HTTP).
 pub struct McpConnection {
     pub server_name: String,
@@ -44,10 +68,12 @@ pub fn connect_stdio(bootstrap: &McpClientBootstrap) -> Option<McpConnection> {
         return None;
     };
 
-    // Spawn the MCP server process
-    let mut child = spawn_stdio_process(stdio)?;
+    // Spawn the MCP server process, wrapped in a guard that kills on drop
+    // so that any early `?` return will clean up the child process.
+    let mut guard = ChildGuard::new(spawn_stdio_process(stdio)?);
 
     // Initialize the JSON-RPC connection
+    let child = guard.0.as_mut().unwrap();
     let stdin = child.stdin.as_mut()?;
     let stdout = child.stdout.as_mut()?;
     let mut reader = BufReader::new(stdout);
@@ -94,6 +120,10 @@ pub fn connect_stdio(bootstrap: &McpClientBootstrap) -> Option<McpConnection> {
 
     let tools_response = read_jsonrpc_response(&mut reader)?;
     let tools = parse_tools_list(&bootstrap.server_name, &tools_response);
+
+    // Success — disarm the guard so the child is not killed.
+    // Ownership transfers to McpConnection which has its own Drop impl.
+    let child = guard.disarm();
 
     Some(McpConnection {
         server_name: bootstrap.server_name.clone(),

@@ -284,10 +284,14 @@ impl App {
             let tx = self.action_tx.clone();
             tokio::spawn(async move {
                 for id in agent_ids {
-                    let _ = tx.send(Action::CancelAgent(id)).await;
+                    if tx.send(Action::CancelAgent(id)).await.is_err() {
+                        eprintln!("[tui] orchestrator channel closed");
+                    }
                 }
                 // Always cancel "primary" as fallback
-                let _ = tx.send(Action::CancelAgent("primary".to_string())).await;
+                if tx.send(Action::CancelAgent("primary".to_string())).await.is_err() {
+                    eprintln!("[tui] orchestrator channel closed");
+                }
             });
         }
     }
@@ -326,7 +330,9 @@ impl App {
         // Send to orchestrator as a regular prompt — orchestrator handles the rest
         let tx = self.action_tx.clone();
         tokio::spawn(async move {
-            let _ = tx.send(Action::SubmitPrompt { text, effort_budget: None, model_override: None }).await;
+            if tx.send(Action::SubmitPrompt { text, effort_budget: None, model_override: None }).await.is_err() {
+                eprintln!("[tui] orchestrator channel closed");
+            }
         });
     }
 
@@ -365,7 +371,9 @@ impl App {
                 }
                 let tx = self.action_tx.clone();
                 tokio::spawn(async move {
-                    let _ = tx.send(Action::MoeDispatch { commands }).await;
+                    if tx.send(Action::MoeDispatch { commands }).await.is_err() {
+                        eprintln!("[tui] orchestrator channel closed");
+                    }
                 });
                 self.is_streaming = true;
                 self.turn_start = Some(Instant::now());
@@ -387,7 +395,9 @@ impl App {
             let tx = self.action_tx.clone();
             let cmd = text.clone();
             tokio::spawn(async move {
-                let _ = tx.send(Action::InjectSkill(cmd)).await;
+                if tx.send(Action::InjectSkill(cmd)).await.is_err() {
+                    eprintln!("[tui] orchestrator channel closed");
+                }
             });
             return;
         }
@@ -428,7 +438,9 @@ impl App {
 
         let tx = self.action_tx.clone();
         tokio::spawn(async move {
-            let _ = tx.send(Action::SubmitPrompt { text, effort_budget, model_override }).await;
+            if tx.send(Action::SubmitPrompt { text, effort_budget, model_override }).await.is_err() {
+                eprintln!("[tui] orchestrator channel closed");
+            }
         });
     }
 
@@ -444,9 +456,13 @@ impl App {
     pub fn resolve_permission(&self, request_id: String, allow: bool) {
         let tx = self.action_tx.clone();
         tokio::spawn(async move {
-            let _ = tx
+            if tx
                 .send(Action::PermissionResponse { request_id, allow })
-                .await;
+                .await
+                .is_err()
+            {
+                eprintln!("[tui] orchestrator channel closed");
+            }
         });
     }
 

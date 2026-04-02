@@ -107,7 +107,9 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                         let tx = app.action_tx.clone();
                         let m = new_model.clone();
                         tokio::spawn(async move {
-                            let _ = tx.send(Action::UpdateModel(m)).await;
+                            if tx.send(Action::UpdateModel(m)).await.is_err() {
+                                eprintln!("[tui] orchestrator channel closed");
+                            }
                         });
                         let table = app.router.render_table();
                         app.chat.push_system(format!(
@@ -148,7 +150,9 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                     let tx = app.action_tx.clone();
                     let m = new_mode.clone();
                     tokio::spawn(async move {
-                        let _ = tx.send(Action::UpdatePermissions(m)).await;
+                        if tx.send(Action::UpdatePermissions(m)).await.is_err() {
+                            eprintln!("[tui] orchestrator channel closed");
+                        }
                     });
                     app.chat.push_system(format!("Permission mode set to: {new_mode}"));
                 } else {
@@ -177,11 +181,38 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
         }
         SlashCommand::Compact => {
             let before = app.chat.messages.len();
+            let _tokens_before = app.status_bar.total_tokens;
             compact_chat_messages(app);
             let after = app.chat.messages.len();
             let removed = before.saturating_sub(after);
+
+            // Estimate token budget usage
+            let token_count = runtime::tokenizer::count_tokens(
+                &app.chat.messages.iter().map(|m| match m {
+                    ChatMessage::User { text } | ChatMessage::System { text } => text.as_str(),
+                    ChatMessage::Assistant { markdown, .. } => markdown.raw(),
+                    ChatMessage::ToolCall { card } => card.input_preview.as_str(),
+                    ChatMessage::FileOutput { description, .. } => description.as_str(),
+                }).collect::<Vec<_>>().join("\n")
+            );
+
+            // Smart guidance based on session state
+            let guidance = if token_count > 80_000 {
+                "\n\nYour session is very large. Consider:\n\
+                 - /clear to start fresh (your work is saved)\n\
+                 - Save important context with: tell me to 'remember' key decisions\n\
+                 - Use /export to save a transcript first"
+            } else if token_count > 40_000 {
+                "\n\nSession is getting large. If you're starting a new task,\n\
+                 /clear gives you a fresh context. Your session is auto-saved."
+            } else {
+                ""
+            };
+
             app.chat.push_system(format!(
-                "Session compacted: {removed} messages removed, {after} kept."
+                "Session compacted: {removed} messages removed, {after} kept.\n\
+                 Estimated context: ~{token_count} tokens ({:.0}% of typical budget){guidance}",
+                (token_count as f64 / 100_000.0) * 100.0
             ));
         }
         SlashCommand::Resume { session_path } => {
@@ -555,7 +586,9 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                              and practical with concrete steps:\n\n{query_clone}"
                         ),
                     };
-                    let _ = tx.send(events::Action::SubmitPrompt { text: prompt, effort_budget: None, model_override: None }).await;
+                    if tx.send(events::Action::SubmitPrompt { text: prompt, effort_budget: None, model_override: None }).await.is_err() {
+                        eprintln!("[tui] orchestrator channel closed");
+                    }
                 });
             } else {
                 app.chat.push_system(
@@ -644,7 +677,9 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                              --- ROOT TREE ---\n{tree}\n\n\
                              --- RECENT COMMITS ---\n```\n{commits}\n```"
                         );
-                        let _ = tx.send(events::Action::SubmitPrompt { text: prompt, effort_budget: None, model_override: None }).await;
+                        if tx.send(events::Action::SubmitPrompt { text: prompt, effort_budget: None, model_override: None }).await.is_err() {
+                            eprintln!("[tui] orchestrator channel closed");
+                        }
                     });
                 }
             } else {
@@ -860,11 +895,13 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                 // Spawn explore + plan in parallel, then primary executes
                 tokio::spawn(async move {
                     // First: explore (fast model)
-                    let _ = spawn_tx.send(events::Action::SubmitPrompt {
+                    if spawn_tx.send(events::Action::SubmitPrompt {
                         text: explore_prompt,
                         effort_budget: Some(1_024), // low effort for exploration
                         model_override: Some("claude-haiku-4-5".to_string()),
-                    }).await;
+                    }).await.is_err() {
+                        eprintln!("[tui] orchestrator channel closed");
+                    }
                 });
 
                 // Queue the plan and then the actual task
@@ -1076,46 +1113,165 @@ fn build_config_output(section: Option<&str>) -> String {
     }
 }
 
-/// /memory — find and display OPENANALYST.md files.
+/// /memory — find and display OPENANALYST.md files AND .openanalyst/memory/ entries.
 fn build_memory_output() -> String {
-    let mut found = Vec::new();
+    let mut sections = Vec::new();
     let cwd = std::env::current_dir().unwrap_or_default();
 
-    // Search cwd and parents for OPENANALYST.md
+    // ── Section 1: OPENANALYST.md instruction files ──
+    let mut instruction_files = Vec::new();
     let mut dir = Some(cwd.as_path());
+    let mut depth = 0;
     while let Some(d) = dir {
-        let candidate = d.join("OPENANALYST.md");
-        if candidate.exists() {
-            if let Ok(content) = std::fs::read_to_string(&candidate) {
-                let preview: String = content.lines().take(20).collect::<Vec<_>>().join("\n");
-                let lines = content.lines().count();
-                found.push(format!(
-                    "── {} ({} lines) ──\n{}{}\n",
-                    candidate.display(),
-                    lines,
-                    preview,
-                    if lines > 20 { "\n  ..." } else { "" }
-                ));
-            }
-        }
-        // Also check .openanalyst/OPENANALYST.md
-        let alt = d.join(".openanalyst").join("OPENANALYST.md");
-        if alt.exists() {
-            if let Ok(content) = std::fs::read_to_string(&alt) {
-                let preview: String = content.lines().take(10).collect::<Vec<_>>().join("\n");
-                found.push(format!("── {} ──\n{}\n", alt.display(), preview));
+        for name in &["OPENANALYST.md", ".openanalyst/OPENANALYST.md"] {
+            let candidate = d.join(name);
+            if candidate.exists() {
+                if let Ok(content) = std::fs::read_to_string(&candidate) {
+                    let lines = content.lines().count();
+                    let preview: String = content.lines().take(10).collect::<Vec<_>>().join("\n");
+                    instruction_files.push(format!(
+                        "  {} ({} lines)\n{}{}",
+                        candidate.display(), lines, preview,
+                        if lines > 10 { "\n  ..." } else { "" }
+                    ));
+                }
             }
         }
         dir = d.parent();
-        // Don't walk above 5 levels
-        if found.len() >= 5 { break; }
+        depth += 1;
+        if depth >= 5 || instruction_files.len() >= 5 { break; }
     }
 
-    if found.is_empty() {
-        "No OPENANALYST.md files found.\nRun /init to create one in the current directory.".to_string()
-    } else {
-        format!("Loaded {} instruction file(s):\n\n{}", found.len(), found.join("\n"))
+    if !instruction_files.is_empty() {
+        sections.push(format!(
+            "── Instruction Files ({}) ──\n\n{}",
+            instruction_files.len(),
+            instruction_files.join("\n\n")
+        ));
     }
+
+    // ── Section 2: .openanalyst/memory/ directory (persistent memory) ──
+    let memory_dir = cwd.join(".openanalyst").join("memory");
+    if memory_dir.exists() {
+        let mut memory_entries = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&memory_dir) {
+            let mut files: Vec<_> = entries.filter_map(|e| e.ok()).collect();
+            files.sort_by(|a, b| a.file_name().cmp(&b.file_name()));
+
+            for entry in &files {
+                let path = entry.path();
+                if path.extension().is_some_and(|ext| ext == "md") {
+                    let fname = path.file_name().unwrap_or_default().to_string_lossy();
+                    if fname == "MEMORY.md" { continue; } // Index file, skip
+
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        // Parse frontmatter for name, description, type
+                        let (name, desc, mtype) = parse_memory_frontmatter(&content);
+                        let display_name = name.unwrap_or_else(|| fname.to_string());
+                        let display_type = mtype.unwrap_or_else(|| "note".to_string());
+                        let display_desc = desc.unwrap_or_default();
+
+                        let type_icon = match display_type.as_str() {
+                            "user" => "\u{1F464}",
+                            "feedback" => "\u{1F4AC}",
+                            "project" => "\u{1F4C1}",
+                            "reference" => "\u{1F517}",
+                            _ => "\u{1F4DD}",
+                        };
+
+                        memory_entries.push(format!(
+                            "  {type_icon} {display_name} [{display_type}]\n    {display_desc}"
+                        ));
+                    }
+                }
+            }
+        }
+
+        // Also check for MEMORY.md index
+        let index_path = memory_dir.join("MEMORY.md");
+        let has_index = index_path.exists();
+
+        if !memory_entries.is_empty() {
+            sections.push(format!(
+                "── Persistent Memory ({} entries) ──\n  Directory: {}\n  Index: {}\n\n{}",
+                memory_entries.len(),
+                memory_dir.display(),
+                if has_index { "MEMORY.md" } else { "(none)" },
+                memory_entries.join("\n")
+            ));
+        }
+    }
+
+    // ── Section 3: User-level memory (~/.openanalyst/memory/) ──
+    let user_memory_dir = resolve_config_home().join("memory");
+    if user_memory_dir.exists() && user_memory_dir != cwd.join(".openanalyst").join("memory") {
+        let mut user_entries = Vec::new();
+        if let Ok(entries) = std::fs::read_dir(&user_memory_dir) {
+            for entry in entries.filter_map(|e| e.ok()) {
+                let path = entry.path();
+                if path.extension().is_some_and(|ext| ext == "md") {
+                    let fname = path.file_name().unwrap_or_default().to_string_lossy();
+                    if fname == "MEMORY.md" { continue; }
+                    if let Ok(content) = std::fs::read_to_string(&path) {
+                        let (name, desc, mtype) = parse_memory_frontmatter(&content);
+                        let display_name = name.unwrap_or_else(|| fname.to_string());
+                        let display_type = mtype.unwrap_or_else(|| "note".to_string());
+                        let display_desc = desc.unwrap_or_default();
+                        user_entries.push(format!("  {display_name} [{display_type}] — {display_desc}"));
+                    }
+                }
+            }
+        }
+        if !user_entries.is_empty() {
+            sections.push(format!(
+                "── User Memory ({} entries) ──\n  Directory: {}\n\n{}",
+                user_entries.len(),
+                user_memory_dir.display(),
+                user_entries.join("\n")
+            ));
+        }
+    }
+
+    if sections.is_empty() {
+        "No memory or instruction files found.\n\
+         - Run /init to create an OPENANALYST.md\n\
+         - Memory files are stored in .openanalyst/memory/\n\
+         - Ask me to 'remember' something to save it to memory"
+            .to_string()
+    } else {
+        sections.join("\n\n")
+    }
+}
+
+/// Parse YAML-like frontmatter from a memory file.
+fn parse_memory_frontmatter(content: &str) -> (Option<String>, Option<String>, Option<String>) {
+    let mut name = None;
+    let mut description = None;
+    let mut mtype = None;
+
+    if !content.starts_with("---") {
+        return (name, description, mtype);
+    }
+
+    let end = content[3..].find("---").map(|i| i + 3);
+    let frontmatter = if let Some(end) = end {
+        &content[3..end]
+    } else {
+        return (name, description, mtype);
+    };
+
+    for line in frontmatter.lines() {
+        let line = line.trim();
+        if let Some(val) = line.strip_prefix("name:") {
+            name = Some(val.trim().to_string());
+        } else if let Some(val) = line.strip_prefix("description:") {
+            description = Some(val.trim().to_string());
+        } else if let Some(val) = line.strip_prefix("type:") {
+            mtype = Some(val.trim().to_string());
+        }
+    }
+
+    (name, description, mtype)
 }
 
 /// /session list — list session files from .openanalyst/sessions/.
@@ -1458,21 +1614,40 @@ async fn kb_fetch(endpoint: &str, api_key: &str, query: &str) -> Result<String, 
     }
 }
 
-/// Compact chat messages — remove tool call details, merge consecutive system messages,
-/// and trim old messages to keep the session manageable.
-/// Auto-compact if session exceeds threshold. Called from app.rs on StreamEnd.
+/// Auto-compact with thrash loop protection.
+/// If compaction runs 3+ times without the count dropping below threshold,
+/// stops and tells user to start a new session.
 pub fn auto_compact_if_needed(app: &mut App) {
-    const AUTO_COMPACT_THRESHOLD: usize = 500;
-    if app.chat.messages.len() > AUTO_COMPACT_THRESHOLD {
-        let before = app.chat.messages.len();
-        compact_chat_messages(app);
-        let after = app.chat.messages.len();
-        let removed = before.saturating_sub(after);
-        if removed > 0 {
-            app.chat.push_system(format!(
-                "(auto-compacted: {removed} old messages compressed, {after} kept)"
-            ));
-        }
+    use std::sync::atomic::{AtomicU32, Ordering};
+    static COMPACT_RUNS: AtomicU32 = AtomicU32::new(0);
+    const THRESHOLD: usize = 500;
+    const THRASH_LIMIT: u32 = 3;
+
+    if app.chat.messages.len() <= THRESHOLD {
+        COMPACT_RUNS.store(0, Ordering::Relaxed);
+        return;
+    }
+    let runs = COMPACT_RUNS.fetch_add(1, Ordering::Relaxed) + 1;
+    if runs >= THRASH_LIMIT {
+        app.chat.push_system(
+            "Context is refilling faster than it can be compacted.\n\n\
+             Recommended:\n\
+             - /clear to start fresh (session auto-saved)\n\
+             - /export session.md to save transcript first\n\
+             - Ask me to 'remember' key decisions before clearing\n\
+             - /memory to verify saved memories".to_string(),
+        );
+        COMPACT_RUNS.store(0, Ordering::Relaxed);
+        return;
+    }
+    let before = app.chat.messages.len();
+    compact_chat_messages(app);
+    let after = app.chat.messages.len();
+    let removed = before.saturating_sub(after);
+    if removed > 0 {
+        app.chat.push_system(format!(
+            "(auto-compacted: {removed} messages compressed, {after} kept)"
+        ));
     }
 }
 

@@ -231,12 +231,16 @@ impl ApiClient for ChannelApiClient {
                             ApiStreamEvent::ContentBlockDelta(delta) => match delta.delta {
                                 ContentBlockDelta::TextDelta { text } => {
                                     if !text.is_empty() {
-                                        let _ = ui_tx
+                                        if ui_tx
                                             .send(UiEvent::StreamDelta {
                                                 agent_id: agent_id.clone(),
                                                 text: text.clone(),
                                             })
-                                            .await;
+                                            .await
+                                            .is_err()
+                                        {
+                                            eprintln!("[worker] TUI channel closed — event dropped");
+                                        }
                                         events.push(AssistantEvent::TextDelta(text));
                                     }
                                 }
@@ -249,14 +253,18 @@ impl ApiClient for ChannelApiClient {
                             },
                             ApiStreamEvent::ContentBlockStop(_) => {
                                 if let Some((id, name, input)) = pending_tool.take() {
-                                    let _ = ui_tx
+                                    if ui_tx
                                         .send(UiEvent::ToolCallStart {
                                             agent_id: agent_id.clone(),
                                             call_id: id.clone(),
                                             tool_name: name.clone(),
                                             input_preview: truncate_utf8(&input, 120),
                                         })
-                                        .await;
+                                        .await
+                                        .is_err()
+                                    {
+                                        eprintln!("[worker] TUI channel closed — event dropped");
+                                    }
                                     events.push(AssistantEvent::ToolUse { id, name, input });
                                 }
                             }
@@ -267,13 +275,17 @@ impl ApiClient for ChannelApiClient {
                                     cache_creation_input_tokens: 0,
                                     cache_read_input_tokens: 0,
                                 };
-                                let _ = ui_tx
+                                if ui_tx
                                     .send(UiEvent::UsageUpdate {
                                         agent_id: agent_id.clone(),
                                         input_tokens: usage.input_tokens,
                                         output_tokens: usage.output_tokens,
                                     })
-                                    .await;
+                                    .await
+                                    .is_err()
+                                {
+                                    eprintln!("[worker] TUI channel closed — event dropped");
+                                }
                                 events.push(AssistantEvent::Usage(usage));
                             }
                             ApiStreamEvent::MessageStop(_) => {
@@ -341,13 +353,15 @@ impl ToolExecutor for ChannelToolExecutor {
         };
 
         // Send tool completion event to TUI (blocking_send is safe from spawn_blocking)
-        let _ = self.ui_tx.blocking_send(UiEvent::ToolCallEnd {
+        if self.ui_tx.blocking_send(UiEvent::ToolCallEnd {
             agent_id: self.agent_id.clone(),
             call_id: String::new(),
             output: truncate_utf8(&output, 500),
             is_error,
             duration,
-        });
+        }).is_err() {
+            eprintln!("[worker] TUI channel closed — event dropped");
+        }
 
         result.map_err(ToolError::new)
     }
@@ -399,13 +413,15 @@ impl PermissionPrompter for TuiPermissionPrompter {
         }
 
         // Send permission request to TUI — shows the dialog
-        let _ = self.ui_tx.blocking_send(UiEvent::PermissionRequest {
+        if self.ui_tx.blocking_send(UiEvent::PermissionRequest {
             request_id: request_id.clone(),
             agent_id: self.agent_id.clone(),
             tool_name: request.tool_name.clone(),
             input: request.input.clone(),
             required_mode: format!("{:?}", request.required_mode),
-        });
+        }).is_err() {
+            eprintln!("[worker] TUI channel closed — event dropped");
+        }
 
         // Block until the user responds, with a 120-second timeout to prevent hanging.
         // Uses a dedicated mini runtime to await with timeout since we're in spawn_blocking.
