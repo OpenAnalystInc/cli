@@ -109,6 +109,8 @@ fn load_saved_provider_credentials() {
 fn main() {
     // Load saved credentials from ~/.openanalyst/credentials.json into env vars
     load_saved_provider_credentials();
+    // Prune old/empty sessions in the background (non-blocking)
+    std::thread::spawn(cleanup_old_sessions);
 
     if let Err(error) = run() {
         // Check if this is a credentials error — show a friendly message, not --help
@@ -1788,6 +1790,9 @@ impl LiveCli {
                     &mut stdout,
                 )?;
                 println!();
+                // Track usage per-provider per-day
+                let usage = self.runtime.usage().cumulative_usage();
+                record_session_usage(&self.model, &usage);
                 self.persist_session()?;
                 Ok(())
             }
@@ -3829,11 +3834,19 @@ fn resolve_session_reference(reference: &str) -> Result<SessionHandle, Box<dyn s
 }
 
 fn list_managed_sessions() -> Result<Vec<ManagedSessionSummary>, Box<dyn std::error::Error>> {
+    let dir = sessions_dir()?;
+    let index = SessionIndex::load(&dir);
     let mut sessions = Vec::new();
-    for entry in fs::read_dir(sessions_dir()?)? {
+    let mut index_dirty = false;
+
+    for entry in fs::read_dir(&dir)? {
         let entry = entry?;
         let path = entry.path();
         if path.extension().and_then(|ext| ext.to_str()) != Some("json") {
+            continue;
+        }
+        let file_name = path.file_name().unwrap_or_default().to_string_lossy().to_string();
+        if file_name == "index.json" || file_name == "usage.json" {
             continue;
         }
         let metadata = entry.metadata()?;
@@ -3843,14 +3856,29 @@ fn list_managed_sessions() -> Result<Vec<ManagedSessionSummary>, Box<dyn std::er
             .and_then(|time| time.duration_since(UNIX_EPOCH).ok())
             .map(|duration| duration.as_secs())
             .unwrap_or_default();
-        let message_count = Session::load_from_path(&path)
-            .map(|session| session.messages.len())
-            .unwrap_or_default();
         let id = path
             .file_stem()
             .and_then(|value| value.to_str())
             .unwrap_or("unknown")
             .to_string();
+
+        // Use cached message count from index if modification time matches
+        let message_count = if let Some(cached) = index.get(&id) {
+            if cached.modified_epoch_secs == modified_epoch_secs {
+                cached.message_count
+            } else {
+                index_dirty = true;
+                Session::load_from_path(&path)
+                    .map(|s| s.messages.len())
+                    .unwrap_or_default()
+            }
+        } else {
+            index_dirty = true;
+            Session::load_from_path(&path)
+                .map(|s| s.messages.len())
+                .unwrap_or_default()
+        };
+
         sessions.push(ManagedSessionSummary {
             id,
             path,
@@ -3859,7 +3887,201 @@ fn list_managed_sessions() -> Result<Vec<ManagedSessionSummary>, Box<dyn std::er
         });
     }
     sessions.sort_by(|left, right| right.modified_epoch_secs.cmp(&left.modified_epoch_secs));
+
+    // Rebuild index if anything changed
+    if index_dirty {
+        let new_index = SessionIndex::from_sessions(&sessions);
+        let _ = new_index.save(&dir);
+    }
+
     Ok(sessions)
+}
+
+// ── Session Index (cached metadata for fast /session list) ──
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct SessionIndexEntry {
+    message_count: usize,
+    modified_epoch_secs: u64,
+}
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+struct SessionIndex {
+    sessions: std::collections::BTreeMap<String, SessionIndexEntry>,
+}
+
+impl SessionIndex {
+    fn load(sessions_dir: &Path) -> Self {
+        let path = sessions_dir.join("index.json");
+        fs::read_to_string(path)
+            .ok()
+            .and_then(|c| serde_json::from_str(&c).ok())
+            .unwrap_or_default()
+    }
+
+    fn save(&self, sessions_dir: &Path) -> Result<(), Box<dyn std::error::Error>> {
+        let path = sessions_dir.join("index.json");
+        fs::write(path, serde_json::to_string(self)?)?;
+        Ok(())
+    }
+
+    fn get(&self, id: &str) -> Option<&SessionIndexEntry> {
+        self.sessions.get(id)
+    }
+
+    fn from_sessions(sessions: &[ManagedSessionSummary]) -> Self {
+        let mut index = Self::default();
+        for s in sessions {
+            index.sessions.insert(
+                s.id.clone(),
+                SessionIndexEntry {
+                    message_count: s.message_count,
+                    modified_epoch_secs: s.modified_epoch_secs,
+                },
+            );
+        }
+        index
+    }
+}
+
+// ── Usage Aggregation (per-provider, per-day token tracking) ──
+
+#[derive(Debug, Clone, Default, serde::Serialize, serde::Deserialize)]
+struct UsageLog {
+    entries: Vec<UsageLogEntry>,
+}
+
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct UsageLogEntry {
+    date: String,
+    model: String,
+    input_tokens: u64,
+    output_tokens: u64,
+    sessions: u32,
+}
+
+impl UsageLog {
+    fn path() -> Result<PathBuf, Box<dyn std::error::Error>> {
+        let dir = sessions_dir()?;
+        Ok(dir.join("usage.json"))
+    }
+
+    fn load() -> Self {
+        Self::path()
+            .ok()
+            .and_then(|p| fs::read_to_string(p).ok())
+            .and_then(|c| serde_json::from_str(&c).ok())
+            .unwrap_or_default()
+    }
+
+    fn save(&self) -> Result<(), Box<dyn std::error::Error>> {
+        let path = Self::path()?;
+        fs::write(path, serde_json::to_string_pretty(self)?)?;
+        Ok(())
+    }
+
+    fn record(&mut self, date: &str, model: &str, input_tokens: u32, output_tokens: u32) {
+        if let Some(entry) = self.entries.iter_mut().find(|e| e.date == date && e.model == model) {
+            entry.input_tokens += u64::from(input_tokens);
+            entry.output_tokens += u64::from(output_tokens);
+            entry.sessions += 1;
+        } else {
+            self.entries.push(UsageLogEntry {
+                date: date.to_string(),
+                model: model.to_string(),
+                input_tokens: u64::from(input_tokens),
+                output_tokens: u64::from(output_tokens),
+                sessions: 1,
+            });
+        }
+        // Keep only last 90 days of entries
+        if self.entries.len() > 500 {
+            self.entries.drain(..self.entries.len() - 500);
+        }
+    }
+}
+
+fn record_session_usage(model: &str, usage: &runtime::TokenUsage) {
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let days = now / 86400;
+    // Simple date from epoch days
+    let date = format!("{days}"); // epoch day number, compact
+    let mut log = UsageLog::load();
+    log.record(&date, model, usage.input_tokens, usage.output_tokens);
+    let _ = log.save();
+}
+
+// ── Session Auto-Cleanup (prune old sessions on startup) ──
+
+fn cleanup_old_sessions() {
+    let Ok(dir) = sessions_dir() else { return };
+    let now = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let cutoff = now.saturating_sub(30 * 24 * 3600); // 30 days
+    let max_sessions = 100;
+
+    let Ok(entries) = fs::read_dir(&dir) else { return };
+    let mut session_files: Vec<(PathBuf, u64)> = entries
+        .flatten()
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            name.starts_with("session-") && name.ends_with(".json")
+        })
+        .filter_map(|e| {
+            let modified = e.metadata().ok()?
+                .modified().ok()?
+                .duration_since(UNIX_EPOCH).ok()?
+                .as_secs();
+            Some((e.path(), modified))
+        })
+        .collect();
+
+    // Sort oldest first
+    session_files.sort_by_key(|(_, modified)| *modified);
+
+    let mut removed = 0_usize;
+    for (path, modified) in &session_files {
+        // Remove empty sessions older than 30 days
+        if *modified < cutoff {
+            if let Ok(content) = fs::read_to_string(path) {
+                if let Ok(session) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let msgs = session.get("messages")
+                        .and_then(|m| m.as_array())
+                        .map_or(0, Vec::len);
+                    if msgs == 0 {
+                        let _ = fs::remove_file(path);
+                        removed += 1;
+                    }
+                }
+            }
+        }
+    }
+
+    // If still over max, remove oldest empty sessions
+    if session_files.len().saturating_sub(removed) > max_sessions {
+        let excess = session_files.len() - removed - max_sessions;
+        let mut pruned = 0;
+        for (path, _) in &session_files {
+            if pruned >= excess { break; }
+            if !path.exists() { continue; }
+            if let Ok(content) = fs::read_to_string(path) {
+                if let Ok(session) = serde_json::from_str::<serde_json::Value>(&content) {
+                    let msgs = session.get("messages")
+                        .and_then(|m| m.as_array())
+                        .map_or(0, Vec::len);
+                    if msgs <= 2 {
+                        let _ = fs::remove_file(path);
+                        pruned += 1;
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn render_session_list(active_session_id: &str) -> Result<String, Box<dyn std::error::Error>> {
