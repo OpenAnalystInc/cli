@@ -407,20 +407,34 @@ impl PermissionPrompter for TuiPermissionPrompter {
             required_mode: format!("{:?}", request.required_mode),
         });
 
-        // Block until the user responds or timeout expires.
-        // The TUI sends Action::PermissionResponse → orchestrator → registry.resolve_permission → oneshot.
-        match rx.blocking_recv() {
-            Ok(true) => PermissionPromptDecision::Allow,
-            Ok(false) => PermissionPromptDecision::Deny {
-                reason: "Denied by user".to_string(),
-            },
-            Err(_) => {
-                // Channel dropped — TUI closed or timeout. Deny for safety.
-                PermissionPromptDecision::Deny {
-                    reason: "Permission prompt timed out or was cancelled".to_string(),
-                }
+        // Block until the user responds, with a 120-second timeout to prevent hanging.
+        // Uses a dedicated mini runtime to await with timeout since we're in spawn_blocking.
+        let decision = {
+            let rt = tokio::runtime::Builder::new_current_thread()
+                .enable_time()
+                .build()
+                .ok();
+            match rt {
+                Some(rt) => rt.block_on(async {
+                    match tokio::time::timeout(std::time::Duration::from_secs(120), rx).await {
+                        Ok(Ok(true)) => PermissionPromptDecision::Allow,
+                        Ok(Ok(false)) => PermissionPromptDecision::Deny {
+                            reason: "Denied by user".to_string(),
+                        },
+                        Ok(Err(_)) => PermissionPromptDecision::Deny {
+                            reason: "Permission dialog was closed".to_string(),
+                        },
+                        Err(_) => PermissionPromptDecision::Deny {
+                            reason: "Permission prompt timed out after 120 seconds".to_string(),
+                        },
+                    }
+                }),
+                None => PermissionPromptDecision::Deny {
+                    reason: "Internal error: could not create runtime for permission check".to_string(),
+                },
             }
-        }
+        };
+        decision
     }
 }
 
