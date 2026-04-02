@@ -10,10 +10,11 @@ use ratatui::widgets::Widget;
 use tui_widgets::status_bar::AgentPhase;
 use tui_widgets::{InputBox, InputBoxState, PermissionDialog, StatusBar, ToolCallCard, ToolCallStatus};
 
+use crate::autocomplete::{InputHistory, SlashSuggestions};
 use crate::banner::{Banner, BannerAccountInfo};
 use crate::layout::compute_layout;
 use crate::panels::chat::{ChatMessage, ChatPanel};
-use crate::panels::sidebar::{self, FileAction, SidebarState};
+use crate::panels::sidebar::{self, BackgroundTaskStatus, FileAction, SidebarState};
 
 /// Exit state machine.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -65,6 +66,12 @@ pub struct App {
 
     // Per-action model override — used for one prompt then reverts
     pub model_override: Option<String>,
+
+    // Slash command autocomplete
+    pub suggestions: SlashSuggestions,
+
+    // Input history
+    pub history: InputHistory,
 }
 
 /// Thinking effort level — maps to token budgets for extended thinking.
@@ -142,6 +149,8 @@ impl App {
             pending_queue: Vec::new(),
             effort: EffortLevel::default(),
             model_override: None,
+            suggestions: SlashSuggestions::default(),
+            history: InputHistory::default(),
         }
     }
 
@@ -201,6 +210,64 @@ impl App {
                 name.to_string_lossy()
             ));
         }
+    }
+
+    /// Auto-save current session to disk.
+    pub fn auto_save_session(&self) {
+        if self.chat.messages.is_empty() {
+            return;
+        }
+        let sessions_dir = std::path::Path::new(".openanalyst").join("sessions");
+        let _ = std::fs::create_dir_all(&sessions_dir);
+
+        // Use a stable filename based on the startup time
+        let path = sessions_dir.join("session-latest.json");
+        let messages: Vec<serde_json::Value> = self
+            .chat
+            .messages
+            .iter()
+            .filter_map(|msg| match msg {
+                ChatMessage::User { text } => Some(serde_json::json!({
+                    "role": "user",
+                    "content": text,
+                })),
+                ChatMessage::Assistant { markdown, .. } => {
+                    let raw = markdown.raw();
+                    if raw.is_empty() {
+                        None
+                    } else {
+                        Some(serde_json::json!({
+                            "role": "assistant",
+                            "content": raw,
+                        }))
+                    }
+                }
+                ChatMessage::ToolCall { card } => Some(serde_json::json!({
+                    "role": "tool_call",
+                    "tool_name": card.tool_name,
+                    "input": card.input_preview,
+                    "output": card.output,
+                    "status": format!("{:?}", card.status),
+                })),
+                ChatMessage::System { text } => Some(serde_json::json!({
+                    "role": "system",
+                    "content": text,
+                })),
+                ChatMessage::FileOutput { path, description, .. } => Some(serde_json::json!({
+                    "role": "file_output",
+                    "path": path,
+                    "description": description,
+                })),
+            })
+            .collect();
+
+        let session = serde_json::json!({
+            "version": 2,
+            "messages": messages,
+            "tokens": self.status_bar.total_tokens,
+        });
+
+        let _ = std::fs::write(&path, serde_json::to_string_pretty(&session).unwrap_or_default());
     }
 
     /// Toggle sidebar visibility.
@@ -289,7 +356,7 @@ impl App {
         // Send to orchestrator as a regular prompt — orchestrator handles the rest
         let tx = self.action_tx.clone();
         tokio::spawn(async move {
-            let _ = tx.send(Action::SubmitPrompt(text)).await;
+            let _ = tx.send(Action::SubmitPrompt { text, effort_budget: None, model_override: None }).await;
         });
     }
 
@@ -297,6 +364,11 @@ impl App {
     /// Slash commands always execute immediately (even mid-stream).
     /// Regular prompts are queued if streaming, sent immediately otherwise.
     pub fn submit_prompt(&mut self, text: String) {
+        // Record in history
+        self.history.push(text.clone());
+        // Dismiss autocomplete
+        self.suggestions.dismiss();
+
         // Slash commands always execute immediately — even mid-stream
         if text.starts_with('/') {
             if crate::slash_commands::handle_slash_command(self, &text) {
@@ -325,13 +397,12 @@ impl App {
         self.status_bar.phase = AgentPhase::Thinking;
         self.chat.auto_scroll = true;
 
-        // Clear model_override after use (will be passed via Action when orchestrator supports it)
-        let _model_override = self.model_override.take();
-        let _effort = self.effort;
+        let model_override = self.model_override.take();
+        let effort_budget = Some(self.effort.thinking_budget());
 
         let tx = self.action_tx.clone();
         tokio::spawn(async move {
-            let _ = tx.send(Action::SubmitPrompt(text)).await;
+            let _ = tx.send(Action::SubmitPrompt { text, effort_budget, model_override }).await;
         });
     }
 
@@ -365,6 +436,13 @@ impl App {
                 self.is_streaming = false;
                 if let Some(start) = self.turn_start.take() {
                     self.status_bar.elapsed = start.elapsed();
+                }
+                // Update background tasks
+                for bt in &mut self.sidebar_state.background_tasks {
+                    if bt.status == BackgroundTaskStatus::Running {
+                        bt.status = BackgroundTaskStatus::Completed;
+                        break;
+                    }
                 }
                 // Auto-send next queued prompt
                 self.drain_pending_queue();
@@ -492,6 +570,13 @@ impl App {
                 self.is_streaming = false;
                 self.chat.push_system(format!("Error: {error}"));
                 self.status_bar.phase = AgentPhase::Error;
+                // Update background tasks
+                for bt in &mut self.sidebar_state.background_tasks {
+                    if bt.status == BackgroundTaskStatus::Running {
+                        bt.status = BackgroundTaskStatus::Failed;
+                        break;
+                    }
+                }
                 // Auto-send next queued prompt
                 self.drain_pending_queue();
             }
@@ -570,6 +655,11 @@ impl App {
         let input_mode = self.current_input_mode();
         let input = InputBox::default().mode(input_mode);
         input.render_with_state(layout.input, buf, &mut self.input_state);
+
+        // Slash command autocomplete overlay (above input)
+        if self.suggestions.active {
+            self.suggestions.render(layout.input, buf);
+        }
 
         // Permission dialog overlay (if active)
         if let Some(dialog) = self.permission_dialog.clone() {

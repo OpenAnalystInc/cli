@@ -141,8 +141,12 @@ pub enum UiEvent {
 /// Actions sent from the TUI to the backend orchestrator.
 #[derive(Debug, Clone)]
 pub enum Action {
-    /// User submitted a prompt.
-    SubmitPrompt(String),
+    /// User submitted a prompt with optional effort/model overrides.
+    SubmitPrompt {
+        text: String,
+        effort_budget: Option<u32>,
+        model_override: Option<String>,
+    },
     /// User responded to a permission request.
     PermissionResponse {
         request_id: String,

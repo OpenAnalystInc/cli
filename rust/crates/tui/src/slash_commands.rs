@@ -319,7 +319,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             }
         }
 
-        // ── Git commands (not yet fully wired) ──
+        // ── Git commands ──
 
         SlashCommand::Branch { action, target } => {
             let output = match action.as_deref() {
@@ -468,7 +468,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                              and practical with concrete steps:\n\n{query_clone}"
                         ),
                     };
-                    let _ = tx.send(events::Action::SubmitPrompt(prompt)).await;
+                    let _ = tx.send(events::Action::SubmitPrompt { text: prompt, effort_budget: None, model_override: None }).await;
                 });
             } else {
                 app.chat.push_system(
@@ -557,7 +557,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                              --- ROOT TREE ---\n{tree}\n\n\
                              --- RECENT COMMITS ---\n```\n{commits}\n```"
                         );
-                        let _ = tx.send(events::Action::SubmitPrompt(prompt)).await;
+                        let _ = tx.send(events::Action::SubmitPrompt { text: prompt, effort_budget: None, model_override: None }).await;
                     });
                 }
             } else {

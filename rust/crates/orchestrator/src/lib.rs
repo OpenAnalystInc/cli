@@ -64,7 +64,7 @@ impl AgentOrchestrator {
                 // Handle user actions from the TUI
                 action = self.action_rx.recv() => {
                     match action {
-                        Some(Action::SubmitPrompt(text)) => {
+                        Some(Action::SubmitPrompt { text, .. }) => {
                             self.submit_to_primary(text).await;
                         }
                         Some(Action::PermissionResponse { request_id, allow }) => {

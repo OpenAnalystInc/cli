@@ -13,6 +13,37 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
         return;
     }
 
+    // Autocomplete popup takes priority when active
+    if app.suggestions.active {
+        match key.code {
+            // Tab / Down → next suggestion
+            KeyCode::Tab | KeyCode::Down => {
+                app.suggestions.next();
+                return;
+            }
+            // Shift+Tab / Up → previous suggestion
+            KeyCode::BackTab | KeyCode::Up => {
+                app.suggestions.prev();
+                return;
+            }
+            // Enter → accept selected suggestion
+            KeyCode::Enter => {
+                if let Some(cmd) = app.suggestions.accept() {
+                    app.input_state.set_text(&cmd);
+                    app.suggestions.dismiss();
+                }
+                return;
+            }
+            // Esc → dismiss autocomplete
+            KeyCode::Esc => {
+                app.suggestions.dismiss();
+                return;
+            }
+            // Any other key → pass through (autocomplete will update below)
+            _ => {}
+        }
+    }
+
     match key.code {
         // Ctrl+C → cancel running agent OR quit
         KeyCode::Char('c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
@@ -36,7 +67,22 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
             app.chat.scroll_offset = 0;
             app.chat.focused_message = None;
         }
-        // Tab → cycle focus between panels
+        // Ctrl+Up → previous history entry
+        KeyCode::Up if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            let current = app.input_state.text();
+            if let Some(prev) = app.history.prev(&current) {
+                let prev_owned = prev.to_string();
+                app.input_state.set_text(&prev_owned);
+            }
+        }
+        // Ctrl+Down → next history entry
+        KeyCode::Down if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            if let Some(next) = app.history.next() {
+                let next_owned = next.to_string();
+                app.input_state.set_text(&next_owned);
+            }
+        }
+        // Tab → cycle focus (only when autocomplete is NOT active)
         KeyCode::Tab if !app.scroll_mode => {
             app.cycle_focus();
         }
@@ -49,7 +95,6 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
             } else {
                 app.scroll_mode = true;
                 app.focus = events::PanelId::Chat;
-                // Focus the last message
                 if !app.chat.messages.is_empty() {
                     app.chat.focused_message = Some(app.chat.messages.len() - 1);
                 }
@@ -71,6 +116,12 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
         _ => {
             if let Some(submitted) = app.input_state.handle_key(key) {
                 app.submit_prompt(submitted);
+            } else {
+                // Update autocomplete based on current input
+                let text = app.input_state.text();
+                app.suggestions.update(&text);
+                // Reset history cursor when user types
+                app.history.reset_cursor();
             }
         }
     }
@@ -80,7 +131,6 @@ fn handle_scroll_mode_key(key: KeyEvent, app: &mut App) {
     match key.code {
         KeyCode::Char('j') | KeyCode::Down => {
             app.chat.scroll_down(1);
-            // Move focused message down
             if let Some(idx) = app.chat.focused_message {
                 if idx + 1 < app.chat.messages.len() {
                     app.chat.focused_message = Some(idx + 1);
@@ -89,7 +139,6 @@ fn handle_scroll_mode_key(key: KeyEvent, app: &mut App) {
         }
         KeyCode::Char('k') | KeyCode::Up => {
             app.chat.scroll_up(1);
-            // Move focused message up
             if let Some(idx) = app.chat.focused_message {
                 if idx > 0 {
                     app.chat.focused_message = Some(idx - 1);
@@ -108,7 +157,6 @@ fn handle_scroll_mode_key(key: KeyEvent, app: &mut App) {
             app.chat.auto_scroll = false;
             app.chat.focused_message = Some(0);
         }
-        // Enter → expand/collapse tool card under focus
         KeyCode::Enter => {
             if let Some(idx) = app.chat.focused_message {
                 if let Some(ChatMessage::ToolCall { card }) = app.chat.messages.get_mut(idx) {
@@ -116,14 +164,13 @@ fn handle_scroll_mode_key(key: KeyEvent, app: &mut App) {
                 }
             }
         }
-        // / → jump to input and start typing a slash command
         KeyCode::Char('/') => {
             app.scroll_mode = false;
             app.focus = events::PanelId::Input;
             app.chat.focused_message = None;
-            // Inject '/' into the input
             let slash_key = KeyEvent::new(KeyCode::Char('/'), KeyModifiers::NONE);
             app.input_state.handle_key(slash_key);
+            app.suggestions.update("/");
         }
         KeyCode::Char('i') | KeyCode::Esc => {
             app.scroll_mode = false;
