@@ -58,7 +58,7 @@ fn main() -> io::Result<()> {
             duration: Duration::from_millis(340),
         },
         output: Some("fn login(user: &str, pass: &str) -> Result<Token> {\n    let client = reqwest::Client::new();\n    // BUG: missing await on async call\n    let resp = client.post(AUTH_URL).json(&creds).send();\n    Ok(resp.json::<Token>()?)\n}".to_string()),
-        expanded: false,
+        expanded: false, diff: None,
     });
 
     app.chat.push_tool_call(ToolCallCard {
@@ -68,7 +68,7 @@ fn main() -> io::Result<()> {
             duration: Duration::from_millis(1250),
         },
         output: Some("Applied edit: added .await to send() call".to_string()),
-        expanded: true,
+        expanded: true, diff: None,
     });
 
     app.chat.start_assistant();
@@ -84,7 +84,7 @@ fn main() -> io::Result<()> {
             elapsed: Duration::from_millis(4500),
         },
         output: None,
-        expanded: false,
+        expanded: false, diff: None,
     });
 
     // Mock sidebar state

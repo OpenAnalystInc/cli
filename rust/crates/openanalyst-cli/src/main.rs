@@ -219,6 +219,97 @@ fn exchange_google_refresh_token(refresh_token: &str, client_id: &str, client_se
 /// Load ALL saved provider credentials from ~/.openanalyst/credentials.json
 /// Sets env vars for EVERY saved provider so /model switching works across providers.
 /// Env vars already set by the user take priority (not overwritten).
+/// Ensure the directory containing the running binary is in the system PATH.
+/// On Windows, updates the user-level PATH in the registry.
+/// On Unix, appends to ~/.bashrc and ~/.zshrc if needed.
+/// Only runs once — creates a marker file to avoid repeating.
+fn ensure_path_registered() {
+    let Ok(exe_path) = env::current_exe() else { return };
+    let Some(bin_dir) = exe_path.parent() else { return };
+    let bin_dir_str = bin_dir.to_string_lossy();
+
+    // Check if already in PATH
+    let path_var = env::var("PATH").unwrap_or_default();
+    let separator = if cfg!(windows) { ';' } else { ':' };
+    if path_var.split(separator).any(|p| {
+        let p = p.trim_end_matches(['/', '\\']);
+        let b = bin_dir_str.trim_end_matches(['/', '\\']);
+        p.eq_ignore_ascii_case(b)
+    }) {
+        return; // Already in PATH
+    }
+
+    // Check marker file — only attempt once per install location
+    let config_dir = runtime::credentials_config_home().unwrap_or_else(|_| PathBuf::from(".openanalyst"));
+    let marker = config_dir.join(".path_registered");
+    if marker.exists() { return; }
+
+    #[cfg(target_os = "windows")]
+    {
+        // Windows: update user PATH via registry
+        let result = std::process::Command::new("powershell")
+            .args([
+                "-NoProfile", "-Command",
+                &format!(
+                    "$p = [Environment]::GetEnvironmentVariable('Path','User'); \
+                     if ($p -notlike '*{}*') {{ \
+                       [Environment]::SetEnvironmentVariable('Path', $p + ';{}', 'User'); \
+                       Write-Output 'added' \
+                     }}",
+                    bin_dir_str.replace('\'', "''"),
+                    bin_dir_str.replace('\'', "''"),
+                ),
+            ])
+            .output();
+
+        if let Ok(output) = result {
+            let stdout = String::from_utf8_lossy(&output.stdout);
+            if stdout.contains("added") {
+                eprintln!(
+                    "  \x1b[38;5;45m\u{2713}\x1b[0m Added \x1b[1m{}\x1b[0m to your PATH.",
+                    bin_dir_str
+                );
+                eprintln!("    \x1b[2mRestart your terminal for this to take effect.\x1b[0m");
+                let _ = fs::write(&marker, "done");
+            }
+        }
+    }
+
+    #[cfg(not(target_os = "windows"))]
+    {
+        // Unix: append to shell profiles
+        let home = env::var("HOME").unwrap_or_default();
+        let export_line = format!("\n# OpenAnalyst CLI\nexport PATH=\"{}:$PATH\"\n", bin_dir_str);
+        let mut added = false;
+
+        for profile in &[".bashrc", ".zshrc", ".profile"] {
+            let profile_path = PathBuf::from(&home).join(profile);
+            if profile_path.exists() {
+                let content = fs::read_to_string(&profile_path).unwrap_or_default();
+                if !content.contains(&*bin_dir_str) {
+                    let _ = fs::OpenOptions::new()
+                        .append(true)
+                        .open(&profile_path)
+                        .and_then(|mut f| {
+                            use std::io::Write;
+                            f.write_all(export_line.as_bytes())
+                        });
+                    added = true;
+                }
+            }
+        }
+
+        if added {
+            eprintln!(
+                "  \x1b[38;5;45m\u{2713}\x1b[0m Added \x1b[1m{}\x1b[0m to your shell PATH.",
+                bin_dir_str
+            );
+            eprintln!("    \x1b[2mRestart your terminal or run: source ~/.bashrc\x1b[0m");
+            let _ = fs::write(&marker, "done");
+        }
+    }
+}
+
 fn load_saved_provider_credentials() {
     let config_dir = runtime::credentials_config_home().ok()
         .or_else(|| {
@@ -226,31 +317,35 @@ fn load_saved_provider_credentials() {
                 .map(|h| PathBuf::from(h).join(".openanalyst"))
         });
     let Some(config_dir) = config_dir else { return };
+
+    // ── Layer 1: credentials.json ──
     let creds_path = config_dir.join("credentials.json");
-    if !creds_path.exists() { return; }
+    if creds_path.exists() {
+        if let Ok(content) = fs::read_to_string(&creds_path) {
+            if let Ok(creds) = serde_json::from_str::<serde_json::Value>(&content) {
+                if let Some(providers) = creds.get("providers").and_then(|v| v.as_object()) {
+                    for (_name, provider_data) in providers {
+                        if let (Some(env_var), Some(api_key)) = (
+                            provider_data.get("env_var").and_then(|v| v.as_str()),
+                            provider_data.get("api_key").and_then(|v| v.as_str()),
+                        ) {
+                            if !api_key.is_empty() && env::var(env_var).ok().filter(|v| !v.is_empty()).is_none() {
+                                env::set_var(env_var, api_key);
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-    let content = match fs::read_to_string(&creds_path) {
-        Ok(c) => c,
-        Err(_) => return,
-    };
-    let creds: serde_json::Value = match serde_json::from_str(&content) {
-        Ok(v) => v,
-        Err(_) => return,
-    };
-
-    let providers = creds.get("providers").and_then(|v| v.as_object());
-    let Some(providers) = providers else { return };
-
-    // Load ALL provider keys into env — this is what makes /model switching work.
-    // If user ran `openanalyst login` for OpenAnalyst, OpenAI, and Grok,
-    // all three keys are loaded so /model gpt-4o or /model grok just works.
-    for (_name, provider_data) in providers {
-        if let (Some(env_var), Some(api_key)) = (
-            provider_data.get("env_var").and_then(|v| v.as_str()),
-            provider_data.get("api_key").and_then(|v| v.as_str()),
-        ) {
-            if !api_key.is_empty() && env::var(env_var).ok().filter(|v| !v.is_empty()).is_none() {
-                env::set_var(env_var, api_key);
+    // ── Layer 2: SQLite fallback — picks up anything credentials.json missed ──
+    if let Ok(db) = orchestrator::knowledge::LearningDb::open() {
+        if let Ok(creds) = db.load_all_credentials() {
+            for (_provider, env_var, api_key) in creds {
+                if !api_key.is_empty() && env::var(&env_var).ok().filter(|v| !v.is_empty()).is_none() {
+                    env::set_var(&env_var, &api_key);
+                }
             }
         }
     }
@@ -265,9 +360,11 @@ fn main() {
     load_saved_provider_credentials();
     // 4. Detect auth from installed CLIs (Claude, Codex, Gemini)
     load_external_cli_credentials();
+    // 5. Ensure the CLI binary directory is in PATH
+    ensure_path_registered();
     // Prune old/empty sessions in the background (non-blocking)
     std::thread::spawn(cleanup_old_sessions);
-    // 5. Check for updates in background (non-blocking, silent)
+    // 6. Check for updates in background (non-blocking, silent)
     std::thread::spawn(background_update_check);
 
     if let Err(error) = run() {
@@ -1325,6 +1422,18 @@ fn run_oauth_login(
                     // 9. Also save as regular credential so /model switching works
                     let api_key = &token_set.access_token;
                     save_provider_credential(provider, api_key)?;
+
+                    // 9b. Save OAuth-specific fields to SQLite
+                    if let Ok(db) = orchestrator::knowledge::LearningDb::open() {
+                        let _ = db.save_credential(
+                            provider.name,
+                            provider.env_var,
+                            api_key,
+                            "oauth",
+                            token_set.refresh_token.as_deref(),
+                            token_set.expires_at.map(|e| e as i64),
+                        );
+                    }
                     env::set_var(oauth_meta.token_env_var, api_key);
 
                     // 10. Fetch models
@@ -1476,6 +1585,11 @@ fn save_provider_credential(provider: &ProviderOption, api_key: &str) -> Result<
 
     // ── Also persist to .env (single source of truth for all env-based auth) ──
     upsert_dotenv_key(&config_dir.join(".env"), provider.env_var, api_key)?;
+
+    // ── Also persist to SQLite (3rd fallback layer) ──
+    if let Ok(db) = orchestrator::knowledge::LearningDb::open() {
+        let _ = db.save_credential(provider.name, provider.env_var, api_key, "api_key", None, None);
+    }
 
     Ok(())
 }
