@@ -100,6 +100,10 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
                 }
             }
         }
+        // Sidebar focused: section navigation
+        _ if app.focus == events::PanelId::Sidebar && app.sidebar_visible => {
+            handle_sidebar_key(key, app);
+        }
         // In scroll mode: vim-like navigation
         _ if app.scroll_mode => {
             handle_scroll_mode_key(key, app);
@@ -176,6 +180,36 @@ fn handle_scroll_mode_key(key: KeyEvent, app: &mut App) {
             app.scroll_mode = false;
             app.focus = events::PanelId::Input;
             app.chat.focused_message = None;
+        }
+        _ => {}
+    }
+}
+
+fn handle_sidebar_key(key: KeyEvent, app: &mut App) {
+    match key.code {
+        // j/Down → select next item in section
+        KeyCode::Char('j') | KeyCode::Down => {
+            app.sidebar_state.select_next();
+        }
+        // k/Up → select previous item in section
+        KeyCode::Char('k') | KeyCode::Up => {
+            app.sidebar_state.select_prev();
+        }
+        // Tab → cycle to next section
+        KeyCode::Tab => {
+            app.sidebar_state.next_section();
+        }
+        // Shift+Tab → cycle to previous section
+        KeyCode::BackTab => {
+            app.sidebar_state.prev_section();
+        }
+        // Enter → expand/collapse selected item
+        KeyCode::Enter => {
+            app.sidebar_state.toggle_expand();
+        }
+        // Esc/i → return focus to input
+        KeyCode::Esc | KeyCode::Char('i') => {
+            app.focus = events::PanelId::Input;
         }
         _ => {}
     }

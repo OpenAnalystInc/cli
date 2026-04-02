@@ -115,6 +115,7 @@ fn run_turn_blocking(
         agent_id: agent_id.clone(),
         tool_registry,
         ui_tx: ui_tx.clone(),
+        mcp_connections,
     };
 
     let permission_policy = runtime::PermissionPolicy::new(config.permission_mode);
@@ -311,10 +312,12 @@ impl ApiClient for ChannelApiClient {
 // ── Channel-based ToolExecutor ──
 
 /// `ToolExecutor` implementation that sends tool call events to the TUI.
+/// Handles built-in tools, plugin tools, and MCP tools.
 struct ChannelToolExecutor {
     agent_id: AgentId,
     tool_registry: tools::GlobalToolRegistry,
     ui_tx: UiEventTx,
+    mcp_connections: Vec<runtime::mcp_bridge::McpConnection>,
 }
 
 impl ToolExecutor for ChannelToolExecutor {
@@ -324,7 +327,12 @@ impl ToolExecutor for ChannelToolExecutor {
         let input_value: serde_json::Value =
             serde_json::from_str(input).unwrap_or(serde_json::Value::String(input.to_string()));
 
-        let result = self.tool_registry.execute(tool_name, &input_value);
+        // Route MCP tools to their server connection
+        let result = if tool_name.starts_with("mcp__") {
+            self.execute_mcp_tool(tool_name, &input_value)
+        } else {
+            self.tool_registry.execute(tool_name, &input_value)
+        };
         let duration = start.elapsed();
 
         let (output, is_error) = match &result {
@@ -342,6 +350,19 @@ impl ToolExecutor for ChannelToolExecutor {
         });
 
         result.map_err(ToolError::new)
+    }
+}
+
+impl ChannelToolExecutor {
+    /// Execute an MCP tool by finding its server connection and dispatching the call.
+    fn execute_mcp_tool(&mut self, tool_name: &str, input: &serde_json::Value) -> Result<String, String> {
+        for conn in &mut self.mcp_connections {
+            if let Some(tool) = conn.tools.iter().find(|t| t.full_name == tool_name) {
+                let original_name = tool.original_name.clone();
+                return runtime::mcp_bridge::call_tool(conn, &original_name, input.clone());
+            }
+        }
+        Err(format!("MCP tool '{tool_name}' has no active server connection"))
     }
 }
 
