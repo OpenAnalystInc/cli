@@ -12,7 +12,80 @@ use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span};
 use ratatui::widgets::{Block, BorderType, Borders, Widget};
 
-/// The current mode displayed in the input box title.
+/// The permission level that controls tool approval behavior.
+/// This is the "mode" the user sees and cycles through with Ctrl+P.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PermissionLevel {
+    /// Default: ask before running tools.
+    Default,
+    /// Plan mode: read-only tools only, planning only.
+    Plan,
+    /// Accept Edits: auto-approve file write/edit, prompt for shell.
+    AcceptEdits,
+    /// Danger (Full Access): everything auto-approved.
+    Danger,
+}
+
+impl PermissionLevel {
+    /// Cycle to the next permission level.
+    #[must_use]
+    pub fn next(self) -> Self {
+        match self {
+            Self::Default => Self::Plan,
+            Self::Plan => Self::AcceptEdits,
+            Self::AcceptEdits => Self::Danger,
+            Self::Danger => Self::Default,
+        }
+    }
+
+    /// Display label for the mode indicator.
+    #[must_use]
+    pub fn label(self) -> &'static str {
+        match self {
+            Self::Default => "Default",
+            Self::Plan => "Plan",
+            Self::AcceptEdits => "Accept Edits",
+            Self::Danger => "Danger",
+        }
+    }
+
+    /// Map to the runtime permission mode string.
+    #[must_use]
+    pub fn to_permission_mode(self) -> &'static str {
+        match self {
+            Self::Default => "prompt",
+            Self::Plan => "read-only",
+            Self::AcceptEdits => "workspace-write",
+            Self::Danger => "danger-full-access",
+        }
+    }
+
+    fn accent_color(self) -> Color {
+        match self {
+            Self::Default => Color::Rgb(50, 130, 255), // blue
+            Self::Plan => Color::Yellow,
+            Self::AcceptEdits => Color::Green,
+            Self::Danger => Color::Red,
+        }
+    }
+
+    fn icon(self) -> &'static str {
+        match self {
+            Self::Default => "❯",
+            Self::Plan => "◈",
+            Self::AcceptEdits => "✎",
+            Self::Danger => "⚡",
+        }
+    }
+}
+
+impl Default for PermissionLevel {
+    fn default() -> Self {
+        Self::Default
+    }
+}
+
+/// The current activity state displayed in the input box title.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum InputMode {
     /// Ready for user input.
@@ -32,27 +105,52 @@ impl Default for InputMode {
 }
 
 impl InputMode {
-    fn border_color(&self) -> Color {
+    fn border_color(&self, perm: PermissionLevel) -> Color {
         match self {
-            Self::Ready => Color::Rgb(50, 130, 255),     // blue border
+            Self::Ready => perm.accent_color(),
             Self::AgentRunning { .. } => Color::Rgb(50, 130, 255),
             Self::PlanRunning { .. } => Color::Yellow,
             Self::Streaming => Color::Cyan,
         }
     }
 
-    fn title_spans(&self) -> Vec<Span<'static>> {
+    fn title_spans(&self, perm: PermissionLevel, active_agent: Option<&str>) -> Vec<Span<'static>> {
         match self {
-            Self::Ready => vec![
-                Span::styled(
-                    " ❯ ",
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
-                ),
-                Span::styled(
-                    "Enter to send · Shift+Enter newline ",
+            Self::Ready => {
+                let mut spans = vec![
+                    Span::styled(
+                        format!(" {} ", perm.icon()),
+                        Style::default().fg(perm.accent_color()).add_modifier(Modifier::BOLD),
+                    ),
+                ];
+                // Show active agent name if one is selected
+                if let Some(agent_name) = active_agent {
+                    spans.push(Span::styled(
+                        format!("{agent_name} "),
+                        Style::default().fg(perm.accent_color()).add_modifier(Modifier::BOLD),
+                    ));
+                    spans.push(Span::styled(
+                        "· ",
+                        Style::default().fg(Color::Indexed(240)),
+                    ));
+                }
+                // Show permission mode label (except Default which is implied)
+                if perm != PermissionLevel::Default {
+                    spans.push(Span::styled(
+                        format!("{} ", perm.label()),
+                        Style::default().fg(perm.accent_color()),
+                    ));
+                    spans.push(Span::styled(
+                        "· ",
+                        Style::default().fg(Color::Indexed(240)),
+                    ));
+                }
+                spans.push(Span::styled(
+                    "Enter to send · Ctrl+P mode ",
                     Style::default().fg(Color::Indexed(240)),
-                ),
-            ],
+                ));
+                spans
+            }
             Self::AgentRunning { label } => vec![
                 Span::styled(
                     " ● ",
@@ -102,18 +200,24 @@ impl InputMode {
 /// Wrapper around `edtui` providing a vim-mode input area with mode-aware styling.
 pub struct InputBox {
     mode: InputMode,
+    /// Current permission level (changes border color and mode indicator).
+    permission_level: PermissionLevel,
     /// Right-aligned context tag (git branch, active plan, agent name).
     context_tag: Option<String>,
     /// Model label shown above the input box (e.g., "claude-opus-4-6").
     model_label: Option<String>,
+    /// Active agent name (from sidebar selection).
+    active_agent: Option<String>,
 }
 
 impl Default for InputBox {
     fn default() -> Self {
         Self {
             mode: InputMode::Ready,
+            permission_level: PermissionLevel::Default,
             context_tag: None,
             model_label: None,
+            active_agent: None,
         }
     }
 }
@@ -126,6 +230,13 @@ impl InputBox {
         self
     }
 
+    /// Set the permission level (changes border color and mode indicator).
+    #[must_use]
+    pub fn permission_level(mut self, level: PermissionLevel) -> Self {
+        self.permission_level = level;
+        self
+    }
+
     /// Set the context tag (displayed top-right of the input border).
     #[must_use]
     pub fn context_tag(mut self, tag: Option<String>) -> Self {
@@ -133,10 +244,17 @@ impl InputBox {
         self
     }
 
+    /// Set the active agent name (displayed in title when an agent is selected).
+    #[must_use]
+    pub fn active_agent(mut self, name: Option<String>) -> Self {
+        self.active_agent = name;
+        self
+    }
+
     /// Render the input box into the given area using the provided state.
     pub fn render_with_state(self, area: Rect, buf: &mut Buffer, state: &mut InputBoxState) {
-        let border_color = self.mode.border_color();
-        let title_spans = self.mode.title_spans();
+        let border_color = self.mode.border_color(self.permission_level);
+        let title_spans = self.mode.title_spans(self.permission_level, self.active_agent.as_deref());
 
         let mut block = Block::default()
             .borders(Borders::ALL)

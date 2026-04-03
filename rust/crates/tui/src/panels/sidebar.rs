@@ -68,6 +68,19 @@ pub enum BackgroundTaskStatus {
     Failed,
 }
 
+/// A project agent definition loaded from .openanalyst/agents/*.md files.
+#[derive(Debug, Clone)]
+pub struct AgentDefinition {
+    /// Display name (derived from filename).
+    pub name: String,
+    /// Description (first line of the markdown body).
+    pub description: String,
+    /// Full system prompt (the file contents after frontmatter).
+    pub system_prompt: String,
+    /// Source path for reference.
+    pub source: String,
+}
+
 /// Which sidebar section is currently focused.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SidebarSection {
@@ -415,7 +428,7 @@ pub fn render_sidebar(
 
     // Split sidebar into 5 sections
     let agent_count = state.agents.len().min(10) as u16;
-    let file_count = state.files.len().min(15) as u16;
+    let file_count = state.files.len().min(5) as u16;
     let plan_count = state.plans.len().min(5) as u16;
 
     let sections = Layout::vertical([
@@ -567,7 +580,9 @@ fn render_files_section(
         lines.push(Line::from(Span::styled("  (no files yet)", Style::default().fg(Color::DarkGray))));
     } else {
         let max_width = area.width as usize - 5;
-        for (i, file) in files.iter().take(15).enumerate() {
+        // Show 5 files max, scrollable via selected index
+        let scroll_offset = if selected >= 5 { selected - 4 } else { 0 };
+        for (i, file) in files.iter().enumerate().skip(scroll_offset).take(5) {
             let icon = file.action.icon();
             let color = file.action.color();
 

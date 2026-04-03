@@ -9,7 +9,7 @@ use ratatui::layout::Rect;
 use ratatui::widgets::{Paragraph, Widget};
 
 use tui_widgets::status_bar::AgentPhase;
-use tui_widgets::{InputBox, InputBoxState, PermissionDialog, StatusBar, ToolCallCard, ToolCallStatus};
+use tui_widgets::{InputBox, InputBoxState, PermissionDialog, PermissionLevel, StatusBar, ToolCallCard, ToolCallStatus};
 
 use crate::autocomplete::{InputHistory, SlashSuggestions};
 use crate::banner::{Banner, BannerAccountInfo};
@@ -75,6 +75,12 @@ pub struct App {
     // Current permission mode (tracked for display, orchestrator has canonical copy)
     pub permission_mode: String,
 
+    // Permission level for the input box mode indicator
+    pub permission_level: PermissionLevel,
+
+    // Active agent name selected from sidebar (changes input box title + system prompt)
+    pub active_agent_name: Option<String>,
+
     // Slash command autocomplete
     pub suggestions: SlashSuggestions,
 
@@ -115,6 +121,8 @@ impl App {
             router: ModelRouter::from_default_model(default_model),
             model_override: None,
             permission_mode: "danger-full-access".to_string(),
+            permission_level: PermissionLevel::Default,
+            active_agent_name: None,
             suggestions: SlashSuggestions::default(),
             history: InputHistory::default(),
             voice: crate::voice::VoiceState::default(),
@@ -243,6 +251,33 @@ impl App {
                 eprintln!("[auto_save_session] Failed to serialize session: {e}");
             }
         }
+    }
+
+    /// Cycle to the next permission level (Default → Plan → AcceptEdits → Danger → Default).
+    /// Sends Action::UpdatePermissions to the orchestrator.
+    pub fn cycle_permission_level(&mut self) {
+        self.permission_level = self.permission_level.next();
+        let mode_str = self.permission_level.to_permission_mode().to_string();
+        self.permission_mode = mode_str.clone();
+        self.chat.push_system(format!(
+            "Mode: {} ({})", self.permission_level.label(), mode_str
+        ));
+        let tx = self.action_tx.clone();
+        tokio::spawn(async move {
+            if tx.send(Action::UpdatePermissions(mode_str)).await.is_err() {
+                eprintln!("[tui] orchestrator channel closed");
+            }
+        });
+    }
+
+    /// Set the active agent from sidebar selection.
+    pub fn set_active_agent(&mut self, name: Option<String>) {
+        if let Some(ref agent_name) = name {
+            self.chat.push_system(format!("Agent: {agent_name}"));
+        } else if self.active_agent_name.is_some() {
+            self.chat.push_system("Agent deselected — back to default.".to_string());
+        }
+        self.active_agent_name = name;
     }
 
     /// Toggle sidebar visibility.
@@ -817,7 +852,11 @@ impl App {
         } else {
             let input_mode = self.current_input_mode();
             let context_tag = self.get_context_tag();
-            let input = InputBox::default().mode(input_mode).context_tag(context_tag);
+            let input = InputBox::default()
+                .mode(input_mode)
+                .permission_level(self.permission_level)
+                .context_tag(context_tag)
+                .active_agent(self.active_agent_name.clone());
             input.render_with_state(layout.input, buf, &mut self.input_state);
         }
 
@@ -849,6 +888,7 @@ fn build_status_hints(is_streaming: bool, scroll_mode: bool, sidebar_visible: bo
         hints.push("Ctrl+C:quit");
     }
     hints.push("Ctrl+B:background");
+    hints.push("Ctrl+P:mode");
     if sidebar_visible {
         hints.push("F2:hide");
     } else {

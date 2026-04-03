@@ -125,9 +125,14 @@ impl Widget for StatusBar {
         let time_str = Self::format_duration(&self.elapsed);
         let token_str = Self::format_tokens(self.total_tokens);
 
-        // Build left side
-        let left_text = format!("{icon} {label} ({time_str} · ↓ {token_str} tokens)");
-        let left_len = left_text.chars().count();
+        // Build left side — hide stats when idle/done (only show during active work)
+        let show_stats = !matches!(self.phase, AgentPhase::Idle | AgentPhase::Done);
+        let left_part = if show_stats {
+            format!("{icon} {label} ({time_str} · ↓ {token_str} tokens)")
+        } else {
+            String::new() // Empty when idle — clean look
+        };
+        let left_len = left_part.chars().count();
 
         // Build right side (hints)
         let hints_len = self.hints.chars().count();
@@ -136,23 +141,34 @@ impl Widget for StatusBar {
         let total_width = area.width as usize;
         let pad = total_width.saturating_sub(left_len + hints_len + 1);
 
-        let line = Line::from(vec![
-            Span::styled(
-                format!("{icon} {label}"),
-                Style::default()
-                    .fg(phase_color)
-                    .add_modifier(Modifier::BOLD),
-            ),
-            Span::styled(
-                format!(" ({time_str} · ↓ {token_str} tokens)"),
-                Style::default().fg(Color::DarkGray),
-            ),
-            Span::raw(" ".repeat(pad)),
-            Span::styled(
-                self.hints,
-                Style::default().fg(Color::Indexed(240)),
-            ),
-        ]);
+        let line = if show_stats {
+            Line::from(vec![
+                Span::styled(
+                    format!("{icon} {label}"),
+                    Style::default()
+                        .fg(phase_color)
+                        .add_modifier(Modifier::BOLD),
+                ),
+                Span::styled(
+                    format!(" ({time_str} · ↓ {token_str} tokens)"),
+                    Style::default().fg(Color::DarkGray),
+                ),
+                Span::raw(" ".repeat(pad)),
+                Span::styled(
+                    self.hints.clone(),
+                    Style::default().fg(Color::Indexed(240)),
+                ),
+            ])
+        } else {
+            // Idle: just show hints right-aligned
+            Line::from(vec![
+                Span::raw(" ".repeat(total_width.saturating_sub(hints_len + 1))),
+                Span::styled(
+                    self.hints.clone(),
+                    Style::default().fg(Color::Indexed(240)),
+                ),
+            ])
+        };
 
         Paragraph::new(line).render(area, buf);
     }

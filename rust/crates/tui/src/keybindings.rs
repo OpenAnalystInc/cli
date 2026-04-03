@@ -81,6 +81,10 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
                 }
             }
         }
+        // Ctrl+P → cycle permission mode (Default → Plan → Accept Edits → Danger)
+        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.cycle_permission_level();
+        }
         // Ctrl+\\ → toggle sidebar (unique binding, Ctrl+B is background)
         KeyCode::Char('\\') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.toggle_sidebar();
@@ -126,9 +130,13 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
         KeyCode::Tab if app.focus == events::PanelId::Sidebar && app.sidebar_visible => {
             app.sidebar_state.next_section();
         }
-        // Shift+Tab → previous sidebar section
-        KeyCode::BackTab if app.focus == events::PanelId::Sidebar && app.sidebar_visible => {
-            app.sidebar_state.prev_section();
+        // Shift+Tab → previous sidebar section (only when sidebar focused)
+        // When not in sidebar, ignore (don't pass to edtui which can't handle it)
+        KeyCode::BackTab => {
+            if app.focus == events::PanelId::Sidebar && app.sidebar_visible {
+                app.sidebar_state.prev_section();
+            }
+            // Ignore when not in sidebar — prevents crash
         }
         // Esc → toggle scroll mode
         KeyCode::Esc => {
