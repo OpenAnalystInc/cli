@@ -60,8 +60,8 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
             app.request_exit();
             return; // Don't clear exit_pending below
         }
-        // Ctrl+Shift+B → send prompt to run in background
-        KeyCode::Char('B') if key.modifiers.contains(KeyModifiers::CONTROL | KeyModifiers::SHIFT) => {
+        // Ctrl+B → run in background (Claude Code parity)
+        KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             let text = app.input_state.text();
             if !text.trim().is_empty() {
                 app.input_state.clear();
@@ -81,8 +81,12 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
                 }
             }
         }
-        // Ctrl+B → toggle sidebar
-        KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        // Ctrl+\\ → toggle sidebar (unique binding, Ctrl+B is background)
+        KeyCode::Char('\\') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.toggle_sidebar();
+        }
+        // F2 → toggle sidebar (alternative)
+        KeyCode::F(2) => {
             app.toggle_sidebar();
         }
         // Ctrl+L → clear chat
@@ -117,9 +121,14 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
                 app.input_state.event_handler.on_key_event(key, &mut app.input_state.editor);
             }
         }
-        // Tab → cycle focus (only when autocomplete is NOT active)
-        KeyCode::Tab if !app.scroll_mode => {
-            app.cycle_focus();
+        // Tab → cycle sidebar sections ONLY (when sidebar is focused)
+        // Does NOT steal focus from input — use Ctrl+\\ or F2 to toggle sidebar
+        KeyCode::Tab if app.focus == events::PanelId::Sidebar && app.sidebar_visible => {
+            app.sidebar_state.next_section();
+        }
+        // Shift+Tab → previous sidebar section
+        KeyCode::BackTab if app.focus == events::PanelId::Sidebar && app.sidebar_visible => {
+            app.sidebar_state.prev_section();
         }
         // Esc → toggle scroll mode
         KeyCode::Esc => {

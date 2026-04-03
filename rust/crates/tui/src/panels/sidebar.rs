@@ -73,18 +73,20 @@ pub enum BackgroundTaskStatus {
 pub enum SidebarSection {
     Agents,
     Files,
+    Plans,
     Routing,
     Activity,
 }
 
 impl SidebarSection {
     #[allow(dead_code)]
-    const ALL: [Self; 4] = [Self::Agents, Self::Files, Self::Routing, Self::Activity];
+    const ALL: [Self; 5] = [Self::Agents, Self::Files, Self::Plans, Self::Routing, Self::Activity];
 
     fn next(self) -> Self {
         match self {
             Self::Agents => Self::Files,
-            Self::Files => Self::Routing,
+            Self::Files => Self::Plans,
+            Self::Plans => Self::Routing,
             Self::Routing => Self::Activity,
             Self::Activity => Self::Agents,
         }
@@ -94,16 +96,33 @@ impl SidebarSection {
         match self {
             Self::Agents => Self::Activity,
             Self::Files => Self::Agents,
-            Self::Routing => Self::Files,
+            Self::Plans => Self::Files,
+            Self::Routing => Self::Plans,
             Self::Activity => Self::Routing,
         }
     }
+}
+
+/// A tracked plan.
+#[derive(Debug, Clone)]
+pub struct PlanInfo {
+    pub name: String,
+    pub status: PlanStatus,
+    pub source: String, // "file" or "session"
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PlanStatus {
+    Todo,
+    InProgress,
+    Done,
 }
 
 /// Sidebar state.
 pub struct SidebarState {
     pub agents: Vec<AgentInfo>,
     pub files: Vec<TouchedFile>,
+    pub plans: Vec<PlanInfo>,
     pub tool_call_count: u32,
     pub background_tasks: Vec<BackgroundTask>,
     /// Currently focused section (when sidebar has focus).
@@ -123,6 +142,7 @@ impl Default for SidebarState {
         Self {
             agents: Vec::new(),
             files: Vec::new(),
+            plans: Vec::new(),
             tool_call_count: 0,
             background_tasks: Vec::new(),
             active_section: SidebarSection::Agents,
@@ -135,6 +155,51 @@ impl Default for SidebarState {
 }
 
 impl SidebarState {
+    /// Discover plans from .openanalyst/plans/ directory.
+    pub fn discover_plans(&mut self) {
+        let cwd = match std::env::current_dir() {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+        let plans_dir = cwd.join(".openanalyst").join("plans");
+        if !plans_dir.is_dir() {
+            return;
+        }
+
+        let entries = match std::fs::read_dir(&plans_dir) {
+            Ok(e) => e,
+            Err(_) => return,
+        };
+
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.extension().map_or(false, |ext| ext == "md") {
+                let name = path.file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                // Detect status from content (look for [DONE], [IN PROGRESS] markers)
+                let status = if let Ok(content) = std::fs::read_to_string(&path) {
+                    let lower = content.to_ascii_lowercase();
+                    if lower.contains("[done]") || lower.contains("completed") {
+                        PlanStatus::Done
+                    } else if lower.contains("[in progress]") || lower.contains("in_progress") {
+                        PlanStatus::InProgress
+                    } else {
+                        PlanStatus::Todo
+                    }
+                } else {
+                    PlanStatus::Todo
+                };
+                self.plans.push(PlanInfo {
+                    name,
+                    status,
+                    source: "file".to_string(),
+                });
+            }
+        }
+    }
+
     /// Discover project files on startup — scans CWD for important files.
     /// Similar to Gemini CLI's FileDiscoveryService but lightweight.
     pub fn discover_project_files(&mut self) {
@@ -315,6 +380,7 @@ impl SidebarState {
         match self.active_section {
             SidebarSection::Agents => self.agents.len(),
             SidebarSection::Files => self.files.len(),
+            SidebarSection::Plans => self.plans.len(),
             SidebarSection::Routing => 4, // explore, research, code, write
             SidebarSection::Activity => 0, // not selectable
         }
@@ -347,14 +413,16 @@ pub fn render_sidebar(
     let inner = outer_block.inner(area);
     outer_block.render(area, buf);
 
-    // Split sidebar into 4 sections
+    // Split sidebar into 5 sections
     let agent_count = state.agents.len().min(10) as u16;
     let file_count = state.files.len().min(15) as u16;
+    let plan_count = state.plans.len().min(5) as u16;
 
     let sections = Layout::vertical([
         Constraint::Length(agent_count.max(1) + 2),  // Agents
         Constraint::Length(file_count.max(1) + 2),   // Files
-        Constraint::Length(7),                         // Routing table (4 rows + header + separator)
+        Constraint::Length(plan_count.max(1) + 2),   // Plans
+        Constraint::Length(7),                         // Routing table
         Constraint::Min(4),                            // Activity
     ])
     .split(inner);
@@ -381,12 +449,21 @@ pub fn render_sidebar(
         buf,
     );
 
+    // ── Plans Section ──
+    render_plans_section(
+        &state.plans,
+        focused && state.active_section == SidebarSection::Plans,
+        state.selected_index,
+        sections[2],
+        buf,
+    );
+
     // ── Routing Section ──
     render_routing_section(
         router,
         focused && state.active_section == SidebarSection::Routing,
         state.selected_index,
-        sections[2],
+        sections[3],
         buf,
     );
 
@@ -397,7 +474,7 @@ pub fn render_sidebar(
         elapsed_secs,
         permission_mode,
         &state.background_tasks,
-        sections[3],
+        sections[4],
         buf,
     );
 }
@@ -512,6 +589,55 @@ fn render_files_section(
                 Span::styled(sel_prefix, Style::default().fg(Color::Yellow).bg(bg)),
                 Span::styled(format!("{icon} "), Style::default().fg(color).bg(bg)),
                 Span::styled(display, Style::default().fg(text_color).bg(bg)),
+            ]));
+        }
+    }
+
+    lines.push(section_separator(area.width, is_focused));
+    Paragraph::new(lines).render(area, buf);
+}
+
+fn render_plans_section(
+    plans: &[PlanInfo],
+    is_focused: bool,
+    selected: usize,
+    area: Rect,
+    buf: &mut Buffer,
+) {
+    let mut lines = vec![section_header("Plans", is_focused)];
+
+    if plans.is_empty() {
+        lines.push(Line::from(Span::styled("  (no plans)", Style::default().fg(Color::DarkGray))));
+    } else {
+        let done = plans.iter().filter(|p| p.status == PlanStatus::Done).count();
+        let in_progress = plans.iter().filter(|p| p.status == PlanStatus::InProgress).count();
+        let todo = plans.iter().filter(|p| p.status == PlanStatus::Todo).count();
+
+        // Summary line
+        lines.push(Line::from(vec![
+            Span::styled(format!(" {done}"), Style::default().fg(Color::Green)),
+            Span::styled(" done ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{in_progress}"), Style::default().fg(Color::Yellow)),
+            Span::styled(" active ", Style::default().fg(Color::DarkGray)),
+            Span::styled(format!("{todo}"), Style::default().fg(Color::Indexed(245))),
+            Span::styled(" todo", Style::default().fg(Color::DarkGray)),
+        ]));
+
+        for (i, plan) in plans.iter().take(5).enumerate() {
+            let is_selected = is_focused && i == selected;
+            let bg = if is_selected { Color::Indexed(239) } else { Color::Reset };
+            let (icon, icon_color) = match plan.status {
+                PlanStatus::Done => ("✓", Color::Green),
+                PlanStatus::InProgress => ("●", Color::Yellow),
+                PlanStatus::Todo => ("○", Color::Indexed(245)),
+            };
+            let sel_prefix = if is_selected { "▸" } else { " " };
+            let text_color = if is_selected { Color::White } else { Color::Indexed(252) };
+            let name = truncate_sidebar(&plan.name, area.width as usize - 5);
+            lines.push(Line::from(vec![
+                Span::styled(sel_prefix, Style::default().fg(Color::Yellow).bg(bg)),
+                Span::styled(format!("{icon} "), Style::default().fg(icon_color).bg(bg)),
+                Span::styled(name, Style::default().fg(text_color).bg(bg)),
             ]));
         }
     }
