@@ -226,7 +226,7 @@ impl ChatPanel {
                     all_lines.push(Line::from(""));
                     let bg = if is_focused { Color::Indexed(236) } else { Color::Reset };
                     all_lines.push(Line::from(vec![
-                        Span::styled(" ❯ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD).bg(bg)),
+                        Span::styled("❯ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD).bg(bg)),
                         Span::styled(text.as_str(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD).bg(bg)),
                     ]));
                 }
@@ -247,13 +247,13 @@ impl ChatPanel {
                     let mut first = true;
                     for line in text.lines {
                         if first {
-                            let mut spans = vec![Span::styled(" ● ", Style::default().fg(dot_color))];
+                            let mut spans = vec![Span::styled("● ", Style::default().fg(dot_color))];
                             spans.extend(line.spans);
                             all_lines.push(Line::from(spans));
                             first = false;
                         } else {
-                            // Continuation lines get matching 3-space indent
-                            let mut spans = vec![Span::raw("   ")];
+                            // Continuation lines get matching 2-space indent
+                            let mut spans = vec![Span::raw("  ")];
                             spans.extend(line.spans);
                             all_lines.push(Line::from(spans));
                         }
@@ -272,13 +272,13 @@ impl ChatPanel {
                     for line in text.lines() {
                         if first {
                             all_lines.push(Line::from(vec![
-                                Span::styled(" ● ", Style::default().fg(dot_color)),
+                                Span::styled("● ", Style::default().fg(dot_color)),
                                 Span::styled(line.to_string(), Style::default().fg(fg)),
                             ]));
                             first = false;
                         } else {
                             all_lines.push(Line::from(Span::styled(
-                                format!("   {line}"),
+                                format!("  {line}"),
                                 Style::default().fg(fg),
                             )));
                         }
@@ -288,13 +288,11 @@ impl ChatPanel {
                     all_lines.extend(lines.iter().cloned());
                 }
                 ChatMessage::InlineStatus { text, is_error } => {
-                    let color = if *is_error { Color::Red } else { Color::Rgb(255, 165, 0) }; // orange for success
-                    all_lines.push(Line::from(""));
+                    let color = if *is_error { Color::Red } else { Color::Indexed(245) }; // dim gray like Claude Code
                     all_lines.push(Line::from(vec![
-                        Span::styled("※ ", Style::default().fg(color).add_modifier(Modifier::BOLD)),
+                        Span::styled("※ ", Style::default().fg(color)),
                         Span::styled(text.as_str(), Style::default().fg(color)),
                     ]));
-                    all_lines.push(Line::from(""));
                 }
                 ChatMessage::FileOutput {
                     path,
@@ -376,10 +374,10 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
         card.tool_name.clone()
     };
 
-    // Title line: ● Update(crates/orchestrator/src/worker.rs) — with 1-space indent
+    // Title line: ● Update(crates/orchestrator/src/worker.rs)
     lines.push(Line::from(vec![
         Span::styled(
-            format!(" {status_icon} "),
+            format!("{status_icon} "),
             Style::default().fg(status_color),
         ),
         Span::styled(

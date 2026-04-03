@@ -561,9 +561,8 @@ impl App {
                     let elapsed = start.elapsed();
                     self.status_bar.elapsed = elapsed;
                     let time_str = format_duration_short(&elapsed);
-                    let token_str = format_tokens_short(self.status_bar.total_tokens);
                     self.chat.push_inline_status(format!(
-                        "✓ Done ({time_str} · ↓ {token_str} tokens)"
+                        "Worked for {time_str}"
                     ), false);
                 }
                 // Update background task matching this agent
@@ -728,7 +727,7 @@ impl App {
                     self.status_bar.elapsed = elapsed;
                     let time_str = format_duration_short(&elapsed);
                     self.chat.push_inline_status(format!(
-                        "✗ Error ({time_str} · ↓ {} tokens)", format_tokens_short(self.status_bar.total_tokens)
+                        "Errored after {time_str}"
                     ), true);
                 }
                 self.status_bar.phase = AgentPhase::Idle;
