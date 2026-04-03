@@ -138,6 +138,10 @@ pub struct SidebarState {
     pub plans: Vec<PlanInfo>,
     pub tool_call_count: u32,
     pub background_tasks: Vec<BackgroundTask>,
+    /// Project agent definitions discovered from .openanalyst/agents/*.md.
+    pub available_agents: Vec<AgentDefinition>,
+    /// Index of the currently selected/active agent (None = default, no agent).
+    pub selected_agent_index: Option<usize>,
     /// Currently focused section (when sidebar has focus).
     pub active_section: SidebarSection,
     /// Selected item index within the active section.
@@ -158,6 +162,8 @@ impl Default for SidebarState {
             plans: Vec::new(),
             tool_call_count: 0,
             background_tasks: Vec::new(),
+            available_agents: Vec::new(),
+            selected_agent_index: None,
             active_section: SidebarSection::Agents,
             selected_index: 0,
             has_focus: false,
@@ -168,6 +174,86 @@ impl Default for SidebarState {
 }
 
 impl SidebarState {
+    /// Discover project agents from .openanalyst/agents/*.md files.
+    /// Also checks ~/.openanalyst/agents/ for user-level agents.
+    pub fn discover_agents_from_files(&mut self) {
+        self.available_agents.clear();
+
+        let dirs_to_scan: Vec<std::path::PathBuf> = {
+            let mut dirs = Vec::new();
+            // Project-level agents
+            if let Ok(cwd) = std::env::current_dir() {
+                dirs.push(cwd.join(".openanalyst").join("agents"));
+            }
+            // User-level agents
+            if let Some(home) = dirs_get_home() {
+                dirs.push(home.join(".openanalyst").join("agents"));
+            }
+            dirs
+        };
+
+        for agents_dir in dirs_to_scan {
+            if !agents_dir.is_dir() {
+                continue;
+            }
+            let entries = match std::fs::read_dir(&agents_dir) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            for entry in entries.flatten() {
+                let path = entry.path();
+                if !path.extension().map_or(false, |ext| ext == "md") {
+                    continue;
+                }
+                let name = path.file_stem()
+                    .map(|s| s.to_string_lossy().to_string())
+                    .unwrap_or_default();
+                if name.is_empty() {
+                    continue;
+                }
+                let content = match std::fs::read_to_string(&path) {
+                    Ok(c) => c,
+                    Err(_) => continue,
+                };
+
+                // Parse simple frontmatter (---\n...\n---) and extract body
+                let (description, system_prompt) = parse_agent_md(&content);
+
+                // Skip duplicates (project agents override user agents)
+                if self.available_agents.iter().any(|a| a.name == name) {
+                    continue;
+                }
+
+                self.available_agents.push(AgentDefinition {
+                    name,
+                    description,
+                    system_prompt,
+                    source: path.to_string_lossy().to_string(),
+                });
+            }
+        }
+    }
+
+    /// Get the currently selected agent definition (if any).
+    #[must_use]
+    pub fn selected_agent(&self) -> Option<&AgentDefinition> {
+        self.selected_agent_index.and_then(|i| self.available_agents.get(i))
+    }
+
+    /// Toggle agent selection at the given index. Returns the selected agent name or None.
+    pub fn toggle_agent_selection(&mut self, index: usize) -> Option<String> {
+        if self.selected_agent_index == Some(index) {
+            // Deselect
+            self.selected_agent_index = None;
+            None
+        } else if index < self.available_agents.len() {
+            self.selected_agent_index = Some(index);
+            Some(self.available_agents[index].name.clone())
+        } else {
+            None
+        }
+    }
+
     /// Discover plans from .openanalyst/plans/ directory.
     pub fn discover_plans(&mut self) {
         let cwd = match std::env::current_dir() {
@@ -391,7 +477,7 @@ impl SidebarState {
     /// Number of selectable items in the current section.
     fn section_item_count(&self) -> usize {
         match self.active_section {
-            SidebarSection::Agents => self.agents.len(),
+            SidebarSection::Agents => self.agents.len() + self.available_agents.len(),
             SidebarSection::Files => self.files.len(),
             SidebarSection::Plans => self.plans.len(),
             SidebarSection::Routing => 4, // explore, research, code, write
@@ -427,7 +513,7 @@ pub fn render_sidebar(
     outer_block.render(area, buf);
 
     // Split sidebar into 5 sections
-    let agent_count = state.agents.len().min(10) as u16;
+    let agent_count = (state.agents.len() + state.available_agents.len()).min(12) as u16;
     let file_count = state.files.len().min(5) as u16;
     let plan_count = state.plans.len().min(5) as u16;
 
@@ -445,6 +531,8 @@ pub fn render_sidebar(
     // ── Agents Section ──
     render_agents_section(
         &state.agents,
+        &state.available_agents,
+        state.selected_agent_index,
         focused && state.active_section == SidebarSection::Agents,
         state.selected_index,
         state.expanded_agent,
@@ -523,6 +611,8 @@ fn section_separator(width: u16, is_next_focused: bool) -> Line<'static> {
 
 fn render_agents_section(
     agents: &[AgentInfo],
+    available_agents: &[AgentDefinition],
+    active_agent_idx: Option<usize>,
     is_focused: bool,
     selected: usize,
     expanded: Option<usize>,
@@ -530,11 +620,14 @@ fn render_agents_section(
     buf: &mut Buffer,
 ) {
     let mut lines = vec![section_header("Agents", is_focused)];
+    let max_label = area.width as usize - 5;
+    let mut item_idx = 0usize;
 
-    if agents.is_empty() {
-        lines.push(Line::from(Span::styled("  (none active)", Style::default().fg(Color::DarkGray))));
-    } else {
-        for (i, agent) in agents.iter().take(10).enumerate() {
+    // Running agents first (scrollable)
+    let max_visible_agents = 6;
+    if !agents.is_empty() {
+        let agent_scroll = if is_focused && selected >= max_visible_agents { selected - (max_visible_agents - 1) } else { 0 };
+        for (i, agent) in agents.iter().enumerate().skip(agent_scroll).take(max_visible_agents) {
             let (icon, color) = match &agent.status {
                 AgentStatus::Pending => ("◦", Color::DarkGray),
                 AgentStatus::Running => ("●", Color::Blue),
@@ -542,13 +635,13 @@ fn render_agents_section(
                 AgentStatus::Failed => ("✗", Color::Red),
             };
 
-            let is_selected = is_focused && i == selected;
+            let is_selected = is_focused && item_idx == selected;
             let is_expanded = expanded == Some(i);
 
             let label = if is_expanded {
-                truncate_sidebar(&agent.task_summary, area.width as usize - 5)
+                truncate_sidebar(&agent.task_summary, max_label)
             } else {
-                truncate_sidebar(&agent.agent_type.to_string(), area.width as usize - 5)
+                truncate_sidebar(&agent.agent_type.to_string(), max_label)
             };
 
             let bg = if is_selected { Color::Indexed(239) } else { Color::Reset };
@@ -559,7 +652,46 @@ fn render_agents_section(
                 Span::styled(format!("{icon} "), Style::default().fg(color).bg(bg)),
                 Span::styled(label, Style::default().fg(text_color).bg(bg)),
             ]));
+            item_idx += 1;
         }
+    }
+
+    // Available project agents (selectable)
+    if !available_agents.is_empty() {
+        if !agents.is_empty() {
+            lines.push(Line::from(Span::styled("  ─ project ─", Style::default().fg(Color::Indexed(238)))));
+        }
+        for (def_idx, def) in available_agents.iter().take(8).enumerate() {
+            let is_active = active_agent_idx == Some(def_idx);
+            let is_selected = is_focused && item_idx == selected;
+
+            let icon = if is_active { "◆" } else { "◇" };
+            let icon_color = if is_active { Color::Rgb(50, 130, 255) } else { Color::Indexed(245) };
+
+            let label = truncate_sidebar(&def.name, max_label);
+            let bg = if is_selected { Color::Indexed(239) } else { Color::Reset };
+            let text_color = if is_active {
+                Color::Rgb(50, 130, 255)
+            } else if is_selected {
+                Color::White
+            } else {
+                Color::Indexed(252)
+            };
+            let sel_prefix = if is_selected { "▸" } else { " " };
+
+            lines.push(Line::from(vec![
+                Span::styled(sel_prefix, Style::default().fg(Color::Yellow).bg(bg)),
+                Span::styled(format!("{icon} "), Style::default().fg(icon_color).bg(bg)),
+                Span::styled(label, Style::default().fg(text_color).bg(bg).add_modifier(
+                    if is_active { Modifier::BOLD } else { Modifier::empty() }
+                )),
+            ]));
+            item_idx += 1;
+        }
+    }
+
+    if agents.is_empty() && available_agents.is_empty() {
+        lines.push(Line::from(Span::styled("  (none active)", Style::default().fg(Color::DarkGray))));
     }
 
     lines.push(section_separator(area.width, is_focused));
@@ -638,7 +770,8 @@ fn render_plans_section(
             Span::styled(" todo", Style::default().fg(Color::DarkGray)),
         ]));
 
-        for (i, plan) in plans.iter().take(5).enumerate() {
+        let plan_scroll = if is_focused && selected >= 5 { selected - 4 } else { 0 };
+        for (i, plan) in plans.iter().enumerate().skip(plan_scroll).take(5) {
             let is_selected = is_focused && i == selected;
             let bg = if is_selected { Color::Indexed(239) } else { Color::Reset };
             let (icon, icon_color) = match plan.status {
@@ -673,13 +806,9 @@ fn render_routing_section(
     for (i, cat) in ActionCategory::ALL.iter().enumerate() {
         let profile = router.table.get(*cat);
         let model = router.resolver.resolve(profile.model_tier);
-        // Shorten model name for sidebar
-        let short_model = model
-            .strip_prefix("claude-")
-            .or_else(|| model.strip_prefix("gpt-"))
-            .or_else(|| model.strip_prefix("gemini-"))
-            .unwrap_or(model);
-        let short_model = truncate_sidebar(short_model, area.width as usize - 14);
+        // Shorten model name for sidebar — strip common prefixes and abbreviate
+        let short_model = shorten_model_name(model);
+        let short_model = truncate_sidebar(&short_model, area.width as usize - 14);
 
         let cat_color = match cat {
             ActionCategory::Explore => Color::Blue,
@@ -728,14 +857,14 @@ fn render_activity_section(
         format!("{}m {:02}s", elapsed_secs / 60, elapsed_secs % 60)
     };
 
-    // Permission mode indicator
-    let (perm_icon, perm_color) = match permission_mode {
-        "read-only" | "readonly" => ("R", Color::Blue),
-        "workspace" | "workspace-write" => ("W", Color::Yellow),
-        "prompt" | "ask" | "default" => ("P", Color::Cyan),
-        "allow" | "allow-all" => ("A", Color::Green),
-        "full" | "danger-full-access" | "yolo" => ("F", Color::Red),
-        _ => ("?", Color::DarkGray),
+    // Permission mode indicator — short label for sidebar
+    let (perm_icon, perm_color, perm_label) = match permission_mode {
+        "read-only" | "readonly" => ("R", Color::Blue, "read-only"),
+        "workspace" | "workspace-write" => ("W", Color::Yellow, "workspace"),
+        "prompt" | "ask" | "default" => ("P", Color::Cyan, "prompt"),
+        "allow" | "allow-all" => ("A", Color::Green, "allow-all"),
+        "full" | "danger-full-access" | "yolo" => ("F", Color::Red, "full-access"),
+        _ => ("?", Color::DarkGray, permission_mode),
     };
 
     let mut lines = vec![
@@ -754,7 +883,7 @@ fn render_activity_section(
         ]),
         Line::from(vec![
             Span::styled(format!(" {perm_icon} "), Style::default().fg(perm_color)),
-            Span::styled(format!("mode: {permission_mode}"), Style::default().fg(Color::Indexed(252))),
+            Span::styled(format!("mode: {perm_label}"), Style::default().fg(Color::Indexed(252))),
         ]),
     ];
 
@@ -786,11 +915,33 @@ fn render_activity_section(
         Span::styled(":section ", Style::default().fg(Color::Indexed(238))),
         Span::styled("j/k", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
         Span::styled(":nav ", Style::default().fg(Color::Indexed(238))),
-        Span::styled("Ctrl+B", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
+        Span::styled("Esc", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
+        Span::styled(":back ", Style::default().fg(Color::Indexed(238))),
+        Span::styled("F2", Style::default().fg(Color::DarkGray).add_modifier(Modifier::BOLD)),
         Span::styled(":hide", Style::default().fg(Color::Indexed(238))),
     ]));
 
     Paragraph::new(lines).render(area, buf);
+}
+
+/// Shorten a model name for sidebar display by stripping common prefixes
+/// and abbreviating known patterns.
+fn shorten_model_name(model: &str) -> String {
+    // Strip common provider prefixes
+    let short = model
+        .strip_prefix("claude-")
+        .or_else(|| model.strip_prefix("gpt-"))
+        .or_else(|| model.strip_prefix("gemini-"))
+        .or_else(|| model.strip_prefix("grok-"))
+        .or_else(|| model.strip_prefix("openanalyst-"))
+        .or_else(|| model.strip_prefix("openrouter/"))
+        .or_else(|| model.strip_prefix("bedrock/"))
+        .unwrap_or(model);
+    // Further abbreviations for long names
+    short
+        .replace("sonnet-4-6", "son-4.6")
+        .replace("opus-4-6", "opus-4.6")
+        .replace("haiku-4-5", "haiku-4.5")
 }
 
 /// Truncate a string for sidebar display width.
@@ -804,4 +955,42 @@ fn truncate_sidebar(s: &str, max: usize) -> String {
     } else {
         s.chars().take(max).collect()
     }
+}
+
+/// Parse an agent .md file: extract description (first non-empty body line) and system prompt.
+/// Supports optional YAML frontmatter delimited by `---`.
+fn parse_agent_md(content: &str) -> (String, String) {
+    let trimmed = content.trim();
+
+    // Check for frontmatter
+    let body = if trimmed.starts_with("---") {
+        // Find closing ---
+        if let Some(end) = trimmed[3..].find("\n---") {
+            trimmed[3 + end + 4..].trim()
+        } else {
+            trimmed
+        }
+    } else {
+        trimmed
+    };
+
+    // First non-empty line is the description
+    let description = body
+        .lines()
+        .find(|l| !l.trim().is_empty() && !l.starts_with('#'))
+        .or_else(|| body.lines().find(|l| !l.trim().is_empty()))
+        .unwrap_or("")
+        .trim()
+        .trim_start_matches('#')
+        .trim()
+        .to_string();
+
+    (description, body.to_string())
+}
+
+/// Get the user's home directory.
+fn dirs_get_home() -> Option<std::path::PathBuf> {
+    std::env::var_os("USERPROFILE")
+        .or_else(|| std::env::var_os("HOME"))
+        .map(std::path::PathBuf::from)
 }

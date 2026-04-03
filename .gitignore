@@ -5,8 +5,12 @@ archive/
 .openanalyst-todos.json
 
 # OpenAnalyst CLI local artifacts
-.openanalyst/settings.local.json
-.openanalyst/sessions/
+.openanalyst/
+rust/.openanalyst/
+
+# Agentic RAG and Knowledge Base (separate repos)
+AgenticRAG/
+knowledgeBase/
 
 # Build artifacts
 rust/target/

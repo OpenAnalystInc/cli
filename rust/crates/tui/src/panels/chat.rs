@@ -127,8 +127,14 @@ impl ChatPanel {
         self.messages.push(ChatMessage::ToolCall { card });
     }
 
-    /// Add a system notice.
+    /// Add a system notice. Prevents duplicate consecutive messages.
     pub fn push_system(&mut self, text: String) {
+        // Don't repeat the exact same system message consecutively
+        if let Some(ChatMessage::System { text: prev }) = self.messages.last() {
+            if *prev == text {
+                return;
+            }
+        }
         self.messages.push(ChatMessage::System { text });
         if self.auto_scroll {
             self.scroll_to_bottom();
@@ -144,7 +150,14 @@ impl ChatPanel {
     }
 
     /// Add an inline status line at the end of the last response (like Claude's "※ Done (1m · ↓ 500 tokens)").
+    /// Prevents duplicate consecutive inline statuses.
     pub fn push_inline_status(&mut self, text: String, is_error: bool) {
+        // Don't stack identical inline statuses
+        if let Some(ChatMessage::InlineStatus { text: prev, .. }) = self.messages.last() {
+            if *prev == text {
+                return;
+            }
+        }
         self.messages.push(ChatMessage::InlineStatus { text, is_error });
         if self.auto_scroll {
             self.scroll_to_bottom();
@@ -327,20 +340,6 @@ impl ChatPanel {
         let paragraph = Paragraph::new(Text::from(visible_lines))
             .wrap(Wrap { trim: false });
         paragraph.render(area, buf);
-
-        // Minimal scroll indicators (▲/▼) instead of full scrollbar — like Claude Code
-        if total_lines > visible_height {
-            let can_scroll_up = scroll > 0;
-            let can_scroll_down = scroll < max_scroll;
-            if can_scroll_up {
-                let pos = ratatui::layout::Position { x: area.right().saturating_sub(1), y: area.y };
-                buf.set_string(pos.x, pos.y, "▲", Style::default().fg(Color::DarkGray));
-            }
-            if can_scroll_down {
-                let y = area.y + area.height.saturating_sub(1);
-                buf.set_string(area.right().saturating_sub(1), y, "▼", Style::default().fg(Color::DarkGray));
-            }
-        }
     }
 }
 
