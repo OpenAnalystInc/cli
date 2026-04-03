@@ -57,6 +57,8 @@ pub enum ChatMessage {
     System { text: String },
     /// Styled banner (preserves colors from banner widget).
     Banner { lines: Vec<Line<'static>> },
+    /// Inline status at end of response (time + tokens, like Claude Code).
+    InlineStatus { text: String, is_error: bool },
     /// File output from multimedia commands (/image, /speak, /diagram).
     FileOutput {
         path: String,
@@ -141,6 +143,14 @@ impl ChatPanel {
         }
     }
 
+    /// Add an inline status line at the end of the last response (like Claude's "※ Done (1m · ↓ 500 tokens)").
+    pub fn push_inline_status(&mut self, text: String, is_error: bool) {
+        self.messages.push(ChatMessage::InlineStatus { text, is_error });
+        if self.auto_scroll {
+            self.scroll_to_bottom();
+        }
+    }
+
     /// Add a file output message from multimedia commands.
     pub fn push_file_output(&mut self, path: String, file_type: FileType, description: String) {
         self.messages.push(ChatMessage::FileOutput {
@@ -201,19 +211,16 @@ impl ChatPanel {
             match msg {
                 ChatMessage::User { text } => {
                     all_lines.push(Line::from(""));
-                    let focus_indicator = if is_focused { "▸ " } else { "  " };
                     let bg = if is_focused { Color::Indexed(236) } else { Color::Reset };
                     all_lines.push(Line::from(vec![
-                        Span::styled(focus_indicator, Style::default().fg(Color::Yellow).bg(bg)),
-                        Span::styled("❯ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD).bg(bg)),
-                        Span::styled(text.as_str(), Style::default().fg(Color::White).bg(bg)),
+                        Span::styled(" ❯ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD).bg(bg)),
+                        Span::styled(text.as_str(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD).bg(bg)),
                     ]));
-                    all_lines.push(Line::from(""));
                 }
                 ChatMessage::Assistant { markdown, streaming } => {
+                    all_lines.push(Line::from(""));
                     // Status dot: blinking white while streaming, solid green when done
                     let dot_color = if *streaming {
-                        // Blink: alternate between white and dark based on time
                         let blink = (std::time::SystemTime::now()
                             .duration_since(std::time::UNIX_EPOCH)
                             .unwrap_or_default()
@@ -222,31 +229,21 @@ impl ChatPanel {
                     } else {
                         Color::Green
                     };
-                    let dot = "● ";
-                    if is_focused {
-                        all_lines.push(Line::from(Span::styled(
-                            "▎ ─── response ───",
-                            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
-                        )));
-                    }
-                    // First line gets the status dot
+                    // First line gets status dot, all lines get 2-space indent
                     let text = markdown.to_text();
                     let mut first = true;
                     for line in text.lines {
                         if first {
-                            let mut spans = vec![Span::styled(dot, Style::default().fg(dot_color))];
+                            let mut spans = vec![Span::styled(" ● ", Style::default().fg(dot_color))];
                             spans.extend(line.spans);
                             all_lines.push(Line::from(spans));
                             first = false;
                         } else {
-                            all_lines.push(line);
+                            // Continuation lines get matching 3-space indent
+                            let mut spans = vec![Span::raw("   ")];
+                            spans.extend(line.spans);
+                            all_lines.push(Line::from(spans));
                         }
-                    }
-                    if is_focused {
-                        all_lines.push(Line::from(Span::styled(
-                            "▎ ──────────────",
-                            Style::default().fg(Color::Yellow),
-                        )));
                     }
                     all_lines.push(Line::from(""));
                 }
@@ -254,37 +251,37 @@ impl ChatPanel {
                     render_tool_card_lines(card, is_focused, &mut all_lines);
                 }
                 ChatMessage::System { text } => {
-                    let bg = if is_focused { Color::Indexed(236) } else { Color::Reset };
                     let fg = if is_focused { Color::Indexed(252) } else { Color::DarkGray };
-                    // Detect error messages for red dot, otherwise white dot
                     let is_error = text.starts_with("Error") || text.starts_with("error")
-                        || text.contains("failed") || text.contains("Failed")
-                        || text.starts_with("[Agent") && text.contains("Error");
-                    let (dot, dot_color) = if is_error {
-                        ("● ", Color::Red)
-                    } else {
-                        ("● ", Color::Indexed(252)) // white dot
-                    };
-                    let focus_prefix = if is_focused { "▸ " } else { "" };
+                        || text.contains("failed") || text.contains("Failed");
+                    let dot_color = if is_error { Color::Red } else { Color::Indexed(245) };
                     let mut first = true;
                     for line in text.lines() {
                         if first {
                             all_lines.push(Line::from(vec![
-                                Span::styled(focus_prefix, Style::default().fg(Color::Yellow).bg(bg)),
-                                Span::styled(dot, Style::default().fg(dot_color).bg(bg)),
-                                Span::styled(line.to_string(), Style::default().fg(fg).bg(bg)),
+                                Span::styled(" ● ", Style::default().fg(dot_color)),
+                                Span::styled(line.to_string(), Style::default().fg(fg)),
                             ]));
                             first = false;
                         } else {
                             all_lines.push(Line::from(Span::styled(
-                                format!("  {line}"),
-                                Style::default().fg(fg).bg(bg),
+                                format!("   {line}"),
+                                Style::default().fg(fg),
                             )));
                         }
                     }
                 }
                 ChatMessage::Banner { lines } => {
                     all_lines.extend(lines.iter().cloned());
+                }
+                ChatMessage::InlineStatus { text, is_error } => {
+                    let color = if *is_error { Color::Red } else { Color::Rgb(255, 165, 0) }; // orange for success
+                    all_lines.push(Line::from(""));
+                    all_lines.push(Line::from(vec![
+                        Span::styled("※ ", Style::default().fg(color).add_modifier(Modifier::BOLD)),
+                        Span::styled(text.as_str(), Style::default().fg(color)),
+                    ]));
+                    all_lines.push(Line::from(""));
                 }
                 ChatMessage::FileOutput {
                     path,
@@ -380,10 +377,10 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
         card.tool_name.clone()
     };
 
-    // Title line: ● Update(crates/orchestrator/src/worker.rs)
+    // Title line: ● Update(crates/orchestrator/src/worker.rs) — with 1-space indent
     lines.push(Line::from(vec![
         Span::styled(
-            format!("{status_icon} "),
+            format!(" {status_icon} "),
             Style::default().fg(status_color),
         ),
         Span::styled(
