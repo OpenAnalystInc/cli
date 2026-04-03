@@ -334,23 +334,38 @@ fn handle_sidebar_key(key: KeyEvent, app: &mut App) {
         KeyCode::BackTab => {
             app.sidebar_state.prev_section();
         }
-        // Enter → expand/collapse selected item, or select agent
+        // Enter → expand/collapse, select agent, or cycle model tier
         KeyCode::Enter => {
             use crate::panels::sidebar::SidebarSection;
-            if app.sidebar_state.active_section == SidebarSection::Agents {
-                let running_count = app.sidebar_state.agents.len();
-                let idx = app.sidebar_state.selected_index;
-                if idx >= running_count {
-                    // Selecting from available agents list
-                    let def_idx = idx - running_count;
-                    let name = app.sidebar_state.toggle_agent_selection(def_idx);
-                    app.set_active_agent(name);
-                } else {
-                    // Expand/collapse running agent
+            use orchestrator::router::ActionCategory;
+            match app.sidebar_state.active_section {
+                SidebarSection::Agents => {
+                    let running_count = app.sidebar_state.agents.len();
+                    let idx = app.sidebar_state.selected_index;
+                    if idx >= running_count {
+                        let def_idx = idx - running_count;
+                        let name = app.sidebar_state.toggle_agent_selection(def_idx);
+                        app.set_active_agent(name);
+                    } else {
+                        app.sidebar_state.toggle_expand();
+                    }
+                }
+                SidebarSection::Routing => {
+                    // Cycle model tier for the selected routing category
+                    let idx = app.sidebar_state.selected_index;
+                    if let Some(cat) = ActionCategory::ALL.get(idx) {
+                        let profile = app.router.table.get_mut(*cat);
+                        profile.model_tier = profile.model_tier.next();
+                        let model = app.router.resolver.resolve(profile.model_tier).to_string();
+                        let short = crate::panels::sidebar::shorten_model_name_pub(&model);
+                        app.chat.push_system(format!(
+                            "Routing: {} → {} ({})", cat.as_str(), profile.model_tier.as_str(), short
+                        ));
+                    }
+                }
+                _ => {
                     app.sidebar_state.toggle_expand();
                 }
-            } else {
-                app.sidebar_state.toggle_expand();
             }
         }
         // Esc/i → return focus to input
