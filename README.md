@@ -193,6 +193,49 @@ Full MCP client with 6 transport types:
 /mcp remove my-server
 ```
 
+### Knowledge Base (`/knowledge`)
+
+Agentic RAG powered by real BGE-M3 1024-dim embeddings, PostgreSQL pgvector, and Neo4j knowledge graph.
+
+```bash
+/knowledge best Meta Ads strategy for scaling D2C brands
+```
+
+**Pipeline:**
+1. **Local intent classification** — Rust-side MOE classifies query intent (strategic, procedural, factual, etc.)
+2. **API call** to hosted AgenticRAG server with intent hint
+3. **Hybrid search** — pgvector cosine + PostgreSQL FTS + Neo4j graph expansion
+4. **RRF fusion** — Reciprocal Rank Fusion merges results from all sources
+5. **KnowledgeCard** — Tabbed, collapsible results with abstracted category labels
+6. **Feedback** — Inline 👍/👎 buttons + `/feedback` command for corrections
+7. **Local cache** — Results cached in `.openanalyst/knowledge/` for instant replay
+
+**MOE Intent Types:** factual, conceptual, procedural, comparative, strategic, example_seeking, diagnostic, general
+
+**No raw course names exposed** — results show abstracted labels like "Ads Strategy", "AI & Machine Learning".
+
+Set `OPENANALYST_API_KEY=oa_your_key` to access the knowledge base.
+
+### Permission Mode Switching (`Ctrl+P`)
+
+Cycle through permission modes directly from the input box:
+
+| Mode | Icon | Border | Behavior |
+|------|------|--------|----------|
+| Default | ❯ | Blue | Ask before running tools |
+| Plan | ◈ | Yellow | Read-only tools only |
+| Accept Edits | ✎ | Green | Auto-approve file write/edit |
+| Danger | ⚡ | Red | Everything auto-approved |
+
+Right-aligned badges on input box show: `[mode] [model] [agent] [branch]`
+
+### Agent Selection from Sidebar
+
+- Load agents from `.openanalyst/agents/*.md` (project + user level)
+- Select agent in sidebar → changes input box title + system prompt
+- Purple badge shows active agent name
+- Dynamic system prompt switching without leaving the conversation
+
 ### Permission System
 
 | Mode | Bash | Write | Edit | Install | Delete |
@@ -201,7 +244,7 @@ Full MCP client with 6 transport types:
 | `workspace-write` | ✓ | ✓ | ✓ | ✗ | ✗ |
 | `danger-full-access` | ✓ | ✓ | ✓ | ✓ | ✓ |
 
-Modal permission dialogs appear when a tool requires elevated access.
+Modal permission dialogs appear when a tool requires elevated access. Cycle with `Ctrl+P`.
 
 ### Hooks System
 
