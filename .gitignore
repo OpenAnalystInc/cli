@@ -8,8 +8,9 @@ archive/
 .openanalyst/
 rust/.openanalyst/
 
-# Agentic RAG (separate repo, not part of CLI distribution)
+# Agentic RAG + Knowledge Base (separate repos, not part of CLI distribution)
 AgenticRAG/
+knowledgeBase/
 
 # Build artifacts
 rust/target/

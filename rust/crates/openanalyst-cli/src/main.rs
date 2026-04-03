@@ -4684,7 +4684,7 @@ impl LiveCli {
         };
 
         let kb_endpoint = env::var("OPENANALYST_KB_URL")
-            .unwrap_or_else(|_| "http://44.200.9.142:8420/v1/knowledge/query".to_string());
+            .unwrap_or_else(|_| "https://kb.openanalyst.ai/v1/knowledge/query".to_string());
 
         println!("  \x1b[38;5;45m[>]\x1b[0m Searching knowledge base...");
         println!("  \x1b[2mQuery: {}\x1b[0m\n", truncate_for_prompt(query, 80));
