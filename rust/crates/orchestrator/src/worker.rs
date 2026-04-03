@@ -115,7 +115,7 @@ fn run_turn_blocking(
         tool_registry: tool_registry.clone(),
         ui_tx: ui_tx.clone(),
         effort_budget,
-        loop_detector: loop_detector.clone(),
+        _loop_detector: loop_detector.clone(),
     };
 
     let tool_executor = ChannelToolExecutor {
@@ -167,7 +167,7 @@ struct ChannelApiClient {
     tool_registry: tools::GlobalToolRegistry,
     ui_tx: UiEventTx,
     effort_budget: Option<u32>,
-    loop_detector: std::sync::Arc<std::sync::Mutex<LoopDetectionService>>,
+    _loop_detector: std::sync::Arc<std::sync::Mutex<LoopDetectionService>>,
 }
 
 impl ApiClient for ChannelApiClient {

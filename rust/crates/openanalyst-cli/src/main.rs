@@ -2549,7 +2549,7 @@ fn run_tui(
     }
 
     // IDE detection — inject into system prompt for context-aware behavior
-    let ide = runtime::detect_ide();
+    let _ide = runtime::detect_ide();
     let ide_context = runtime::ide_context_string();
 
     // Load system prompt with IDE context

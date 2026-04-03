@@ -950,9 +950,18 @@ impl App {
         } else {
             let input_mode = self.current_input_mode();
             let context_tag = self.get_context_tag();
+            // Shorten model name for the badge (e.g., "claude-opus-4-6" → "opus-4-6")
+            let model_badge = {
+                let m = &self.status_bar.model_name;
+                m.strip_prefix("claude-")
+                    .or_else(|| m.strip_prefix("openanalyst-"))
+                    .unwrap_or(m)
+                    .to_string()
+            };
             let input = InputBox::default()
                 .mode(input_mode)
                 .permission_level(self.permission_level)
+                .model_label(Some(model_badge))
                 .context_tag(context_tag)
                 .active_agent(self.active_agent_name.clone());
             input.render_with_state(layout.input, buf, &mut self.input_state);
@@ -1007,13 +1016,6 @@ fn format_duration_short(d: &Duration) -> String {
     let secs = d.as_secs();
     if secs < 60 { format!("{secs}s") }
     else { format!("{}m {:02}s", secs / 60, secs % 60) }
-}
-
-/// Format token count as short string.
-fn format_tokens_short(tokens: u64) -> String {
-    if tokens < 1_000 { format!("{tokens}") }
-    else if tokens < 1_000_000 { format!("{:.1}k", tokens as f64 / 1_000.0) }
-    else { format!("{:.1}M", tokens as f64 / 1_000_000.0) }
 }
 
 /// Generate a unique session ID based on timestamp.
