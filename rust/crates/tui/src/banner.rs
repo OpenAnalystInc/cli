@@ -18,6 +18,22 @@ pub struct BannerAccountInfo {
     pub version: String,
 }
 
+impl BannerAccountInfo {
+    /// Whether the current provider is OpenAnalyst (show OA branding).
+    pub fn is_openanalyst(&self) -> bool {
+        self.provider_name == "OpenAnalyst Inc"
+    }
+
+    /// App title shown in the banner header — dynamic based on provider.
+    pub fn app_title(&self) -> String {
+        if self.is_openanalyst() {
+            format!("OpenAnalyst CLI v{}", self.version)
+        } else {
+            format!("OpenAnalyst CLI v{} · {}", self.version, self.provider_name)
+        }
+    }
+}
+
 /// The startup banner widget.
 pub struct Banner {
     pub info: BannerAccountInfo,
@@ -49,16 +65,18 @@ impl Banner {
         let green = Style::default().fg(Color::Indexed(40));
         let logo_color = Style::default().fg(Color::Rgb(255, 140, 0)); // orange OA logo
 
-        // Column widths
-        let left_w: usize = 40;
+        // Column widths — adapt to title length to prevent truncation
+        let title_text = self.info.app_title();
+        let title_len = title_text.chars().count() + 3; // " title " + leading "─"
+        let left_w: usize = title_len.max(40);
         let right_w: usize = 38;
         let _total_inner = left_w + 1 + right_w; // +1 for middle │
 
         let mut lines = Vec::new();
 
         // ── Top border with version inline (like Claude Code) ──
-        // ╭─ OpenAnalyst CLI v1.0.89 ──────────────┬──────────────────╮
-        let ver_text = format!(" OpenAnalyst CLI v{} ", self.info.version);
+        // ╭─ OpenAnalyst CLI v1.0.98 · Anthropic ──┬──────────────────╮
+        let ver_text = format!(" {} ", self.info.app_title());
         let ver_len = ver_text.chars().count();
         let left_pad = left_w.saturating_sub(ver_len + 1); // +1 for leading ─
         let right_border = "─".repeat(right_w);
@@ -102,14 +120,25 @@ impl Banner {
             "       ████████  ██  ██     ",
         ];
 
-        let tip_lines: [(&str, Style); 6] = [
-            (" Run /init to create an", dim),
-            (" OPENANALYST.md file with", dim),
-            (" instructions for OpenAnalyst", dim),
-            ("", dim),       // separator
-            (" Recent activity", green),
-            (" No recent activity", dim),
-        ];
+        let tip_lines: [(&str, Style); 6] = if self.info.is_openanalyst() {
+            [
+                (" Run /init to create an", dim),
+                (" OPENANALYST.md file with", dim),
+                (" instructions for OpenAnalyst", dim),
+                ("", dim),       // separator
+                (" Recent activity", green),
+                (" No recent activity", dim),
+            ]
+        } else {
+            [
+                (" Run /init to create a", dim),
+                (" project config file with", dim),
+                (" instructions for the agent", dim),
+                ("", dim),       // separator
+                (" Recent activity", green),
+                (" No recent activity", dim),
+            ]
+        };
 
         for (i, (logo_line, (tip, tip_style))) in logo.iter().zip(tip_lines.iter()).enumerate() {
             let lp = left_w.saturating_sub(logo_line.chars().count());

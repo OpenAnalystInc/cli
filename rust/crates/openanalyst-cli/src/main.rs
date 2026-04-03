@@ -42,15 +42,48 @@ use tools::GlobalToolRegistry;
 
 const DEFAULT_MODEL: &str = "openanalyst-beta";
 
-/// Resolve the default model: env vars take priority, then fall back to built-in default.
+/// Resolve the default model: env vars take priority, then detect from available API keys,
+/// then fall back to built-in default.
 /// Supports: OPENANALYST_MODEL, OPENANALYST_DEFAULT_MODEL, ANTHROPIC_DEFAULT_SONNET_MODEL
 fn resolve_default_model() -> String {
-    env::var("OPENANALYST_MODEL")
+    // 1. Explicit env var overrides always win
+    if let Some(model) = env::var("OPENANALYST_MODEL")
         .or_else(|_| env::var("OPENANALYST_DEFAULT_MODEL"))
         .or_else(|_| env::var("ANTHROPIC_DEFAULT_SONNET_MODEL"))
         .ok()
         .filter(|v| !v.is_empty())
-        .unwrap_or_else(|| DEFAULT_MODEL.to_string())
+    {
+        return model;
+    }
+
+    // 2. Auto-detect from available API keys — use the provider's default model
+    //    Priority: OpenAnalyst > Anthropic > OpenAI > xAI > Gemini > OpenRouter > Bedrock
+    if env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty()).is_some()
+        || env::var("OPENANALYST_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some()
+    {
+        return DEFAULT_MODEL.to_string(); // openanalyst-beta
+    }
+    if env::var("ANTHROPIC_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+        return "claude-sonnet-4-6".to_string();
+    }
+    if env::var("OPENAI_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+        return "gpt-4o".to_string();
+    }
+    if env::var("XAI_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+        return "grok-3".to_string();
+    }
+    if env::var("GEMINI_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+        return "gemini-2.5-pro".to_string();
+    }
+    if env::var("OPENROUTER_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+        return "openrouter/auto".to_string();
+    }
+    if env::var("BEDROCK_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+        return "bedrock/claude".to_string();
+    }
+
+    // 3. Fall back to built-in default
+    DEFAULT_MODEL.to_string()
 }
 
 fn max_tokens_for_model(model: &str) -> u32 {

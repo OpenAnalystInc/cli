@@ -128,9 +128,10 @@ impl App {
             voice: crate::voice::VoiceState::default(),
             session_id: generate_session_id(),
         };
-        // Discover project files and plans on startup for sidebar
+        // Discover project files, plans, and agents on startup for sidebar
         app.sidebar_state.discover_project_files();
         app.sidebar_state.discover_plans();
+        app.sidebar_state.discover_agents_from_files();
         app
     }
 
@@ -678,25 +679,40 @@ impl App {
                     task.clone(),
                     AgentStatus::Running,
                 );
-                self.chat
-                    .push_system(format!("[{agent_type}] Agent spawned: {}", truncate_display(&task, 80)));
+                // Only show agent status in chat for non-primary agents
+                // (Primary is the default internal agent — no need to announce it)
+                if agent_type != events::AgentType::Primary {
+                    self.chat
+                        .push_system(format!("[{agent_type}] {}", truncate_display(&task, 80)));
+                }
             }
             UiEvent::AgentStatusChanged { agent_id, status } => {
+                let is_primary = self.sidebar_state.agents.iter()
+                    .find(|a| a.agent_id == agent_id)
+                    .map_or(false, |a| a.agent_type == events::AgentType::Primary);
                 if let Some(agent) = self.sidebar_state.agents.iter_mut().find(|a| a.agent_id == agent_id) {
                     agent.status = status.clone();
                 }
-                self.chat.push_system(format!(
-                    "[Agent {agent_id}] Status: {status:?}"
-                ));
+                // Suppress status messages for the primary agent
+                if !is_primary {
+                    self.chat.push_system(format!(
+                        "[Agent] Status: {status:?}"
+                    ));
+                }
             }
             UiEvent::AgentCompleted { agent_id, result } => {
+                let is_primary = self.sidebar_state.agents.iter()
+                    .find(|a| a.agent_id == agent_id)
+                    .map_or(false, |a| a.agent_type == events::AgentType::Primary);
                 if let Some(agent) = self.sidebar_state.agents.iter_mut().find(|a| a.agent_id == agent_id) {
                     agent.status = AgentStatus::Completed;
                 }
-                self.chat.push_system(format!(
-                    "Agent completed: {}",
-                    truncate_display(&result, 120)
-                ));
+                if !is_primary {
+                    self.chat.push_system(format!(
+                        "Agent completed: {}",
+                        truncate_display(&result, 120)
+                    ));
+                }
             }
             UiEvent::AgentFailed { agent_id, error } => {
                 if let Some(agent) = self.sidebar_state.agents.iter_mut().find(|a| a.agent_id == agent_id) {
@@ -704,6 +720,7 @@ impl App {
                 }
                 self.chat.finish_assistant();
                 self.is_streaming = false;
+                // Show error without agent prefix — clean message
                 self.chat.push_system(format!("Error: {error}"));
                 // Inject inline error status at end of response
                 if let Some(start) = self.turn_start.take() {
@@ -830,7 +847,7 @@ impl App {
         }
 
         // Status line (full width, with hints + animated spinner color)
-        let hints = build_status_hints(self.is_streaming, self.scroll_mode, self.sidebar_visible);
+        let hints = build_status_hints(self.is_streaming, self.scroll_mode, self.sidebar_visible, self.focus);
         let mut status = self.status_bar.clone();
         status.hints = hints;
         status.spinner_color = if self.is_streaming { Some(self.spinner_state.current_color()) } else { None };
@@ -873,21 +890,28 @@ impl App {
 }
 
 /// Build the right-aligned keybinding hints for the status bar.
-fn build_status_hints(is_streaming: bool, scroll_mode: bool, sidebar_visible: bool) -> String {
+fn build_status_hints(is_streaming: bool, scroll_mode: bool, sidebar_visible: bool, focus: events::PanelId) -> String {
     let mut hints = Vec::new();
-    if scroll_mode {
+    if focus == events::PanelId::Sidebar {
+        hints.push("Esc:input");
+        hints.push("Tab:section");
+        hints.push("j/k:nav");
+    } else if scroll_mode {
         hints.push("Esc:input");
         hints.push("j/k:scroll");
         hints.push("Enter:expand");
     } else {
         hints.push("Esc:scroll");
+        if sidebar_visible {
+            hints.push("Tab:sidebar");
+        }
     }
     if is_streaming {
         hints.push("Ctrl+C:cancel");
     } else {
         hints.push("Ctrl+C:quit");
     }
-    hints.push("Ctrl+B:background");
+    hints.push("Ctrl+B:bg");
     hints.push("Ctrl+P:mode");
     if sidebar_visible {
         hints.push("F2:hide");

@@ -61,7 +61,7 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
             return; // Don't clear exit_pending below
         }
         // Ctrl+B → run in background (Claude Code parity)
-        KeyCode::Char('b') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        KeyCode::Char('b') | KeyCode::Char('\x02') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             let text = app.input_state.text();
             if !text.trim().is_empty() {
                 app.input_state.clear();
@@ -82,19 +82,34 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
             }
         }
         // Ctrl+P → cycle permission mode (Default → Plan → Accept Edits → Danger)
-        KeyCode::Char('p') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        // Handle both 'p' and '\x10' (ASCII DLE) for Windows terminal compatibility
+        KeyCode::Char('p') | KeyCode::Char('\x10') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.cycle_permission_level();
         }
         // Ctrl+\\ → toggle sidebar (unique binding, Ctrl+B is background)
         KeyCode::Char('\\') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.toggle_sidebar();
         }
-        // F2 → toggle sidebar (alternative)
+        // F2 → toggle sidebar visibility/focus
         KeyCode::F(2) => {
-            app.toggle_sidebar();
+            if app.sidebar_visible && app.focus == events::PanelId::Sidebar {
+                // Already focused → hide sidebar
+                app.sidebar_visible = false;
+                app.focus = events::PanelId::Input;
+                app.sidebar_state.has_focus = false;
+            } else if app.sidebar_visible {
+                // Visible but not focused → focus it
+                app.focus = events::PanelId::Sidebar;
+                app.sidebar_state.has_focus = true;
+            } else {
+                // Hidden → show and focus
+                app.sidebar_visible = true;
+                app.focus = events::PanelId::Sidebar;
+                app.sidebar_state.has_focus = true;
+            }
         }
         // Ctrl+L → clear chat
-        KeyCode::Char('l') if key.modifiers.contains(KeyModifiers::CONTROL) => {
+        KeyCode::Char('l') | KeyCode::Char('\x0c') if key.modifiers.contains(KeyModifiers::CONTROL) => {
             app.chat.messages.clear();
             app.chat.scroll_offset = 0;
             app.chat.focused_message = None;
@@ -125,22 +140,37 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
                 app.input_state.event_handler.on_key_event(key, &mut app.input_state.editor);
             }
         }
-        // Tab → cycle sidebar sections ONLY (when sidebar is focused)
-        // Does NOT steal focus from input — use Ctrl+\\ or F2 to toggle sidebar
-        KeyCode::Tab if app.focus == events::PanelId::Sidebar && app.sidebar_visible => {
-            app.sidebar_state.next_section();
-        }
-        // Shift+Tab → previous sidebar section (only when sidebar focused)
-        // When not in sidebar, ignore (don't pass to edtui which can't handle it)
-        KeyCode::BackTab => {
-            if app.focus == events::PanelId::Sidebar && app.sidebar_visible {
-                app.sidebar_state.prev_section();
+        // Tab → focus sidebar (from input) or cycle sections (when already in sidebar)
+        KeyCode::Tab if app.sidebar_visible => {
+            if app.focus == events::PanelId::Sidebar {
+                app.sidebar_state.next_section();
+            } else {
+                // Switch focus to sidebar
+                app.focus = events::PanelId::Sidebar;
+                app.sidebar_state.has_focus = true;
+                app.scroll_mode = false;
             }
-            // Ignore when not in sidebar — prevents crash
         }
-        // Esc → toggle scroll mode
+        // Shift+Tab → previous sidebar section or focus sidebar from input
+        KeyCode::BackTab => {
+            if app.sidebar_visible {
+                if app.focus == events::PanelId::Sidebar {
+                    app.sidebar_state.prev_section();
+                } else {
+                    // Switch focus to sidebar
+                    app.focus = events::PanelId::Sidebar;
+                    app.sidebar_state.has_focus = true;
+                    app.scroll_mode = false;
+                }
+            }
+        }
+        // Esc → return from sidebar/scroll to input, or enter scroll mode
         KeyCode::Esc => {
-            if app.scroll_mode {
+            if app.focus == events::PanelId::Sidebar {
+                // Return from sidebar to input
+                app.focus = events::PanelId::Input;
+                app.sidebar_state.has_focus = false;
+            } else if app.scroll_mode {
                 app.scroll_mode = false;
                 app.focus = events::PanelId::Input;
                 app.chat.focused_message = None;
@@ -152,6 +182,24 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
                 }
             }
         }
+        // Page up/down → ALWAYS scroll chat (from any mode)
+        KeyCode::PageUp => {
+            app.chat.scroll_up(10);
+            app.chat.auto_scroll = false;
+        }
+        KeyCode::PageDown => {
+            app.chat.scroll_down(10);
+        }
+        // Home → scroll to top
+        KeyCode::Home if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.chat.scroll_offset = 0;
+            app.chat.auto_scroll = false;
+        }
+        // End → scroll to bottom
+        KeyCode::End if key.modifiers.contains(KeyModifiers::CONTROL) => {
+            app.chat.scroll_to_bottom();
+            app.chat.auto_scroll = true;
+        }
         // Sidebar focused: section navigation
         _ if app.focus == events::PanelId::Sidebar && app.sidebar_visible => {
             handle_sidebar_key(key, app);
@@ -159,14 +207,6 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
         // In scroll mode: vim-like navigation
         _ if app.scroll_mode => {
             handle_scroll_mode_key(key, app);
-        }
-        // Page up/down always work for scrolling
-        KeyCode::PageUp => {
-            app.chat.scroll_up(10);
-        }
-        KeyCode::PageDown => {
-            app.chat.scroll_down(10);
-            app.chat.auto_scroll = true;
         }
         // Everything else → delegate to input box
         _ => {
@@ -231,6 +271,13 @@ fn handle_scroll_mode_key(key: KeyEvent, app: &mut App) {
             app.input_state.handle_key(slash_key);
             app.suggestions.update("/");
         }
+        KeyCode::PageUp => {
+            app.chat.scroll_up(10);
+            app.chat.auto_scroll = false;
+        }
+        KeyCode::PageDown => {
+            app.chat.scroll_down(10);
+        }
         KeyCode::Char('i') | KeyCode::Esc => {
             app.scroll_mode = false;
             app.focus = events::PanelId::Input;
@@ -287,9 +334,24 @@ fn handle_sidebar_key(key: KeyEvent, app: &mut App) {
         KeyCode::BackTab => {
             app.sidebar_state.prev_section();
         }
-        // Enter → expand/collapse selected item
+        // Enter → expand/collapse selected item, or select agent
         KeyCode::Enter => {
-            app.sidebar_state.toggle_expand();
+            use crate::panels::sidebar::SidebarSection;
+            if app.sidebar_state.active_section == SidebarSection::Agents {
+                let running_count = app.sidebar_state.agents.len();
+                let idx = app.sidebar_state.selected_index;
+                if idx >= running_count {
+                    // Selecting from available agents list
+                    let def_idx = idx - running_count;
+                    let name = app.sidebar_state.toggle_agent_selection(def_idx);
+                    app.set_active_agent(name);
+                } else {
+                    // Expand/collapse running agent
+                    app.sidebar_state.toggle_expand();
+                }
+            } else {
+                app.sidebar_state.toggle_expand();
+            }
         }
         // Esc/i → return focus to input
         KeyCode::Esc | KeyCode::Char('i') => {

@@ -57,9 +57,28 @@ pub async fn run_event_loop(
                         handle_key(key, &mut app);
                     }
                     ct_event::Event::Mouse(mouse) => {
+                        // Use mouse column to decide target: sidebar vs chat
+                        let in_sidebar = app.sidebar_visible && {
+                            let term_width = ratatui::crossterm::terminal::size()
+                                .map(|(w, _)| w).unwrap_or(120);
+                            mouse.column >= term_width.saturating_sub(crate::layout::SIDEBAR_WIDTH)
+                        };
                         match mouse.kind {
-                            ct_event::MouseEventKind::ScrollUp => app.chat.scroll_up(3),
-                            ct_event::MouseEventKind::ScrollDown => app.chat.scroll_down(3),
+                            ct_event::MouseEventKind::ScrollUp => {
+                                if in_sidebar && app.focus == events::PanelId::Sidebar {
+                                    app.sidebar_state.select_prev();
+                                } else {
+                                    app.chat.scroll_up(3);
+                                    app.chat.auto_scroll = false;
+                                }
+                            }
+                            ct_event::MouseEventKind::ScrollDown => {
+                                if in_sidebar && app.focus == events::PanelId::Sidebar {
+                                    app.sidebar_state.select_next();
+                                } else {
+                                    app.chat.scroll_down(3);
+                                }
+                            }
                             _ => {}
                         }
                     }

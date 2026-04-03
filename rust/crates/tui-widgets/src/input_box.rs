@@ -114,42 +114,21 @@ impl InputMode {
         }
     }
 
-    fn title_spans(&self, perm: PermissionLevel, active_agent: Option<&str>) -> Vec<Span<'static>> {
+    fn title_spans(&self, perm: PermissionLevel, _active_agent: Option<&str>) -> Vec<Span<'static>> {
         match self {
             Self::Ready => {
-                let mut spans = vec![
+                // Clean left title: icon + hint text only
+                // Mode badge, agent badge, and branch are on the right side
+                vec![
                     Span::styled(
                         format!(" {} ", perm.icon()),
                         Style::default().fg(perm.accent_color()).add_modifier(Modifier::BOLD),
                     ),
-                ];
-                // Show active agent name if one is selected
-                if let Some(agent_name) = active_agent {
-                    spans.push(Span::styled(
-                        format!("{agent_name} "),
-                        Style::default().fg(perm.accent_color()).add_modifier(Modifier::BOLD),
-                    ));
-                    spans.push(Span::styled(
-                        "· ",
+                    Span::styled(
+                        "Enter to send · Ctrl+P mode ",
                         Style::default().fg(Color::Indexed(240)),
-                    ));
-                }
-                // Show permission mode label (except Default which is implied)
-                if perm != PermissionLevel::Default {
-                    spans.push(Span::styled(
-                        format!("{} ", perm.label()),
-                        Style::default().fg(perm.accent_color()),
-                    ));
-                    spans.push(Span::styled(
-                        "· ",
-                        Style::default().fg(Color::Indexed(240)),
-                    ));
-                }
-                spans.push(Span::styled(
-                    "Enter to send · Ctrl+P mode ",
-                    Style::default().fg(Color::Indexed(240)),
-                ));
-                spans
+                    ),
+                ]
             }
             Self::AgentRunning { label } => vec![
                 Span::styled(
@@ -262,20 +241,51 @@ impl InputBox {
             .border_style(Style::default().fg(border_color))
             .title(Line::from(title_spans));
 
-        // Right-aligned context tag (git branch, active plan, agent name)
-        if let Some(ref tag) = self.context_tag {
-            block = block.title_top(
-                Line::from(vec![
-                    Span::styled(
-                        format!(" {tag} "),
-                        Style::default()
-                            .fg(Color::Black)
-                            .bg(Color::Rgb(50, 130, 255))
-                            .add_modifier(Modifier::BOLD),
-                    ),
-                ])
-                .alignment(ratatui::layout::Alignment::Right),
-            );
+        // Right-aligned badges: [mode] [agent] [branch] — like Claude Code
+        {
+            let mut right_spans: Vec<Span<'static>> = Vec::new();
+
+            // Permission mode badge (only when not Default)
+            if self.permission_level != PermissionLevel::Default {
+                right_spans.push(Span::styled(
+                    format!(" {} {} ", self.permission_level.icon(), self.permission_level.label()),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(self.permission_level.accent_color())
+                        .add_modifier(Modifier::BOLD),
+                ));
+                right_spans.push(Span::styled(" ", Style::default()));
+            }
+
+            // Active agent badge
+            if let Some(ref agent_name) = self.active_agent {
+                right_spans.push(Span::styled(
+                    format!(" {agent_name} "),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Rgb(180, 120, 255)) // purple for agent
+                        .add_modifier(Modifier::BOLD),
+                ));
+                right_spans.push(Span::styled(" ", Style::default()));
+            }
+
+            // Git branch badge
+            if let Some(ref tag) = self.context_tag {
+                right_spans.push(Span::styled(
+                    format!(" {tag} "),
+                    Style::default()
+                        .fg(Color::Black)
+                        .bg(Color::Rgb(50, 130, 255))
+                        .add_modifier(Modifier::BOLD),
+                ));
+            }
+
+            if !right_spans.is_empty() {
+                block = block.title_top(
+                    Line::from(right_spans)
+                        .alignment(ratatui::layout::Alignment::Right),
+                );
+            }
         }
 
         let inner = block.inner(area);
