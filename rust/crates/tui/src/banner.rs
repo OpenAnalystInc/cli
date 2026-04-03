@@ -47,7 +47,7 @@ impl Banner {
         let white = Style::default().fg(Color::White);
         let dim = Style::default().fg(Color::Indexed(245));
         let green = Style::default().fg(Color::Indexed(40));
-        let logo_color = Style::default().fg(Color::Rgb(255, 140, 0)); // orange OPENANALYST logo
+        let logo_color = Style::default().fg(Color::Rgb(255, 140, 0)); // orange OA logo
 
         // Column widths
         let left_w: usize = 40;
@@ -87,14 +87,14 @@ impl Banner {
         let welcome = format!("   Welcome back, {}!", self.info.display_name);
         lines.push(brow(&welcome, white_bold, " Tips for getting started", green));
 
-        // ── OPENANALYST block letters (N and A fixed) ──
+        // ── Original OA block logo in orange ──
         let logo: [&str; 6] = [
-            " ███ ███ ███ █ █ ███ █ █ ███ █   █ █  ██ ███",
-            " █ █ █ █ █   ██  █ █ ██  █ █ █   █ █ ██   █ ",
-            " █ █ ███ ██  █ █ ███ █ █ ███ █    █   ██  █ ",
-            " ███ █   ███ █ █ █ █ █ █ █ █ ███  █  ██   █ ",
-            "                                        ",
-            "                                        ",
+            "   ████████   ████  ",
+            "   ██    ██  ██  ██ ",
+            "   ██    ██  ██  ██ ",
+            "   ██    ██  ██████ ",
+            "   ██    ██  ██  ██ ",
+            "   ████████  ██  ██ ",
         ];
 
         let tip_lines: [(&str, Style); 6] = [
