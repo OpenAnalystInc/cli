@@ -104,6 +104,8 @@ pub struct InputBox {
     mode: InputMode,
     /// Right-aligned context tag (git branch, active plan, agent name).
     context_tag: Option<String>,
+    /// Model label shown above the input box (e.g., "claude-opus-4-6").
+    model_label: Option<String>,
 }
 
 impl Default for InputBox {
@@ -111,6 +113,7 @@ impl Default for InputBox {
         Self {
             mode: InputMode::Ready,
             context_tag: None,
+            model_label: None,
         }
     }
 }

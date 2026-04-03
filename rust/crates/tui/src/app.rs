@@ -120,8 +120,9 @@ impl App {
             voice: crate::voice::VoiceState::default(),
             session_id: generate_session_id(),
         };
-        // Discover project files on startup for sidebar
+        // Discover project files and plans on startup for sidebar
         app.sidebar_state.discover_project_files();
+        app.sidebar_state.discover_plans();
         app
     }
 
@@ -832,10 +833,11 @@ fn build_status_hints(is_streaming: bool, scroll_mode: bool, sidebar_visible: bo
     } else {
         hints.push("Ctrl+C:quit");
     }
+    hints.push("Ctrl+B:background");
     if sidebar_visible {
-        hints.push("Ctrl+B:hide");
+        hints.push("F2:hide");
     } else {
-        hints.push("Ctrl+B:sidebar");
+        hints.push("F2:sidebar");
     }
     hints.join(" · ")
 }
