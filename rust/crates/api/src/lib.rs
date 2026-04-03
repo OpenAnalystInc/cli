@@ -12,7 +12,7 @@ pub use error::ApiError;
 pub use providers::openanalyst_provider::{AuthSource, OpenAnalystApiClient, OpenAnalystApiClient as ApiClient};
 pub use providers::openai_compat::{OpenAiCompatClient, OpenAiCompatConfig};
 pub use providers::{
-    detect_provider_kind, max_tokens_for_model, resolve_model_alias, ProviderKind,
+    available_models, detect_provider_kind, max_tokens_for_model, resolve_model_alias, ProviderKind,
 };
 pub use sse::{parse_frame, SseParser};
 pub use types::{

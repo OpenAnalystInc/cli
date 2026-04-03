@@ -152,10 +152,21 @@ pub struct SidebarState {
     pub expanded_file: Option<usize>,
     /// Expanded agent index (to show full task).
     pub expanded_agent: Option<usize>,
+    /// Available models from all configured providers (cached on startup).
+    pub available_models: Vec<String>,
+    /// Per-category model index for cycling through available_models.
+    /// [explore, research, code, write] — each indexes into available_models.
+    pub routing_model_index: [usize; 4],
 }
 
 impl Default for SidebarState {
     fn default() -> Self {
+        // Discover available models from all configured providers
+        let available_models: Vec<String> = api::available_models()
+            .into_iter()
+            .map(|s| s.to_string())
+            .collect();
+
         Self {
             agents: Vec::new(),
             files: Vec::new(),
@@ -169,6 +180,8 @@ impl Default for SidebarState {
             has_focus: false,
             expanded_file: None,
             expanded_agent: None,
+            available_models,
+            routing_model_index: [0; 4],
         }
     }
 }
@@ -472,6 +485,18 @@ impl SidebarState {
             }
             _ => {}
         }
+    }
+
+    /// Cycle to the next available model for a routing category (0=explore, 1=research, 2=code, 3=write).
+    /// Returns the new model name, or None if no models available.
+    pub fn cycle_routing_model(&mut self, category_idx: usize) -> Option<String> {
+        if self.available_models.is_empty() || category_idx >= 4 {
+            return None;
+        }
+        let current = self.routing_model_index[category_idx];
+        let next = (current + 1) % self.available_models.len();
+        self.routing_model_index[category_idx] = next;
+        Some(self.available_models[next].clone())
     }
 
     /// Number of selectable items in the current section.

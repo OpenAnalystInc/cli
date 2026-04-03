@@ -472,7 +472,7 @@ fn pattern_score(text: &str, patterns: &[&str]) -> usize {
 }
 
 /// Classify a model name into a tier.
-fn classify_model(model: &str) -> ModelTier {
+pub fn classify_model(model: &str) -> ModelTier {
     let lower = model.to_ascii_lowercase();
 
     // Fast tier
