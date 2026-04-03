@@ -88,6 +88,16 @@ impl ModelTier {
         }
     }
 
+    /// Cycle to the next tier (Fast → Balanced → Capable → Fast).
+    #[must_use]
+    pub const fn next(self) -> Self {
+        match self {
+            Self::Fast => Self::Balanced,
+            Self::Balanced => Self::Capable,
+            Self::Capable => Self::Fast,
+        }
+    }
+
     #[must_use]
     pub fn from_str_opt(s: &str) -> Option<Self> {
         match s.to_ascii_lowercase().as_str() {

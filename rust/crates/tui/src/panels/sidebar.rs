@@ -806,9 +806,7 @@ fn render_routing_section(
     for (i, cat) in ActionCategory::ALL.iter().enumerate() {
         let profile = router.table.get(*cat);
         let model = router.resolver.resolve(profile.model_tier);
-        // Shorten model name for sidebar — strip common prefixes and abbreviate
         let short_model = shorten_model_name(model);
-        let short_model = truncate_sidebar(&short_model, area.width as usize - 14);
 
         let cat_color = match cat {
             ActionCategory::Explore => Color::Blue,
@@ -817,13 +815,25 @@ fn render_routing_section(
             ActionCategory::Write => Color::Yellow,
         };
 
+        // Tier indicator color
+        let tier_color = match profile.model_tier {
+            orchestrator::router::ModelTier::Fast => Color::Cyan,
+            orchestrator::router::ModelTier::Balanced => Color::Yellow,
+            orchestrator::router::ModelTier::Capable => Color::Green,
+        };
+
         let is_selected = is_focused && i == selected;
         let bg = if is_selected { Color::Indexed(239) } else { Color::Reset };
         let sel_prefix = if is_selected { "▸" } else { " " };
 
+        // Show: ▸ explore  ● model-name
+        // The ● color indicates the tier; Enter cycles it
+        let max_model = area.width as usize - 14;
+        let short_model = truncate_sidebar(&short_model, max_model);
         lines.push(Line::from(vec![
             Span::styled(sel_prefix, Style::default().fg(Color::Yellow).bg(bg)),
-            Span::styled(format!("{:<8} ", cat.as_str()), Style::default().fg(cat_color).bg(bg)),
+            Span::styled(format!("{:<8}", cat.as_str()), Style::default().fg(cat_color).bg(bg)),
+            Span::styled(" ● ", Style::default().fg(tier_color).bg(bg)),
             Span::styled(short_model, Style::default().fg(Color::Indexed(245)).bg(bg)),
         ]));
     }
@@ -922,6 +932,11 @@ fn render_activity_section(
     ]));
 
     Paragraph::new(lines).render(area, buf);
+}
+
+/// Shorten a model name for sidebar display (public for keybinding handler).
+pub fn shorten_model_name_pub(model: &str) -> String {
+    shorten_model_name(model)
 }
 
 /// Shorten a model name for sidebar display by stripping common prefixes
