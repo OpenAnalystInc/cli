@@ -2504,6 +2504,7 @@ fn run_resume_command(
         | SlashCommand::Ask { .. }
         | SlashCommand::UserPrompt { .. }
         | SlashCommand::Hooks { .. }
+        | SlashCommand::Trust { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -2521,8 +2522,25 @@ fn run_tui(
 
     let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
-    // Load system prompt
-    let system_prompt = runtime::load_system_prompt(&cwd, DEFAULT_DATE, "Windows", "11")?;
+    // Folder trust check — warn if workspace is blocked
+    let trust_info = runtime::discover_trust(&cwd);
+    if trust_info.level == runtime::TrustLevel::Blocked {
+        eprintln!("Workspace is blocked by trust policy: {}", trust_info.reason);
+        return Err("Blocked workspace".into());
+    }
+
+    // IDE detection — inject into system prompt for context-aware behavior
+    let ide = runtime::detect_ide();
+    let ide_context = runtime::ide_context_string();
+
+    // Load system prompt with IDE context
+    let mut system_prompt = runtime::load_system_prompt(&cwd, DEFAULT_DATE, "Windows", "11")?;
+    if !ide_context.is_empty() {
+        system_prompt.push(ide_context);
+    }
+    if trust_info.level == runtime::TrustLevel::Untrusted {
+        system_prompt.push("Note: This workspace is untrusted. Hooks and skills are disabled. Run /trust to enable.".to_string());
+    }
 
     let config = OrchestratorConfig {
         model: model.clone(),
@@ -2530,6 +2548,7 @@ fn run_tui(
         allowed_tools,
         cwd: cwd.clone(),
         system_prompt,
+        max_turns: None, // Use default (200 turns)
     };
 
     let orchestrator = orchestrator::AgentOrchestrator::new(config, ui_tx, action_rx, None);
@@ -3185,6 +3204,10 @@ impl LiveCli {
             }
             SlashCommand::Hooks { .. } => {
                 eprintln!("Use /hooks in the TUI mode for interactive hook management.");
+                false
+            }
+            SlashCommand::Trust { .. } => {
+                eprintln!("Use /trust in the TUI mode.");
                 false
             }
             SlashCommand::Unknown(name) => {

@@ -11,6 +11,13 @@ pub mod mcp_bridge;
 mod mcp_client;
 mod mcp_stdio;
 mod oauth;
+pub mod output_masking;
+pub mod folder_trust;
+pub mod ide_detect;
+pub mod compression;
+pub mod policy;
+pub mod settings;
+pub mod skills;
 mod permissions;
 mod prompt;
 mod remote;
@@ -87,6 +94,28 @@ pub use remote::{
 pub use session::{ContentBlock, ConversationMessage, MessageRole, Session, SessionError};
 pub use usage::{
     format_usd, pricing_for_model, ModelPricing, TokenUsage, UsageCostEstimate, UsageTracker,
+};
+
+// ── New battle-tested modules ──
+pub use compression::{
+    estimate_text_tokens, estimate_conversation_tokens, needs_compression,
+    truncate_tool_outputs, find_compress_split_point, extract_state_snapshot,
+    CompressionResult, CompressionStatus, COMPRESSION_SYSTEM_PROMPT, VERIFICATION_PROMPT,
+};
+pub use folder_trust::{discover_trust, trust_folder, untrust_folder, TrustLevel, TrustInfo};
+pub use ide_detect::{detect_ide, ide_context_string, Ide};
+pub use output_masking::{mask_tool_output, likely_contains_secrets, MaskingStats};
+pub use policy::{
+    PolicyEngine, PolicyDecision, ApprovalMode, PolicyTier, PolicyRule,
+    PolicyCheckResult, load_policy_toml, load_workspace_policy, load_user_policy,
+};
+pub use settings::{
+    load_settings, load_user_settings, load_project_settings, save_project_settings,
+    update_setting, load_mcp_json, save_mcp_server, remove_mcp_server,
+    Settings, McpServerEntry, HookSettings, SkillSettings, PluginSettings,
+};
+pub use skills::{
+    load_skills, execute_skill, format_skills_list, SkillDefinition, SkillScope,
 };
 
 #[cfg(test)]

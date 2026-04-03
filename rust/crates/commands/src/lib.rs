@@ -467,6 +467,13 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: Some("[list|add <event> <command>|remove <event> <index>|test <event>]"),
         resume_supported: false,
     },
+    SlashCommandSpec {
+        name: "trust",
+        aliases: &[],
+        summary: "Trust or untrust the current workspace for hooks and skills",
+        argument_hint: Some("[add|remove|status]"),
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -643,6 +650,9 @@ pub enum SlashCommand {
         action: Option<String>,
         event: Option<String>,
         command_or_index: Option<String>,
+    },
+    Trust {
+        action: Option<String>,
     },
     Unknown(String),
 }
@@ -851,6 +861,9 @@ impl SlashCommand {
             },
             "user-prompt" | "up" => Self::UserPrompt {
                 prompt: remainder_after_command(trimmed, command),
+            },
+            "trust" => Self::Trust {
+                action: parts.next().map(ToOwned::to_owned),
             },
             other => Self::Unknown(other.to_string()),
         })
@@ -2164,6 +2177,7 @@ pub fn handle_slash_command(
         | SlashCommand::Ask { .. }
         | SlashCommand::UserPrompt { .. }
         | SlashCommand::Hooks { .. }
+        | SlashCommand::Trust { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2520,7 +2534,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 59);
+        assert_eq!(slash_command_specs().len(), 60);
         assert_eq!(resume_supported_slash_commands().len(), 14);
     }
 

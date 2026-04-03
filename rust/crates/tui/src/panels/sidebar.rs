@@ -135,6 +135,76 @@ impl Default for SidebarState {
 }
 
 impl SidebarState {
+    /// Discover project files on startup — scans CWD for important files.
+    /// Similar to Gemini CLI's FileDiscoveryService but lightweight.
+    pub fn discover_project_files(&mut self) {
+        let cwd = match std::env::current_dir() {
+            Ok(p) => p,
+            Err(_) => return,
+        };
+
+        // Priority files to show (config, entrypoints, docs)
+        let priority_names: &[&str] = &[
+            "OPENANALYST.md", "CLAUDE.md", "README.md", "Cargo.toml",
+            "package.json", "pyproject.toml", "go.mod", "Makefile",
+            ".gitignore", "tsconfig.json", "rust-toolchain.toml",
+        ];
+
+        // First: add priority files that exist
+        for name in priority_names {
+            let path = cwd.join(name);
+            if path.exists() {
+                self.files.push(TouchedFile {
+                    path: name.to_string(),
+                    action: FileAction::Read,
+                });
+            }
+        }
+
+        // Second: scan top-level source directories for code files (max 12 total)
+        let source_dirs: &[&str] = &["src", "crates", "packages", "lib", "app", "rust"];
+        for dir_name in source_dirs {
+            let dir = cwd.join(dir_name);
+            if !dir.is_dir() {
+                continue;
+            }
+            let entries = match std::fs::read_dir(&dir) {
+                Ok(e) => e,
+                Err(_) => continue,
+            };
+            for entry in entries.flatten() {
+                if self.files.len() >= 20 {
+                    return;
+                }
+                let path = entry.path();
+                let name = entry.file_name().to_string_lossy().to_string();
+                // Skip hidden files and common non-code dirs
+                if name.starts_with('.') || name == "target" || name == "node_modules" {
+                    continue;
+                }
+                let display = format!("{}/{}", dir_name, name);
+                if path.is_dir() {
+                    // Show directories as entries
+                    if !self.files.iter().any(|f| f.path == display) {
+                        self.files.push(TouchedFile {
+                            path: display,
+                            action: FileAction::Read,
+                        });
+                    }
+                } else if path.extension().map_or(false, |ext| {
+                    matches!(ext.to_str(), Some("rs" | "py" | "ts" | "tsx" | "js" | "go" | "toml" | "json" | "md"))
+                }) {
+                    if !self.files.iter().any(|f| f.path == display) {
+                        self.files.push(TouchedFile {
+                            path: display,
+                            action: FileAction::Read,
+                        });
+                    }
+                }
+            }
+        }
+    }
+
     /// Track a file being touched by a tool call.
     pub fn track_file(&mut self, path: String, action: FileAction) {
         if let Some(existing) = self.files.iter_mut().find(|f| f.path == path) {
@@ -149,7 +219,7 @@ impl SidebarState {
             }
         } else {
             self.files.insert(0, TouchedFile { path, action });
-            if self.files.len() > 20 {
+            if self.files.len() > 50 {
                 self.files.pop();
             }
         }
@@ -243,9 +313,15 @@ pub fn render_sidebar(
     area: Rect,
     buf: &mut Buffer,
 ) {
-    let border_style = Style::default().fg(Color::Rgb(50, 130, 255));
+    // Border changes color when sidebar is focused
+    let border_color = if state.has_focus {
+        Color::Yellow
+    } else {
+        Color::Rgb(50, 130, 255)
+    };
+    let border_style = Style::default().fg(border_color);
 
-    // Draw outer border
+    // Draw outer border with focus indicator
     let outer_block = Block::default()
         .borders(Borders::LEFT)
         .border_type(BorderType::Plain)
@@ -254,8 +330,8 @@ pub fn render_sidebar(
     outer_block.render(area, buf);
 
     // Split sidebar into 4 sections
-    let agent_count = state.agents.len().min(4) as u16;
-    let file_count = state.files.len().min(8) as u16;
+    let agent_count = state.agents.len().min(10) as u16;
+    let file_count = state.files.len().min(15) as u16;
 
     let sections = Layout::vertical([
         Constraint::Length(agent_count.max(1) + 2),  // Agents
@@ -309,22 +385,31 @@ pub fn render_sidebar(
 }
 
 fn section_header(title: &str, is_focused: bool) -> Line<'static> {
-    let style = if is_focused {
-        Style::default().fg(Color::Rgb(255, 107, 0)).add_modifier(Modifier::BOLD)
+    if is_focused {
+        // Bright yellow background highlight for active section
+        let bg = Color::Indexed(239);
+        Line::from(vec![
+            Span::styled("▸ ", Style::default().fg(Color::Yellow).bg(bg).add_modifier(Modifier::BOLD)),
+            Span::styled(title.to_string(), Style::default().fg(Color::Yellow).bg(bg).add_modifier(Modifier::BOLD)),
+            Span::styled(" ◂", Style::default().fg(Color::Yellow).bg(bg)),
+        ])
     } else {
-        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-    };
-    let indicator = if is_focused { "▸ " } else { "  " };
-    Line::from(vec![
-        Span::styled(indicator, style),
-        Span::styled(title.to_string(), style),
-    ])
+        Line::from(vec![
+            Span::styled("  ", Style::default().fg(Color::Cyan)),
+            Span::styled(title.to_string(), Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+        ])
+    }
 }
 
-fn section_separator(width: u16) -> Line<'static> {
+fn section_separator(width: u16, is_next_focused: bool) -> Line<'static> {
+    let color = if is_next_focused {
+        Color::Yellow
+    } else {
+        Color::Indexed(238)
+    };
     Line::from(Span::styled(
         " ".to_string() + &"─".repeat((width as usize).saturating_sub(2)),
-        Style::default().fg(Color::Indexed(238)),
+        Style::default().fg(color),
     ))
 }
 
@@ -341,7 +426,7 @@ fn render_agents_section(
     if agents.is_empty() {
         lines.push(Line::from(Span::styled("  (none active)", Style::default().fg(Color::DarkGray))));
     } else {
-        for (i, agent) in agents.iter().take(4).enumerate() {
+        for (i, agent) in agents.iter().take(10).enumerate() {
             let (icon, color) = match &agent.status {
                 AgentStatus::Pending => ("◦", Color::DarkGray),
                 AgentStatus::Running => ("●", Color::Blue),
@@ -358,15 +443,18 @@ fn render_agents_section(
                 truncate_sidebar(&agent.agent_type.to_string(), area.width as usize - 5)
             };
 
-            let bg = if is_selected { Color::Indexed(236) } else { Color::Reset };
+            let bg = if is_selected { Color::Indexed(239) } else { Color::Reset };
+            let text_color = if is_selected { Color::White } else { Color::Indexed(252) };
+            let sel_prefix = if is_selected { "▸" } else { " " };
             lines.push(Line::from(vec![
-                Span::styled(format!(" {icon} "), Style::default().fg(color).bg(bg)),
-                Span::styled(label, Style::default().fg(Color::Indexed(252)).bg(bg)),
+                Span::styled(sel_prefix, Style::default().fg(Color::Yellow).bg(bg)),
+                Span::styled(format!("{icon} "), Style::default().fg(color).bg(bg)),
+                Span::styled(label, Style::default().fg(text_color).bg(bg)),
             ]));
         }
     }
 
-    lines.push(section_separator(area.width));
+    lines.push(section_separator(area.width, is_focused));
     Paragraph::new(lines).render(area, buf);
 }
 
@@ -384,7 +472,7 @@ fn render_files_section(
         lines.push(Line::from(Span::styled("  (no files yet)", Style::default().fg(Color::DarkGray))));
     } else {
         let max_width = area.width as usize - 5;
-        for (i, file) in files.iter().take(8).enumerate() {
+        for (i, file) in files.iter().take(15).enumerate() {
             let icon = file.action.icon();
             let color = file.action.color();
 
@@ -399,15 +487,18 @@ fn render_files_section(
                 truncate_sidebar(fname, max_width)
             };
 
-            let bg = if is_selected { Color::Indexed(236) } else { Color::Reset };
+            let bg = if is_selected { Color::Indexed(239) } else { Color::Reset };
+            let text_color = if is_selected { Color::White } else { Color::Indexed(252) };
+            let sel_prefix = if is_selected { "▸" } else { " " };
             lines.push(Line::from(vec![
-                Span::styled(format!(" {icon} "), Style::default().fg(color).bg(bg)),
-                Span::styled(display, Style::default().fg(Color::Indexed(252)).bg(bg)),
+                Span::styled(sel_prefix, Style::default().fg(Color::Yellow).bg(bg)),
+                Span::styled(format!("{icon} "), Style::default().fg(color).bg(bg)),
+                Span::styled(display, Style::default().fg(text_color).bg(bg)),
             ]));
         }
     }
 
-    lines.push(section_separator(area.width));
+    lines.push(section_separator(area.width, is_focused));
     Paragraph::new(lines).render(area, buf);
 }
 
@@ -439,15 +530,17 @@ fn render_routing_section(
         };
 
         let is_selected = is_focused && i == selected;
-        let bg = if is_selected { Color::Indexed(236) } else { Color::Reset };
+        let bg = if is_selected { Color::Indexed(239) } else { Color::Reset };
+        let sel_prefix = if is_selected { "▸" } else { " " };
 
         lines.push(Line::from(vec![
-            Span::styled(format!(" {:<8} ", cat.as_str()), Style::default().fg(cat_color).bg(bg)),
+            Span::styled(sel_prefix, Style::default().fg(Color::Yellow).bg(bg)),
+            Span::styled(format!("{:<8} ", cat.as_str()), Style::default().fg(cat_color).bg(bg)),
             Span::styled(short_model, Style::default().fg(Color::Indexed(245)).bg(bg)),
         ]));
     }
 
-    lines.push(section_separator(area.width));
+    lines.push(section_separator(area.width, is_focused));
     Paragraph::new(lines).render(area, buf);
 }
 
@@ -514,7 +607,7 @@ fn render_activity_section(
             Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
         )));
         let max_w = area.width as usize - 5;
-        for task in bg_tasks.iter().take(3) {
+        for task in bg_tasks.iter().take(8) {
             let (icon, color) = match task.status {
                 BackgroundTaskStatus::Running => ("⠋", Color::Blue),
                 BackgroundTaskStatus::Completed => ("✓", Color::Green),

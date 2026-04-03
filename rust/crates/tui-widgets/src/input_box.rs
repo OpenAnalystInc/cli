@@ -4,7 +4,7 @@
 //! We wrap it with submit handling (Ctrl+S / Enter), mode-aware borders, and
 //! dynamic height calculation.
 
-use edtui::{EditorEventHandler, EditorState, EditorTheme, EditorView, Lines};
+use edtui::{EditorEventHandler, EditorMode, EditorState, EditorTheme, EditorView, Lines};
 use ratatui::buffer::Buffer;
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::layout::Rect;
@@ -102,12 +102,15 @@ impl InputMode {
 /// Wrapper around `edtui` providing a vim-mode input area with mode-aware styling.
 pub struct InputBox {
     mode: InputMode,
+    /// Right-aligned context tag (git branch, active plan, agent name).
+    context_tag: Option<String>,
 }
 
 impl Default for InputBox {
     fn default() -> Self {
         Self {
             mode: InputMode::Ready,
+            context_tag: None,
         }
     }
 }
@@ -120,16 +123,39 @@ impl InputBox {
         self
     }
 
+    /// Set the context tag (displayed top-right of the input border).
+    #[must_use]
+    pub fn context_tag(mut self, tag: Option<String>) -> Self {
+        self.context_tag = tag;
+        self
+    }
+
     /// Render the input box into the given area using the provided state.
     pub fn render_with_state(self, area: Rect, buf: &mut Buffer, state: &mut InputBoxState) {
         let border_color = self.mode.border_color();
         let title_spans = self.mode.title_spans();
 
-        let block = Block::default()
+        let mut block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Thick)
             .border_style(Style::default().fg(border_color))
             .title(Line::from(title_spans));
+
+        // Right-aligned context tag (git branch, active plan, agent name)
+        if let Some(ref tag) = self.context_tag {
+            block = block.title_top(
+                Line::from(vec![
+                    Span::styled(
+                        format!(" {tag} "),
+                        Style::default()
+                            .fg(Color::Black)
+                            .bg(Color::Rgb(50, 130, 255))
+                            .add_modifier(Modifier::BOLD),
+                    ),
+                ])
+                .alignment(ratatui::layout::Alignment::Right),
+            );
+        }
 
         let inner = block.inner(area);
         block.render(area, buf);
@@ -163,8 +189,11 @@ pub struct InputBoxState {
 
 impl Default for InputBoxState {
     fn default() -> Self {
+        let mut editor = EditorState::default();
+        // Start in Insert mode so users can type immediately (not vim Normal mode)
+        editor.mode = EditorMode::Insert;
         Self {
-            editor: EditorState::default(),
+            editor,
             event_handler: EditorEventHandler::default(),
         }
     }
@@ -174,8 +203,10 @@ impl InputBoxState {
     /// Create with vim keybindings (Normal/Insert/Visual modes).
     #[must_use]
     pub fn with_vim_mode() -> Self {
+        let mut editor = EditorState::default();
+        editor.mode = EditorMode::Insert;
         Self {
-            editor: EditorState::default(),
+            editor,
             event_handler: EditorEventHandler::vim_mode(),
         }
     }
@@ -189,11 +220,15 @@ impl InputBoxState {
     /// Set the input text (replaces current content).
     pub fn set_text(&mut self, text: &str) {
         self.editor = EditorState::new(Lines::from(text));
+        // Stay in Insert mode after setting text
+        self.editor.mode = EditorMode::Insert;
     }
 
     /// Clear the input.
     pub fn clear(&mut self) {
         self.editor = EditorState::new(Lines::default());
+        // Stay in Insert mode after clearing
+        self.editor.mode = EditorMode::Insert;
     }
 
     /// Get the number of lines in the current editor content.
