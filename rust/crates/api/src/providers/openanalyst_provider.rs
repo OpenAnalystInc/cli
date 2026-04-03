@@ -148,17 +148,24 @@ impl OpenAnalystApiClient {
         Ok(Self::from_auth(AuthSource::from_env_or_saved()?).with_base_url(read_base_url()))
     }
 
-    /// Create a client that calls Anthropic's API directly using the user's own key.
+    /// Create a client that calls Anthropic's API directly.
+    /// Supports both API keys (`sk-ant-api*`) and OAuth tokens (`sk-ant-oat*`).
     pub fn from_anthropic_env() -> Result<Self, ApiError> {
-        let api_key = read_env_non_empty("ANTHROPIC_API_KEY")?
+        let key = read_env_non_empty("ANTHROPIC_API_KEY")?
             .ok_or_else(|| ApiError::missing_credentials("Anthropic", &["ANTHROPIC_API_KEY"]))?;
         let base_url = std::env::var("ANTHROPIC_BASE_URL")
             .ok()
             .filter(|v| !v.is_empty())
             .unwrap_or_else(|| DEFAULT_ANTHROPIC_BASE_URL.to_string());
+        // OAuth tokens (sk-ant-oat*) use Bearer auth; API keys use x-api-key
+        let auth = if key.starts_with("sk-ant-oat") {
+            AuthSource::BearerToken(key)
+        } else {
+            AuthSource::ApiKey(key)
+        };
         Ok(Self {
             http: reqwest::Client::new(),
-            auth: AuthSource::ApiKey(api_key),
+            auth,
             base_url,
             max_retries: DEFAULT_MAX_RETRIES,
             initial_backoff: DEFAULT_INITIAL_BACKOFF,
