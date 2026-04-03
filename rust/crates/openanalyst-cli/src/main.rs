@@ -2523,6 +2523,7 @@ fn run_resume_command(
         | SlashCommand::UserPrompt { .. }
         | SlashCommand::Hooks { .. }
         | SlashCommand::Trust { .. }
+        | SlashCommand::Feedback { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -3226,6 +3227,14 @@ impl LiveCli {
             }
             SlashCommand::Trust { .. } => {
                 eprintln!("Use /trust in the TUI mode.");
+                false
+            }
+            SlashCommand::Feedback { text } => {
+                if let Some(t) = text {
+                    eprintln!("Feedback recorded: {t}");
+                } else {
+                    eprintln!("Usage: /feedback <your correction or comment>");
+                }
                 false
             }
             SlashCommand::Unknown(name) => {

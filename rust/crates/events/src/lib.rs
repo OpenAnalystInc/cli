@@ -170,9 +170,45 @@ pub enum UiEvent {
         output_tokens: u32,
     },
 
+    // ── Knowledge Base ──
+    /// Knowledge base query completed with structured agentic results.
+    KnowledgeResult {
+        query_id: i64,
+        query: String,
+        intent: String,
+        sub_questions: Vec<SubQuestionResult>,
+        answer: Option<String>,
+        latency_ms: u64,
+        from_cache: bool,
+    },
+
     // ── Animation ──
     /// Periodic tick for spinner animations and elapsed time updates.
     Tick,
+}
+
+/// A sub-question result from the agentic RAG pipeline.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubQuestionResult {
+    pub sub_question: String,
+    pub intent: String,
+    pub results: Vec<KbChunkResult>,
+}
+
+/// A single chunk result from the knowledge base.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct KbChunkResult {
+    pub chunk_id: String,
+    pub text: String,
+    pub snippet: String,
+    pub score: f64,
+    /// Abstracted category label — e.g., "Ads Strategy", never raw course name.
+    pub category_label: String,
+    pub content_type: String,
+    /// Citation label — e.g., "[Ads Strategy #1]".
+    pub citation_label: String,
+    pub has_timestamps: bool,
+    pub graph_expanded: bool,
 }
 
 // ── User actions (TUI → backend) ──
@@ -208,6 +244,13 @@ pub enum Action {
     InjectSkill(String),
     /// Voice transcription completed — place text in input box for review.
     VoiceTranscribed { text: String },
+    /// User submitted feedback for a knowledge query.
+    KnowledgeFeedback {
+        query_id: i64,
+        rating: String,  // "positive" | "negative" | "corrected"
+        comment: String,
+        correction: String,
+    },
     /// User requested to quit.
     Quit,
 }

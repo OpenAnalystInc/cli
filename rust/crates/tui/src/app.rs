@@ -216,6 +216,12 @@ impl App {
                     "path": path,
                     "description": description,
                 })),
+                ChatMessage::KnowledgeResult { card } => Some(serde_json::json!({
+                    "role": "knowledge_result",
+                    "query": card.query,
+                    "intent": card.intent,
+                    "query_id": card.query_id,
+                })),
                 ChatMessage::Banner { .. } | ChatMessage::InlineStatus { .. } => None,
             })
             .collect();
@@ -502,6 +508,41 @@ impl App {
     /// Send a prompt directly to the orchestrator (used by slash commands too).
     /// Uses the smart per-action router to determine model + effort from prompt content.
     pub fn submit_prompt_internal(&mut self, text: String) {
+        // Intercept __KB_RESULT__ from /knowledge async handler — render as KnowledgeCard
+        if let Some(json_str) = text.strip_prefix("__KB_RESULT__") {
+            if let Ok(response) = serde_json::from_str::<serde_json::Value>(json_str) {
+                let sub_questions = crate::slash_commands::parse_sub_questions_from_json(&response);
+                let answer = response.get("answer")
+                    .and_then(|a| a.as_str())
+                    .map(|s| s.to_string());
+                let latency_ms = response.get("latency_ms").and_then(|l| l.as_u64()).unwrap_or(0);
+                let query_id = response.get("query_id").and_then(|q| q.as_i64()).unwrap_or(0);
+                let query = response.get("query").and_then(|q| q.as_str()).unwrap_or("").to_string();
+                let intent = response.get("intent").and_then(|i| i.as_str()).unwrap_or("general").to_string();
+                let from_cache = response.get("from_cache").and_then(|f| f.as_bool()).unwrap_or(false);
+
+                // Complete the running KB: Knowledge Graph tool call card
+                for msg in self.chat.messages.iter_mut().rev() {
+                    if let ChatMessage::ToolCall { card } = msg {
+                        if card.tool_name == "KB: Knowledge Graph" {
+                            if let tui_widgets::ToolCallStatus::Running { .. } = card.status {
+                                card.status = tui_widgets::ToolCallStatus::Completed {
+                                    duration: self.turn_start.map(|s| s.elapsed()).unwrap_or_default(),
+                                };
+                                card.output = Some(format!("{} results found.", sub_questions.iter().map(|sq| sq.results.len()).sum::<usize>()));
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                self.handle_ui_event(events::UiEvent::KnowledgeResult {
+                    query_id, query, intent, sub_questions, answer, latency_ms, from_cache,
+                });
+            }
+            return;
+        }
+
         if !self.chat.messages.last().is_some_and(|m| matches!(m, ChatMessage::User { .. })) {
             self.chat.push_user(text.clone());
         }
@@ -741,6 +782,47 @@ impl App {
                 } else {
                     self.drain_pending_queue();
                 }
+            }
+            UiEvent::KnowledgeResult {
+                query_id, query, intent, sub_questions, answer, latency_ms, from_cache,
+            } => {
+                self.status_bar.phase = AgentPhase::Idle;
+                self.is_streaming = false;
+                if let Some(start) = self.turn_start.take() {
+                    self.status_bar.elapsed = start.elapsed();
+                }
+
+                // Build tabbed KnowledgeCard from sub-question results
+                let tabs: Vec<tui_widgets::KnowledgeTab> = sub_questions.iter().map(|sq| {
+                    tui_widgets::KnowledgeTab {
+                        sub_question: sq.sub_question.clone(),
+                        intent: sq.intent.clone(),
+                        results: sq.results.iter().map(|r| {
+                            tui_widgets::KbResultEntry {
+                                category_label: r.category_label.clone(),
+                                snippet: r.snippet.clone(),
+                                score: r.score,
+                                citation_label: r.citation_label.clone(),
+                                graph_expanded: r.graph_expanded,
+                            }
+                        }).collect(),
+                    }
+                }).collect();
+
+                let card = tui_widgets::KnowledgeCard {
+                    query,
+                    intent,
+                    latency_ms,
+                    tabs,
+                    active_tab: 0,
+                    expanded: true,
+                    answer,
+                    from_cache,
+                    feedback_submitted: false,
+                    query_id,
+                };
+
+                self.chat.push_knowledge_result(card);
             }
             UiEvent::Tick => {
                 self.spinner_state.calc_next();

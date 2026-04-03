@@ -391,6 +391,8 @@ impl InputBoxState {
                 self.clear();
                 return Some(text);
             }
+            // Empty input: swallow the Enter (don't insert a newline)
+            return None;
         }
 
         // Delegate to edtui vim-mode handler

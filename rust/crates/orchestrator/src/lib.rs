@@ -106,6 +106,9 @@ impl AgentOrchestrator {
                         Some(Action::VoiceTranscribed { .. }) => {
                             // Handled directly in the TUI event loop, not here
                         }
+                        Some(Action::KnowledgeFeedback { .. }) => {
+                            // Handled in the TUI slash command layer, not here
+                        }
                         Some(Action::Quit) | None => break,
                         Some(Action::SlashCommand(_)) => {}
                     }

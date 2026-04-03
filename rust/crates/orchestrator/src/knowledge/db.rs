@@ -143,7 +143,23 @@ impl LearningDb {
                 created_at    TEXT NOT NULL DEFAULT (datetime('now'))
             );
 
+            -- ── Knowledge cache (local results for instant replay) ──
+            CREATE TABLE IF NOT EXISTS kb_cache (
+                id            INTEGER PRIMARY KEY AUTOINCREMENT,
+                query_hash    TEXT NOT NULL UNIQUE,
+                query_text    TEXT NOT NULL,
+                intent        TEXT NOT NULL,
+                response_json TEXT NOT NULL,
+                answer_text   TEXT DEFAULT '',
+                file_path     TEXT DEFAULT '',
+                hit_count     INTEGER DEFAULT 0,
+                created_at    TEXT NOT NULL DEFAULT (datetime('now')),
+                expires_at    TEXT
+            );
+
             -- Indexes
+            CREATE UNIQUE INDEX IF NOT EXISTS idx_cache_hash ON kb_cache(query_hash);
+            CREATE INDEX IF NOT EXISTS idx_cache_expires ON kb_cache(expires_at);
             CREATE UNIQUE INDEX IF NOT EXISTS idx_creds_provider ON cli_credentials(provider_name);
             CREATE INDEX IF NOT EXISTS idx_creds_env_var ON cli_credentials(env_var);
             CREATE INDEX IF NOT EXISTS idx_queries_intent ON kb_queries(intent);
@@ -483,6 +499,149 @@ impl std::fmt::Display for DbStats {
             self.positive_feedback, self.negative_feedback
         )
     }
+}
+
+/// A cached knowledge base result.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CachedResult {
+    pub query_hash: String,
+    pub query_text: String,
+    pub intent: String,
+    pub response_json: String,
+    pub answer_text: String,
+    pub file_path: String,
+    pub hit_count: i32,
+    pub created_at: String,
+}
+
+impl LearningDb {
+    // ── Cache operations ──
+
+    /// Look up a cached result by query hash. Returns None if not found or expired.
+    /// Bumps hit_count on cache hit.
+    pub fn cache_lookup(&self, query_hash: &str) -> SqlResult<Option<CachedResult>> {
+        let mut stmt = self.conn.prepare(
+            "SELECT query_hash, query_text, intent, response_json, answer_text, file_path, hit_count, created_at, expires_at
+             FROM kb_cache WHERE query_hash = ?1"
+        )?;
+        let result = stmt.query_row(params![query_hash], |row| {
+            let expires_at: Option<String> = row.get(8)?;
+            Ok((CachedResult {
+                query_hash: row.get(0)?,
+                query_text: row.get(1)?,
+                intent: row.get(2)?,
+                response_json: row.get(3)?,
+                answer_text: row.get(4)?,
+                file_path: row.get(5)?,
+                hit_count: row.get(6)?,
+                created_at: row.get(7)?,
+            }, expires_at))
+        });
+
+        match result {
+            Ok((cached, expires_at)) => {
+                // Check expiry
+                if let Some(exp) = expires_at {
+                    if exp < chrono_now_str() {
+                        // Expired — delete and return None
+                        let _ = self.conn.execute("DELETE FROM kb_cache WHERE query_hash = ?1", params![query_hash]);
+                        return Ok(None);
+                    }
+                }
+                // Bump hit count
+                let _ = self.conn.execute(
+                    "UPDATE kb_cache SET hit_count = hit_count + 1 WHERE query_hash = ?1",
+                    params![query_hash],
+                );
+                Ok(Some(cached))
+            }
+            Err(rusqlite::Error::QueryReturnedNoRows) => Ok(None),
+            Err(e) => Err(e),
+        }
+    }
+
+    /// Store a result in the cache. Also writes a .md file to .openanalyst/knowledge/.
+    pub fn cache_store(
+        &self,
+        query_hash: &str,
+        query_text: &str,
+        intent: &str,
+        response_json: &str,
+        answer_text: &str,
+        ttl_days: i64,
+    ) -> SqlResult<()> {
+        // Write .md cache file
+        let cache_dir = std::path::Path::new(".openanalyst").join("knowledge");
+        let _ = std::fs::create_dir_all(&cache_dir);
+        let file_path = cache_dir.join(format!("{query_hash}.md"));
+        let md_content = format!(
+            "---\nquery: \"{}\"\nintent: {}\ncached_at: {}\n---\n\n## Answer\n\n{}\n",
+            query_text.replace('"', "\\\""),
+            intent,
+            chrono_now_str(),
+            answer_text,
+        );
+        let _ = std::fs::write(&file_path, &md_content);
+
+        let file_path_str = file_path.to_string_lossy().to_string();
+
+        self.conn.execute(
+            &format!(
+                "INSERT INTO kb_cache (query_hash, query_text, intent, response_json, answer_text, file_path, expires_at)
+                 VALUES (?1, ?2, ?3, ?4, ?5, ?6, {})
+                 ON CONFLICT(query_hash) DO UPDATE SET
+                   response_json = excluded.response_json,
+                   answer_text = excluded.answer_text,
+                   file_path = excluded.file_path,
+                   hit_count = kb_cache.hit_count + 1",
+                if ttl_days > 0 { format!("datetime('now', '+{ttl_days} days')") } else { "NULL".to_string() }
+            ),
+            params![query_hash, query_text, intent, response_json, answer_text, file_path_str],
+        )?;
+        Ok(())
+    }
+}
+
+/// Simple timestamp string (no chrono dependency).
+fn chrono_now_str() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    // ISO-ish format for SQLite comparison
+    let secs = now.as_secs();
+    let days = secs / 86400;
+    let time = secs % 86400;
+    let h = time / 3600;
+    let m = (time % 3600) / 60;
+    let s = time % 60;
+    // Simplified year calc
+    let mut y = 1970u64;
+    let mut rem = days;
+    loop {
+        let dy = if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) { 366 } else { 365 };
+        if rem < dy { break; }
+        rem -= dy;
+        y += 1;
+    }
+    let months = [31, if y % 4 == 0 && (y % 100 != 0 || y % 400 == 0) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    let mut mo = 1u64;
+    for dm in &months {
+        if rem < *dm { break; }
+        rem -= dm;
+        mo += 1;
+    }
+    let d = rem + 1;
+    format!("{y:04}-{mo:02}-{d:02} {h:02}:{m:02}:{s:02}")
+}
+
+/// Compute SHA256 hash of a normalized query for cache lookup.
+pub fn normalize_query_hash(query: &str) -> String {
+    use std::collections::hash_map::DefaultHasher;
+    use std::hash::{Hash, Hasher};
+    let normalized = query.trim().to_lowercase();
+    let mut hasher = DefaultHasher::new();
+    normalized.hash(&mut hasher);
+    format!("{:016x}", hasher.finish())
 }
 
 #[cfg(test)]

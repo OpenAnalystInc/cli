@@ -596,6 +596,10 @@ pub enum SlashCommand {
     Explore {
         target: Option<String>,
     },
+    /// Submit feedback for the most recent /knowledge result.
+    Feedback {
+        text: Option<String>,
+    },
     // ── Claude Code parity ──
     Doctor,
     Login,
@@ -799,6 +803,9 @@ impl SlashCommand {
             },
             "knowledge" | "kb" => Self::Knowledge {
                 query: remainder_after_command(trimmed, command),
+            },
+            "feedback" | "fb" | "rate" => Self::Feedback {
+                text: remainder_after_command(trimmed, command),
             },
             "explore" | "repo-explore" => Self::Explore {
                 target: remainder_after_command(trimmed, command),
@@ -2159,6 +2166,7 @@ pub fn handle_slash_command(
         | SlashCommand::Dev { .. }
         | SlashCommand::Mcp { .. }
         | SlashCommand::Knowledge { .. }
+        | SlashCommand::Feedback { .. }
         | SlashCommand::Explore { .. }
         | SlashCommand::Doctor
         | SlashCommand::Login
