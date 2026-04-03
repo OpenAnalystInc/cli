@@ -1002,54 +1002,36 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
     },
     ProviderOption {
         name: "Anthropic / Claude",
-        description: "opus, sonnet, haiku — browser login",
+        description: "opus, sonnet, haiku — API key",
         env_var: "ANTHROPIC_API_KEY",
         test_url: "https://api.anthropic.com/v1/messages",
         test_header: "x-api-key",
         dashboard_url: "https://console.anthropic.com/settings/keys",
         models_url: "https://api.anthropic.com/v1/models",
-        oauth: Some(ProviderOAuthMeta {
-            client_id_env: "OPENANALYST_ANTHROPIC_CLIENT_ID",
-            default_client_id: "9d07ea41-5da3-42c2-b0e9-0e4c8108a0a2",
-            authorize_url: "https://console.anthropic.com/oauth/authorize",
-            token_url: "https://console.anthropic.com/oauth/token",
-            scopes: &["org:read", "model:read", "model:invoke"],
-            token_env_var: "ANTHROPIC_API_KEY",
-        }),
+        // Anthropic does not support third-party OAuth yet — use API key only
+        oauth: None,
     },
     ProviderOption {
         name: "OpenAI / Codex",
-        description: "gpt-4o, o3, codex-mini — browser login",
+        description: "gpt-4o, o3, codex-mini — API key",
         env_var: "OPENAI_API_KEY",
         test_url: "https://api.openai.com/v1/models",
         test_header: "bearer",
         dashboard_url: "https://platform.openai.com/api-keys",
         models_url: "https://api.openai.com/v1/models",
-        oauth: Some(ProviderOAuthMeta {
-            client_id_env: "OPENANALYST_OPENAI_CLIENT_ID",
-            default_client_id: "DKKvGJmDqMqBFganonym2PKZA",
-            authorize_url: "https://auth.openai.com/authorize",
-            token_url: "https://auth.openai.com/oauth/token",
-            scopes: &["openid", "profile", "models.read", "models.invoke"],
-            token_env_var: "OPENAI_API_KEY",
-        }),
+        // OpenAI OAuth requires registered app — use API key for now
+        oauth: None,
     },
     ProviderOption {
         name: "Google Gemini",
-        description: "gemini-2.5-pro, flash — browser login",
+        description: "gemini-2.5-pro, flash — API key",
         env_var: "GEMINI_API_KEY",
         test_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
         test_header: "bearer",
         dashboard_url: "https://aistudio.google.com/apikey",
         models_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
-        oauth: Some(ProviderOAuthMeta {
-            client_id_env: "OPENANALYST_GOOGLE_CLIENT_ID",
-            default_client_id: "openanalyst-cli.apps.googleusercontent.com",
-            authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
-            token_url: "https://oauth2.googleapis.com/token",
-            scopes: &["https://www.googleapis.com/auth/generative-language"],
-            token_env_var: "GEMINI_API_KEY",
-        }),
+        // Google OAuth requires registered Cloud Console project — use API key from AI Studio
+        oauth: None,
     },
     ProviderOption {
         name: "xAI / Grok",
@@ -1151,7 +1133,9 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
 
     loop {
         if event::poll(Duration::from_millis(100))? {
-            if let Event::Key(KeyEvent { code, modifiers, .. }) = event::read()? {
+            if let Event::Key(KeyEvent { code, modifiers, kind, .. }) = event::read()? {
+                // Only handle Press events — Windows emits Press+Release, causing double-step
+                if kind != event::KeyEventKind::Press { continue; }
                 match code {
                     KeyCode::Up if selected > 0 => {
                         selected -= 1;
@@ -1228,7 +1212,8 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
 
             loop {
                 if event::poll(Duration::from_millis(100))? {
-                    if let Event::Key(KeyEvent { code, modifiers, .. }) = event::read()? {
+                    if let Event::Key(KeyEvent { code, modifiers, kind, .. }) = event::read()? {
+                        if kind != event::KeyEventKind::Press { continue; }
                         match code {
                             KeyCode::Up if method_sel > 0 => {
                                 method_sel -= 1;
