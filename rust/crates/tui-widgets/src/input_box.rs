@@ -183,7 +183,7 @@ pub struct InputBox {
     permission_level: PermissionLevel,
     /// Right-aligned context tag (git branch, active plan, agent name).
     context_tag: Option<String>,
-    /// Model label shown above the input box (e.g., "claude-opus-4-6").
+    /// Model label shown in the right-side badges (e.g., "opus-4-6").
     model_label: Option<String>,
     /// Active agent name (from sidebar selection).
     active_agent: Option<String>,
@@ -223,6 +223,13 @@ impl InputBox {
         self
     }
 
+    /// Set the model label (displayed as right-side badge, e.g., "opus-4-6").
+    #[must_use]
+    pub fn model_label(mut self, label: Option<String>) -> Self {
+        self.model_label = label;
+        self
+    }
+
     /// Set the active agent name (displayed in title when an agent is selected).
     #[must_use]
     pub fn active_agent(mut self, name: Option<String>) -> Self {
@@ -252,6 +259,18 @@ impl InputBox {
                     Style::default()
                         .fg(Color::Black)
                         .bg(self.permission_level.accent_color())
+                        .add_modifier(Modifier::BOLD),
+                ));
+                right_spans.push(Span::styled(" ", Style::default()));
+            }
+
+            // Model label badge (like Claude Code shows the model)
+            if let Some(ref label) = self.model_label {
+                right_spans.push(Span::styled(
+                    format!(" {label} "),
+                    Style::default()
+                        .fg(Color::Indexed(252))
+                        .bg(Color::Indexed(238))
                         .add_modifier(Modifier::BOLD),
                 ));
                 right_spans.push(Span::styled(" ", Style::default()));

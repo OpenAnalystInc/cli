@@ -8,8 +8,6 @@
 //! - Per-rule deny messages
 //! - Tiered priority bands (default, extension, workspace, user, admin)
 
-use std::collections::HashMap;
-
 use regex::Regex;
 
 // ── Decision & Approval Mode ─────────────────────────────────────────────────
