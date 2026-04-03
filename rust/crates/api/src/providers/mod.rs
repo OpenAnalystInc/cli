@@ -263,6 +263,40 @@ const MODEL_REGISTRY: &[(&str, ProviderMetadata)] = &[
     }),
 ];
 
+/// Return all models whose provider has a valid API key configured.
+/// Excludes aliases (e.g., "opus" when "claude-opus-4-6" is also present).
+#[must_use]
+pub fn available_models() -> Vec<&'static str> {
+    let mut seen_providers = std::collections::HashSet::new();
+    let mut models = Vec::new();
+
+    // Collect unique auth env vars that are set
+    for (_, meta) in MODEL_REGISTRY {
+        if seen_providers.contains(&meta.auth_env) {
+            continue;
+        }
+        let has_key = match meta.provider {
+            ProviderKind::OpenAnalystApi => {
+                openanalyst_provider::has_auth_from_env_or_saved().unwrap_or(false)
+            }
+            _ => openai_compat::has_api_key(meta.auth_env),
+        };
+        if has_key {
+            seen_providers.insert(meta.auth_env);
+        }
+    }
+
+    // Short aliases to skip (keep only canonical names)
+    let aliases = ["opus", "sonnet", "haiku", "grok", "grok-mini", "openanalyst"];
+
+    for (name, meta) in MODEL_REGISTRY {
+        if seen_providers.contains(&meta.auth_env) && !aliases.contains(name) {
+            models.push(*name);
+        }
+    }
+    models
+}
+
 #[must_use]
 pub fn resolve_model_alias(model: &str) -> String {
     let trimmed = model.trim();

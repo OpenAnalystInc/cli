@@ -351,16 +351,33 @@ fn handle_sidebar_key(key: KeyEvent, app: &mut App) {
                     }
                 }
                 SidebarSection::Routing => {
-                    // Cycle model tier for the selected routing category
+                    // Cycle through available models for the selected category
                     let idx = app.sidebar_state.selected_index;
                     if let Some(cat) = ActionCategory::ALL.get(idx) {
-                        let profile = app.router.table.get_mut(*cat);
-                        profile.model_tier = profile.model_tier.next();
-                        let model = app.router.resolver.resolve(profile.model_tier).to_string();
-                        let short = crate::panels::sidebar::shorten_model_name_pub(&model);
-                        app.chat.push_system(format!(
-                            "Routing: {} → {} ({})", cat.as_str(), profile.model_tier.as_str(), short
-                        ));
+                        if let Some(new_model) = app.sidebar_state.cycle_routing_model(idx) {
+                            // Update the resolver to use this model for the category's tier
+                            let profile = app.router.table.get_mut(*cat);
+                            // Classify the new model to set the right tier
+                            profile.model_tier = orchestrator::router::classify_model(&new_model);
+                            // Update the resolver's slot for this tier
+                            match profile.model_tier {
+                                orchestrator::router::ModelTier::Fast => {
+                                    app.router.resolver.fast_model = new_model.clone();
+                                }
+                                orchestrator::router::ModelTier::Balanced => {
+                                    app.router.resolver.balanced_model = new_model.clone();
+                                }
+                                orchestrator::router::ModelTier::Capable => {
+                                    app.router.resolver.capable_model = new_model.clone();
+                                }
+                            }
+                            let short = crate::panels::sidebar::shorten_model_name_pub(&new_model);
+                            app.chat.push_system(format!(
+                                "Routing: {} → {}", cat.as_str(), short
+                            ));
+                        } else {
+                            app.chat.push_system("No models available. Set an API key first.".to_string());
+                        }
                     }
                 }
                 _ => {
