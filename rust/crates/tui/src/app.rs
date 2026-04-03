@@ -207,7 +207,7 @@ impl App {
                     "path": path,
                     "description": description,
                 })),
-                ChatMessage::Banner { .. } => None,
+                ChatMessage::Banner { .. } | ChatMessage::InlineStatus { .. } => None,
             })
             .collect();
 
@@ -518,10 +518,17 @@ impl App {
             }
             UiEvent::StreamEnd { agent_id } => {
                 self.chat.finish_assistant();
-                self.status_bar.phase = AgentPhase::Done;
+                self.status_bar.phase = AgentPhase::Idle;
                 self.is_streaming = false;
+                // Inject inline status at end of response (like Claude Code)
                 if let Some(start) = self.turn_start.take() {
-                    self.status_bar.elapsed = start.elapsed();
+                    let elapsed = start.elapsed();
+                    self.status_bar.elapsed = elapsed;
+                    let time_str = format_duration_short(&elapsed);
+                    let token_str = format_tokens_short(self.status_bar.total_tokens);
+                    self.chat.push_inline_status(format!(
+                        "✓ Done ({time_str} · ↓ {token_str} tokens)"
+                    ), false);
                 }
                 // Update background task matching this agent
                 if let Some(bt) = self.sidebar_state.background_tasks.iter_mut().find(|bt| bt.id == agent_id && bt.status == BackgroundTaskStatus::Running) {
@@ -663,7 +670,15 @@ impl App {
                 self.chat.finish_assistant();
                 self.is_streaming = false;
                 self.chat.push_system(format!("Error: {error}"));
-                // Show Error briefly, then reset to Idle so status bar returns to "Ready"
+                // Inject inline error status at end of response
+                if let Some(start) = self.turn_start.take() {
+                    let elapsed = start.elapsed();
+                    self.status_bar.elapsed = elapsed;
+                    let time_str = format_duration_short(&elapsed);
+                    self.chat.push_inline_status(format!(
+                        "✗ Error ({time_str} · ↓ {} tokens)", format_tokens_short(self.status_bar.total_tokens)
+                    ), true);
+                }
                 self.status_bar.phase = AgentPhase::Idle;
                 // Update background task matching this agent
                 if let Some(bt) = self.sidebar_state.background_tasks.iter_mut().find(|bt| bt.id == agent_id && bt.status == BackgroundTaskStatus::Running) {
@@ -840,6 +855,20 @@ fn build_status_hints(is_streaming: bool, scroll_mode: bool, sidebar_visible: bo
         hints.push("F2:sidebar");
     }
     hints.join(" · ")
+}
+
+/// Format duration as short string for inline status.
+fn format_duration_short(d: &Duration) -> String {
+    let secs = d.as_secs();
+    if secs < 60 { format!("{secs}s") }
+    else { format!("{}m {:02}s", secs / 60, secs % 60) }
+}
+
+/// Format token count as short string.
+fn format_tokens_short(tokens: u64) -> String {
+    if tokens < 1_000 { format!("{tokens}") }
+    else if tokens < 1_000_000 { format!("{:.1}k", tokens as f64 / 1_000.0) }
+    else { format!("{:.1}M", tokens as f64 / 1_000_000.0) }
 }
 
 /// Generate a unique session ID based on timestamp.

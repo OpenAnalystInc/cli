@@ -193,7 +193,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                     ChatMessage::Assistant { markdown, .. } => markdown.raw(),
                     ChatMessage::ToolCall { card } => card.input_preview.as_str(),
                     ChatMessage::FileOutput { description, .. } => description.as_str(),
-                    ChatMessage::Banner { .. } => "",
+                    ChatMessage::Banner { .. } | ChatMessage::InlineStatus { .. } => "",
                 }).collect::<Vec<_>>().join("\n")
             );
 
@@ -1555,7 +1555,7 @@ fn export_session(messages: &[crate::panels::chat::ChatMessage], dest: &str) -> 
                 md.push_str(&format!("### File Output\n\n{description}\nPath: {path}\n\n---\n\n"));
                 count += 1;
             }
-            ChatMessage::Banner { .. } => {} // Skip banner in export
+            ChatMessage::Banner { .. } | ChatMessage::InlineStatus { .. } => {} // Skip visual-only
         }
     }
     match std::fs::write(dest, &md) {
