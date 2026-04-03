@@ -83,18 +83,23 @@ impl Banner {
             ])
         };
 
-        // ── Row: Welcome | Tips header ──
-        let welcome = format!("   Welcome back, {}!", self.info.display_name);
+        // ── Blank spacer after top border ──
+        lines.push(brow("", dim, "", dim));
+
+        // ── Row: Welcome (centered) | Tips header ──
+        let welcome_text = format!("Welcome back, {}!", self.info.display_name);
+        let welcome_pad = left_w.saturating_sub(welcome_text.len()) / 2;
+        let welcome = format!("{}{}", " ".repeat(welcome_pad), welcome_text);
         lines.push(brow(&welcome, white_bold, " Tips for getting started", green));
 
-        // ── Original OA block logo in orange ──
+        // ── OA block logo centered in orange (5 rows) ──
         let logo: [&str; 6] = [
-            "   ████████   ████  ",
-            "   ██    ██  ██  ██ ",
-            "   ██    ██  ██  ██ ",
-            "   ██    ██  ██████ ",
-            "   ██    ██  ██  ██ ",
-            "   ████████  ██  ██ ",
+            "                            ",
+            "       ████████   ████      ",
+            "       ██    ██  ██  ██     ",
+            "       ██    ██  ██████     ",
+            "       ██    ██  ██  ██     ",
+            "       ████████  ██  ██     ",
         ];
 
         let tip_lines: [(&str, Style); 6] = [
