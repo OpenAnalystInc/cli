@@ -10,8 +10,10 @@
 //! are custom widgets.
 
 pub mod agent_card;
+pub mod feedback_dialog;
 pub mod file_tree;
 pub mod input_box;
+pub mod knowledge_card;
 pub mod markdown;
 pub mod permission_dialog;
 pub mod spinner;
@@ -19,8 +21,10 @@ pub mod status_bar;
 pub mod tool_card;
 
 pub use agent_card::AgentStatusCard;
+pub use feedback_dialog::FeedbackDialog;
 pub use file_tree::FileTree;
 pub use input_box::{InputBox, InputBoxState, InputMode, PermissionLevel};
+pub use knowledge_card::{KnowledgeCard, KnowledgeTab, KbResultEntry};
 pub use markdown::MarkdownStream;
 pub use permission_dialog::PermissionDialog;
 pub use spinner::OaSpinner;

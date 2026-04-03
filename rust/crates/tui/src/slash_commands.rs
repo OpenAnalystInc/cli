@@ -193,7 +193,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                     ChatMessage::Assistant { markdown, .. } => markdown.raw(),
                     ChatMessage::ToolCall { card } => card.input_preview.as_str(),
                     ChatMessage::FileOutput { description, .. } => description.as_str(),
-                    ChatMessage::Banner { .. } | ChatMessage::InlineStatus { .. } => "",
+                    ChatMessage::KnowledgeResult { .. } | ChatMessage::Banner { .. } | ChatMessage::InlineStatus { .. } => "",
                 }).collect::<Vec<_>>().join("\n")
             );
 
@@ -545,20 +545,91 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
         // ── Knowledge & Exploration ──
         SlashCommand::Knowledge { query } => {
             if let Some(q) = query {
-                app.chat.push_system(format!("[>] Searching knowledge base: {q}..."));
+                app.chat.push_user(format!("/knowledge {q}"));
                 app.status_bar.phase = tui_widgets::status_bar::AgentPhase::Thinking;
+                app.is_streaming = true;
+                app.turn_start = Some(std::time::Instant::now());
 
+                // Step 1: Local cache check — show as ToolCallCard
+                let query_hash = orchestrator::knowledge::normalize_query_hash(&q);
+                let cache_hit = if let Ok(db) = orchestrator::knowledge::LearningDb::open() {
+                    db.cache_lookup(&query_hash).ok().flatten()
+                } else {
+                    None
+                };
+
+                if let Some(cached) = cache_hit {
+                    // Cache hit — render immediately
+                    app.chat.push_tool_call(tui_widgets::ToolCallCard {
+                        tool_name: "KB: Local Cache".to_string(),
+                        input_preview: "Checking local knowledge...".to_string(),
+                        status: tui_widgets::ToolCallStatus::Completed { duration: std::time::Duration::from_millis(1) },
+                        output: Some("Cache hit — serving from local knowledge.".to_string()),
+                        diff: None,
+                        expanded: false,
+                    });
+                    // Parse cached response_json into KnowledgeResult
+                    if let Ok(response) = serde_json::from_str::<serde_json::Value>(&cached.response_json) {
+                        let sub_questions = parse_sub_questions_from_json(&response);
+                        let answer = response.get("answer")
+                            .and_then(|a| a.get("text"))
+                            .and_then(|t| t.as_str())
+                            .map(|s| s.to_string());
+                        let latency_ms = response.get("latency_ms")
+                            .and_then(|l| l.as_u64())
+                            .unwrap_or(0);
+                        let query_id = response.get("query_id")
+                            .and_then(|q| q.as_i64())
+                            .unwrap_or(0);
+                        let intent = cached.intent.clone();
+
+                        app.handle_ui_event(events::UiEvent::KnowledgeResult {
+                            query_id,
+                            query: q,
+                            intent,
+                            sub_questions,
+                            answer,
+                            latency_ms,
+                            from_cache: true,
+                        });
+                    }
+                    return true;
+                }
+
+                // Cache miss
+                app.chat.push_tool_call(tui_widgets::ToolCallCard {
+                    tool_name: "KB: Local Cache".to_string(),
+                    input_preview: "Checking local knowledge...".to_string(),
+                    status: tui_widgets::ToolCallStatus::Completed { duration: std::time::Duration::from_millis(2) },
+                    output: Some("Not in local cache.".to_string()),
+                    diff: None,
+                    expanded: false,
+                });
+
+                // Step 2: Intent classification (fast, inline)
+                let intent = orchestrator::knowledge::IntentClassifier::classify(&q);
+                let complexity = if intent == orchestrator::knowledge::Intent::Factual
+                    && q.split_whitespace().count() <= 6
+                {
+                    "simple"
+                } else {
+                    "complex"
+                };
+                app.chat.push_system(format!(
+                    "Intent: {} | Complexity: {complexity}",
+                    intent.label()
+                ));
+
+                // Step 3: API fetch — show progress ToolCallCard
                 let api_key = std::env::var("OPENANALYST_API_KEY")
                     .or_else(|_| std::env::var("OA_API_KEY"))
                     .unwrap_or_default();
 
                 if api_key.is_empty() {
                     app.chat.push_system(
-                        "[!] OPENANALYST_API_KEY not set.\n\
-                         Set your key to access the knowledge base:\n\
-                           export OPENANALYST_API_KEY=oa_...\n\
-                         Falling back to AI-only answer...".to_string()
+                        "[!] OPENANALYST_API_KEY not set — falling back to AI-only answer.".to_string()
                     );
+                    app.is_streaming = false;
                     let prompt = format!(
                         "Answer this query as an expert consultant. Be specific, actionable, \
                          and practical with concrete steps:\n\n{q}"
@@ -570,25 +641,119 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                 let kb_endpoint = std::env::var("OPENANALYST_KB_URL")
                     .unwrap_or_else(|_| "http://44.200.9.142:8420/v1/knowledge/query".to_string());
 
+                app.chat.push_tool_call(tui_widgets::ToolCallCard {
+                    tool_name: "KB: Knowledge Graph".to_string(),
+                    input_preview: "Finding relevant expert strategies...".to_string(),
+                    status: tui_widgets::ToolCallStatus::Running { elapsed: std::time::Duration::ZERO },
+                    output: None,
+                    diff: None,
+                    expanded: false,
+                });
+                app.sidebar_state.tool_call_count += 1;
+
                 let query_clone = q.clone();
-                let tx = app.action_tx.clone();
+                let query_hash_clone = query_hash.clone();
+                let intent_label = intent.label().to_string();
+                let complexity_str = complexity.to_string();
+                let session_id = app.session_id.clone();
+                let ui_tx = app.action_tx.clone();
                 tokio::spawn(async move {
-                    let result = kb_fetch(&kb_endpoint, &api_key, &query_clone).await;
-                    let prompt = match result {
-                        Ok(body) => format!(
-                            "The user asked: \"{query_clone}\"\n\n\
-                             The knowledge base returned these results:\n\
-                             ```json\n{body}\n```\n\n\
-                             Synthesize a comprehensive, actionable answer from these results. \
-                             Include source citations [1], [2] etc. Be specific and practical."
-                        ),
-                        Err(_) => format!(
-                            "Answer this query as an expert consultant. Be specific, actionable, \
-                             and practical with concrete steps:\n\n{query_clone}"
-                        ),
-                    };
-                    if tx.send(events::Action::SubmitPrompt { text: prompt, effort_budget: None, model_override: None }).await.is_err() {
-                        eprintln!("[tui] orchestrator channel closed");
+                    let result = kb_agentic_fetch(
+                        &kb_endpoint, &api_key, &query_clone,
+                        &intent_label, &complexity_str, &session_id,
+                    ).await;
+
+                    match result {
+                        Ok(response_json) => {
+                            // Parse the AgenticResponse
+                            let response: serde_json::Value = serde_json::from_str(&response_json)
+                                .unwrap_or_default();
+                            let sub_questions = parse_sub_questions_from_json(&response);
+                            let answer = response.get("answer")
+                                .and_then(|a| a.get("text"))
+                                .and_then(|t| t.as_str())
+                                .map(|s| s.to_string());
+                            let latency_ms = response.get("latency_ms")
+                                .and_then(|l| l.as_u64())
+                                .unwrap_or(0);
+                            let query_id = response.get("query_id")
+                                .and_then(|q| q.as_i64())
+                                .unwrap_or(0);
+                            let intent_val = response.get("intent")
+                                .and_then(|i| i.as_str())
+                                .unwrap_or(&intent_label)
+                                .to_string();
+
+                            // Step 4: Cache locally
+                            if let Ok(db) = orchestrator::knowledge::LearningDb::open() {
+                                let _ = db.cache_store(
+                                    &query_hash_clone,
+                                    &query_clone,
+                                    &intent_val,
+                                    &response_json,
+                                    answer.as_deref().unwrap_or(""),
+                                    7, // TTL days
+                                );
+                                // Record query in local LearningDb
+                                let intent_enum = orchestrator::knowledge::Intent::from_label(&intent_val);
+                                let _ = db.record_query(
+                                    &query_clone,
+                                    intent_enum,
+                                    sub_questions.iter().map(|sq| sq.results.len() as i32).sum(),
+                                    answer.as_deref().unwrap_or(""),
+                                    "",
+                                );
+                            }
+
+                            // Send structured result to TUI
+                            // We reuse SubmitPrompt channel but encode as a special JSON
+                            // that app.handle_ui_event can pick up
+                            let _ = ui_tx.send(events::Action::SubmitPrompt {
+                                text: format!(
+                                    "__KB_RESULT__{}",
+                                    serde_json::json!({
+                                        "query_id": query_id,
+                                        "query": query_clone,
+                                        "intent": intent_val,
+                                        "sub_questions": sub_questions.iter().map(|sq| {
+                                            serde_json::json!({
+                                                "sub_question": sq.sub_question,
+                                                "intent": sq.intent,
+                                                "results": sq.results.iter().map(|r| {
+                                                    serde_json::json!({
+                                                        "chunk_id": r.chunk_id,
+                                                        "text": r.text,
+                                                        "snippet": r.snippet,
+                                                        "score": r.score,
+                                                        "category_label": r.category_label,
+                                                        "content_type": r.content_type,
+                                                        "citation_label": r.citation_label,
+                                                        "has_timestamps": r.has_timestamps,
+                                                        "graph_expanded": r.graph_expanded,
+                                                    })
+                                                }).collect::<Vec<_>>(),
+                                            })
+                                        }).collect::<Vec<_>>(),
+                                        "answer": answer,
+                                        "latency_ms": latency_ms,
+                                        "from_cache": false,
+                                    })
+                                ),
+                                effort_budget: None,
+                                model_override: None,
+                            }).await;
+                        }
+                        Err(_e) => {
+                            // Fallback to AI-only answer
+                            let _ = ui_tx.send(events::Action::SubmitPrompt {
+                                text: format!(
+                                    "Answer this query as an expert consultant. \
+                                     Be specific, actionable, and practical:\n\n{query_clone}"
+                                ),
+                                effort_budget: None,
+                                model_override: None,
+                            }).await;
+                        }
                     }
                 });
             } else {
@@ -599,6 +764,52 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                      Searches the hosted knowledge base for expert strategies,\n\
                      course insights, and actionable guidance.\n\n\
                      Requires OPENANALYST_API_KEY environment variable.".to_string()
+                );
+            }
+        }
+        SlashCommand::Feedback { text } => {
+            if let Some(correction_text) = text {
+                // Find the most recent KnowledgeResult in chat for query_id
+                let query_id = app.chat.messages.iter().rev()
+                    .find_map(|m| match m {
+                        ChatMessage::KnowledgeResult { card } => Some(card.query_id),
+                        _ => None,
+                    });
+
+                if let Some(qid) = query_id {
+                    // Record locally in LearningDb
+                    if let Ok(db) = orchestrator::knowledge::LearningDb::open() {
+                        let _ = db.record_feedback(
+                            qid,
+                            orchestrator::knowledge::db::FeedbackRating::Corrected,
+                            &correction_text,
+                            &correction_text,
+                        );
+                    }
+                    // Send to server via action channel
+                    let tx = app.action_tx.clone();
+                    let comment = correction_text.clone();
+                    let correction = correction_text;
+                    tokio::spawn(async move {
+                        let _ = tx.send(events::Action::KnowledgeFeedback {
+                            query_id: qid,
+                            rating: "corrected".to_string(),
+                            comment,
+                            correction,
+                        }).await;
+                    });
+                    app.chat.push_system("Feedback recorded. Thank you!".to_string());
+                } else {
+                    app.chat.push_system(
+                        "No recent knowledge query to attach feedback to.\n\
+                         Run /knowledge <query> first.".to_string()
+                    );
+                }
+            } else {
+                app.chat.push_system(
+                    "Usage: /feedback <your correction or comment>\n\
+                     Attaches feedback to the most recent /knowledge result.\n\
+                     Use 👍/👎 inline buttons for quick ratings.".to_string()
                 );
             }
         }
@@ -1555,7 +1766,7 @@ fn export_session(messages: &[crate::panels::chat::ChatMessage], dest: &str) -> 
                 md.push_str(&format!("### File Output\n\n{description}\nPath: {path}\n\n---\n\n"));
                 count += 1;
             }
-            ChatMessage::Banner { .. } | ChatMessage::InlineStatus { .. } => {} // Skip visual-only
+            ChatMessage::KnowledgeResult { .. } | ChatMessage::Banner { .. } | ChatMessage::InlineStatus { .. } => {} // Skip visual-only
         }
     }
     match std::fs::write(dest, &md) {
@@ -1722,38 +1933,6 @@ fn truncate(s: &str, max: usize) -> String {
     }
 }
 
-/// Fetch knowledge base results from the hosted API.
-async fn kb_fetch(endpoint: &str, api_key: &str, query: &str) -> Result<String, String> {
-    let client = reqwest::Client::builder()
-        .timeout(std::time::Duration::from_secs(60))
-        .build()
-        .map_err(|e| format!("HTTP client error: {e}"))?;
-
-    let payload = serde_json::json!({
-        "query": query,
-        "mode": "progressive",
-        "max_results": 10,
-        "synthesize": false
-    });
-
-    let resp = client
-        .post(endpoint)
-        .header("Authorization", format!("Bearer {api_key}"))
-        .header("Content-Type", "application/json")
-        .json(&payload)
-        .send()
-        .await
-        .map_err(|e| format!("Request failed: {e}"))?;
-
-    let status = resp.status();
-    let body = resp.text().await.map_err(|e| format!("Read body failed: {e}"))?;
-
-    if status.is_success() {
-        Ok(body)
-    } else {
-        Err(format!("HTTP {status}: {body}"))
-    }
-}
 
 /// Auto-compact with thrash loop protection.
 /// If compaction runs 3+ times without the count dropping below threshold,
@@ -2330,4 +2509,72 @@ fn hooks_test(event: Option<&str>) -> String {
     }
 
     out
+}
+
+/// Fetch from the AgenticRAG server with intent and complexity hints.
+async fn kb_agentic_fetch(
+    endpoint: &str,
+    api_key: &str,
+    query: &str,
+    intent_hint: &str,
+    complexity_hint: &str,
+    session_id: &str,
+) -> Result<String, String> {
+    let client = reqwest::Client::new();
+    let body = serde_json::json!({
+        "query": query,
+        "mode": "agentic",
+        "max_results": 10,
+        "synthesize": true,
+        "intent_hint": intent_hint,
+        "complexity_hint": complexity_hint,
+        "session_id": session_id,
+    });
+    let response = client
+        .post(endpoint)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .await
+        .map_err(|e| format!("KB request failed: {e}"))?;
+
+    if !response.status().is_success() {
+        let status = response.status();
+        let text = response.text().await.unwrap_or_default();
+        return Err(format!("KB returned {status}: {text}"));
+    }
+
+    response.text().await.map_err(|e| format!("KB response read failed: {e}"))
+}
+
+/// Parse sub-question results from an AgenticResponse JSON value.
+pub fn parse_sub_questions_from_json(response: &serde_json::Value) -> Vec<events::SubQuestionResult> {
+    let empty_vec = vec![];
+    let sqs = response.get("sub_questions")
+        .and_then(|v| v.as_array())
+        .unwrap_or(&empty_vec);
+
+    sqs.iter().map(|sq| {
+        let results_arr = sq.get("results")
+            .and_then(|v| v.as_array())
+            .cloned()
+            .unwrap_or_default();
+
+        events::SubQuestionResult {
+            sub_question: sq.get("sub_question").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+            intent: sq.get("intent").and_then(|v| v.as_str()).unwrap_or("general").to_string(),
+            results: results_arr.iter().map(|r| events::KbChunkResult {
+                chunk_id: r.get("chunk_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                text: r.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                snippet: r.get("snippet").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                score: r.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                category_label: r.get("category_label").and_then(|v| v.as_str()).unwrap_or("Reference").to_string(),
+                content_type: r.get("content_type").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                citation_label: r.get("citation_label").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                has_timestamps: r.get("has_timestamps").and_then(|v| v.as_bool()).unwrap_or(false),
+                graph_expanded: r.get("graph_expanded").and_then(|v| v.as_bool()).unwrap_or(false),
+            }).collect(),
+        }
+    }).collect()
 }

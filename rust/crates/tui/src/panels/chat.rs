@@ -7,7 +7,7 @@ use ratatui::text::{Line, Span, Text};
 use ratatui::widgets::{Paragraph, Widget, Wrap};
 
 use events::DiffLine;
-use tui_widgets::{MarkdownStream, ToolCallCard};
+use tui_widgets::{KnowledgeCard, MarkdownStream, ToolCallCard};
 
 /// Type of file output from multimedia commands.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -65,6 +65,8 @@ pub enum ChatMessage {
         file_type: FileType,
         description: String,
     },
+    /// Knowledge base result card with tabs and abstracted sources.
+    KnowledgeResult { card: KnowledgeCard },
 }
 
 /// The main chat panel state.
@@ -159,6 +161,14 @@ impl ChatPanel {
             }
         }
         self.messages.push(ChatMessage::InlineStatus { text, is_error });
+        if self.auto_scroll {
+            self.scroll_to_bottom();
+        }
+    }
+
+    /// Add a knowledge base result card.
+    pub fn push_knowledge_result(&mut self, card: KnowledgeCard) {
+        self.messages.push(ChatMessage::KnowledgeResult { card });
         if self.auto_scroll {
             self.scroll_to_bottom();
         }
@@ -319,6 +329,72 @@ impl ChatPanel {
                                 .fg(Color::Blue)
                                 .add_modifier(Modifier::UNDERLINED),
                         ),
+                    ]));
+                    all_lines.push(Line::from(""));
+                }
+                ChatMessage::KnowledgeResult { card } => {
+                    // Render KnowledgeCard inline — collapsed or expanded
+                    let title_color = if card.expanded { Color::Cyan } else { Color::Indexed(245) };
+                    let latency_str = if card.latency_ms < 1000 {
+                        format!("{}ms", card.latency_ms)
+                    } else {
+                        format!("{:.1}s", card.latency_ms as f64 / 1000.0)
+                    };
+                    let cache_tag = if card.from_cache { " ⚡cached" } else { "" };
+                    let expand_icon = if card.expanded { "▾" } else { "▸" };
+
+                    all_lines.push(Line::from(vec![
+                        Span::styled("╭─ ", Style::default().fg(title_color)),
+                        Span::styled("✦ KB", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                        Span::styled(format!(" ── {} ── {latency_str}{cache_tag} {expand_icon} ", card.intent),
+                            Style::default().fg(title_color)),
+                    ]));
+
+                    if card.expanded {
+                        // Show results summary
+                        let result_count: usize = card.tabs.iter().map(|t| t.results.len()).sum();
+                        all_lines.push(Line::from(vec![
+                            Span::styled("│ ", Style::default().fg(title_color)),
+                            Span::styled(format!("{result_count} results · {} sub-queries", card.tabs.len()),
+                                Style::default().fg(Color::Indexed(252))),
+                        ]));
+
+                        // Active tab results (first few)
+                        if let Some(tab) = card.tabs.get(card.active_tab) {
+                            for entry in tab.results.iter().take(5) {
+                                let graph = if entry.graph_expanded { " ⇔" } else { "" };
+                                all_lines.push(Line::from(vec![
+                                    Span::styled("│ ", Style::default().fg(title_color)),
+                                    Span::styled(&entry.citation_label,
+                                        Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                                    Span::styled(format!("{graph} "), Style::default().fg(Color::Indexed(240))),
+                                ]));
+                                let snippet: String = entry.snippet.chars().take(80).collect();
+                                all_lines.push(Line::from(vec![
+                                    Span::styled("│   ", Style::default().fg(title_color)),
+                                    Span::styled(snippet, Style::default().fg(Color::Indexed(245))),
+                                ]));
+                            }
+                        }
+
+                        // Synthesized answer preview
+                        if let Some(ref answer) = card.answer {
+                            all_lines.push(Line::from(vec![
+                                Span::styled("│ ", Style::default().fg(title_color)),
+                                Span::styled("── Answer ──", Style::default().fg(Color::Green).add_modifier(Modifier::BOLD)),
+                            ]));
+                            for line in answer.lines().take(15) {
+                                let truncated: String = line.chars().take((area.width as usize).saturating_sub(4)).collect();
+                                all_lines.push(Line::from(vec![
+                                    Span::styled("│ ", Style::default().fg(title_color)),
+                                    Span::raw(truncated),
+                                ]));
+                            }
+                        }
+                    }
+
+                    all_lines.push(Line::from(vec![
+                        Span::styled("╰─────", Style::default().fg(title_color)),
                     ]));
                     all_lines.push(Line::from(""));
                 }

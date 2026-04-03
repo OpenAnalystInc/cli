@@ -258,10 +258,36 @@ fn handle_scroll_mode_key(key: KeyEvent, app: &mut App) {
         }
         KeyCode::Enter => {
             if let Some(idx) = app.chat.focused_message {
-                if let Some(ChatMessage::ToolCall { card }) = app.chat.messages.get_mut(idx) {
-                    card.toggle_expand();
+                match app.chat.messages.get_mut(idx) {
+                    Some(ChatMessage::ToolCall { card }) => card.toggle_expand(),
+                    Some(ChatMessage::KnowledgeResult { card }) => card.toggle_expand(),
+                    _ => {}
                 }
             }
+        }
+        // Tab → cycle KnowledgeCard tabs (when focused on one)
+        KeyCode::Tab => {
+            if let Some(idx) = app.chat.focused_message {
+                if let Some(ChatMessage::KnowledgeResult { card }) = app.chat.messages.get_mut(idx) {
+                    card.next_tab();
+                }
+            }
+        }
+        // Shift+Tab → previous KnowledgeCard tab
+        KeyCode::BackTab => {
+            if let Some(idx) = app.chat.focused_message {
+                if let Some(ChatMessage::KnowledgeResult { card }) = app.chat.messages.get_mut(idx) {
+                    card.prev_tab();
+                }
+            }
+        }
+        // y → positive feedback for most recent KnowledgeResult
+        KeyCode::Char('y') => {
+            submit_kb_feedback(app, "positive");
+        }
+        // n → negative feedback for most recent KnowledgeResult
+        KeyCode::Char('n') => {
+            submit_kb_feedback(app, "negative");
         }
         KeyCode::Char('/') => {
             app.scroll_mode = false;
@@ -388,6 +414,7 @@ fn handle_sidebar_key(key: KeyEvent, app: &mut App) {
         // Esc/i → return focus to input
         KeyCode::Esc | KeyCode::Char('i') => {
             app.focus = events::PanelId::Input;
+            app.sidebar_state.has_focus = false;
         }
         _ => {}
     }
@@ -417,5 +444,52 @@ fn handle_permission_dialog_key(key: KeyEvent, app: &mut App) {
             }
             _ => {}
         }
+    }
+}
+
+/// Submit KB feedback (positive/negative) for the most recent KnowledgeResult.
+fn submit_kb_feedback(app: &mut App, rating: &str) {
+    // Find the most recent KnowledgeResult that hasn't been rated
+    let query_id = app.chat.messages.iter().rev()
+        .find_map(|m| match m {
+            ChatMessage::KnowledgeResult { card } if !card.feedback_submitted => Some(card.query_id),
+            _ => None,
+        });
+
+    if let Some(qid) = query_id {
+        // Mark as submitted
+        for msg in app.chat.messages.iter_mut().rev() {
+            if let ChatMessage::KnowledgeResult { card } = msg {
+                if card.query_id == qid {
+                    card.feedback_submitted = true;
+                    break;
+                }
+            }
+        }
+
+        // Record locally
+        if let Ok(db) = orchestrator::knowledge::LearningDb::open() {
+            let fb_rating = if rating == "positive" {
+                orchestrator::knowledge::db::FeedbackRating::Positive
+            } else {
+                orchestrator::knowledge::db::FeedbackRating::Negative
+            };
+            let _ = db.record_feedback(qid, fb_rating, "", "");
+        }
+
+        // Send to server
+        let tx = app.action_tx.clone();
+        let rating_owned = rating.to_string();
+        tokio::spawn(async move {
+            let _ = tx.send(events::Action::KnowledgeFeedback {
+                query_id: qid,
+                rating: rating_owned,
+                comment: String::new(),
+                correction: String::new(),
+            }).await;
+        });
+
+        let emoji = if rating == "positive" { "👍" } else { "👎" };
+        app.chat.push_system(format!("{emoji} Feedback recorded. Thank you!"));
     }
 }

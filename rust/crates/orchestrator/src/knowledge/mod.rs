@@ -18,6 +18,6 @@ pub mod db;
 pub mod intent;
 pub mod expert;
 
-pub use db::LearningDb;
+pub use db::{CachedResult, LearningDb, normalize_query_hash};
 pub use intent::{Intent, IntentClassifier};
 pub use expert::{ExpertRouter, KnowledgeExpert};
