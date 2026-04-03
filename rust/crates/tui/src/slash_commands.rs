@@ -638,8 +638,10 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                     return true;
                 }
 
+                // Default: localhost:8000 via SSH tunnel to Lambda A100
+                // Override with OPENANALYST_KB_URL for direct access or custom deployment
                 let kb_endpoint = std::env::var("OPENANALYST_KB_URL")
-                    .unwrap_or_else(|_| "http://150.136.113.177:8000/v1/knowledge/query".to_string());
+                    .unwrap_or_else(|_| "http://localhost:8000/v1/knowledge/query".to_string());
 
                 app.chat.push_tool_call(tui_widgets::ToolCallCard {
                     tool_name: "KB: Knowledge Graph".to_string(),
