@@ -47,7 +47,6 @@ impl SlashSuggestions {
                     spec.name.starts_with(&filter_lower)
                         || spec.aliases.iter().any(|a| a.starts_with(&filter_lower))
                 })
-                .take(10) // max 10 suggestions
                 .collect();
             self.active = !self.items.is_empty();
             // Clamp selection
@@ -94,12 +93,15 @@ impl SlashSuggestions {
     }
 
     /// Render the autocomplete popup above the input area.
+    /// Supports scrolling — shows a window of up to 12 visible items.
     pub fn render(&self, input_area: Rect, buf: &mut Buffer) {
         if !self.active || self.items.is_empty() {
             return;
         }
 
-        let popup_height = (self.items.len() as u16 + 2).min(12); // +2 for borders
+        let max_visible: usize = 12;
+        let visible_count = self.items.len().min(max_visible);
+        let popup_height = (visible_count as u16 + 2).min(14); // +2 for borders
         let popup_width = input_area.width.min(70);
         let popup_x = input_area.x;
         let popup_y = input_area.y.saturating_sub(popup_height);
@@ -109,25 +111,44 @@ impl SlashSuggestions {
         // Clear background
         Clear.render(popup_area, buf);
 
+        // Build title with scroll indicator
+        let title_text = if self.items.len() > max_visible {
+            format!(" Commands ({}/{}) ", self.selected + 1, self.items.len())
+        } else {
+            " Commands ".to_string()
+        };
+
         let block = Block::default()
             .borders(Borders::ALL)
             .border_type(BorderType::Rounded)
             .border_style(Style::default().fg(Color::Rgb(50, 130, 255)))
             .title(Line::from(Span::styled(
-                " Commands ",
+                title_text,
                 Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD),
             )));
 
         let inner = block.inner(popup_area);
         block.render(popup_area, buf);
 
-        let max_name_w = self.items.iter().map(|s| s.name.len()).max().unwrap_or(10);
-
-        let lines: Vec<Line<'_>> = self.items
+        // Calculate visible window (scroll so selected item is always visible)
+        let scroll_offset = if self.selected >= max_visible {
+            self.selected - max_visible + 1
+        } else {
+            0
+        };
+        let visible_items: Vec<(usize, &&SlashCommandSpec)> = self.items
             .iter()
             .enumerate()
+            .skip(scroll_offset)
+            .take(max_visible)
+            .collect();
+
+        let max_name_w = visible_items.iter().map(|(_, s)| s.name.len()).max().unwrap_or(10);
+
+        let lines: Vec<Line<'_>> = visible_items
+            .iter()
             .map(|(i, spec)| {
-                let is_selected = i == self.selected;
+                let is_selected = *i == self.selected;
                 let name_pad = max_name_w + 2 - spec.name.len();
 
                 let name_style = if is_selected {

@@ -10,6 +10,7 @@ pub mod agent;
 pub mod autonomous;
 pub mod context;
 pub mod knowledge;
+pub mod loop_detection;
 pub mod moe;
 pub mod registry;
 pub mod router;
@@ -37,6 +38,8 @@ pub struct OrchestratorConfig {
     pub allowed_tools: Option<BTreeSet<String>>,
     pub cwd: PathBuf,
     pub system_prompt: Vec<String>,
+    /// Maximum turns per agent before forced stop (loop detection safety net).
+    pub max_turns: Option<u32>,
 }
 
 /// The main orchestrator that manages all agents and routes events.

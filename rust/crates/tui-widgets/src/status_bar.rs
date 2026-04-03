@@ -72,6 +72,8 @@ pub struct StatusBar {
     pub model_name: String,
     /// Right-aligned keybinding hints (e.g., "Esc:scroll · Ctrl+C:quit").
     pub hints: String,
+    /// Animated spinner color (cycles through brand colors).
+    pub spinner_color: Option<Color>,
 }
 
 impl Default for StatusBar {
@@ -82,6 +84,7 @@ impl Default for StatusBar {
             total_tokens: 0,
             model_name: String::new(),
             hints: String::new(),
+            spinner_color: None,
         }
     }
 }
@@ -111,7 +114,12 @@ impl StatusBar {
 
 impl Widget for StatusBar {
     fn render(self, area: Rect, buf: &mut Buffer) {
-        let phase_color = self.phase.color();
+        // Use animated spinner color when active, otherwise use phase color
+        let phase_color = match (&self.phase, self.spinner_color) {
+            (AgentPhase::Thinking | AgentPhase::ReadingFile(_) | AgentPhase::EditingFile(_)
+            | AgentPhase::RunningBash | AgentPhase::Searching, Some(c)) => c,
+            _ => self.phase.color(),
+        };
         let icon = self.phase.icon();
         let label = self.phase.label();
         let time_str = Self::format_duration(&self.elapsed);

@@ -83,12 +83,15 @@ pub struct App {
 
     // Voice input state
     pub voice: crate::voice::VoiceState,
+
+    // Session persistence — unique ID for this session
+    pub session_id: String,
 }
 
 impl App {
     /// Create a new App with smart per-action routing based on the user's model.
     pub fn new(ui_rx: UiEventRx, action_tx: ActionTx, default_model: &str) -> Self {
-        Self {
+        let mut app = Self {
             chat: ChatPanel::default(),
             status_bar: StatusBar::default(),
             input_state: InputBoxState::default(),
@@ -115,7 +118,11 @@ impl App {
             suggestions: SlashSuggestions::default(),
             history: InputHistory::default(),
             voice: crate::voice::VoiceState::default(),
-        }
+            session_id: generate_session_id(),
+        };
+        // Discover project files on startup for sidebar
+        app.sidebar_state.discover_project_files();
+        app
     }
 
     /// Set banner info and inject the banner into the chat.
@@ -123,17 +130,7 @@ impl App {
         if !self.banner_shown {
             let banner = Banner::new(info.clone());
             let lines = banner.to_lines();
-            let banner_text = lines
-                .iter()
-                .map(|l| {
-                    l.spans
-                        .iter()
-                        .map(|s| s.content.to_string())
-                        .collect::<String>()
-                })
-                .collect::<Vec<_>>()
-                .join("\n");
-            self.chat.push_system(banner_text);
+            self.chat.push_banner(lines);
             self.banner_shown = true;
         }
         self.banner_info = Some(info);
@@ -141,42 +138,31 @@ impl App {
 
     /// Check for recent sessions and offer to resume on startup.
     pub fn check_resume_on_startup(&mut self) {
-        let sessions_dir = std::path::Path::new(".openanalyst").join("sessions");
-        if !sessions_dir.exists() {
+        let latest = std::path::Path::new(".openanalyst").join("sessions").join("session-latest.json");
+        if !latest.exists() {
             return;
         }
-        let mut entries: Vec<_> = std::fs::read_dir(&sessions_dir)
-            .ok()
-            .into_iter()
-            .flatten()
-            .filter_map(|e| e.ok())
-            .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
-            .collect();
-        if entries.is_empty() {
+        let size = std::fs::metadata(&latest).map(|m| m.len()).unwrap_or(0);
+        if size == 0 {
             return;
         }
-        // Sort by modified time (newest first)
-        entries.sort_by(|a, b| {
-            b.metadata()
-                .and_then(|m| m.modified())
-                .ok()
-                .cmp(&a.metadata().and_then(|m| m.modified()).ok())
-        });
-        let newest = &entries[0];
-        let name = newest.file_name();
-        let size = newest.metadata().map(|m| m.len()).unwrap_or(0);
-        if size > 0 {
-            self.chat.push_system(format!(
-                "Recent session available: {} ({:.1} KB)\n\
-                 Type /resume {} to continue, or start a new conversation.",
-                name.to_string_lossy(),
-                size as f64 / 1024.0,
-                name.to_string_lossy()
-            ));
-        }
+
+        // Read metadata from the latest session (v3 fields)
+        let content = std::fs::read_to_string(&latest).unwrap_or_default();
+        let v: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
+        let model = v.get("model").and_then(|m| m.as_str()).unwrap_or("default");
+        let timestamp = v.get("timestamp").and_then(|t| t.as_str()).unwrap_or("unknown");
+        let msg_count = v.get("messages").and_then(|m| m.as_array()).map(|a| a.len()).unwrap_or(0);
+
+        self.chat.push_system(format!(
+            "Recent session available: {msg_count} messages ({:.1} KB)\n\
+             Model: {model} | Saved: {timestamp}\n\
+             Type /resume session-latest.json to continue, or start a new conversation.",
+            size as f64 / 1024.0,
+        ));
     }
 
-    /// Auto-save current session to disk.
+    /// Auto-save current session to disk (v3 format with full metadata).
     pub fn auto_save_session(&self) {
         if self.chat.messages.is_empty() {
             return;
@@ -184,8 +170,6 @@ impl App {
         let sessions_dir = std::path::Path::new(".openanalyst").join("sessions");
         let _ = std::fs::create_dir_all(&sessions_dir);
 
-        // Use a stable filename based on the startup time
-        let path = sessions_dir.join("session-latest.json");
         let messages: Vec<serde_json::Value> = self
             .chat
             .messages
@@ -222,17 +206,38 @@ impl App {
                     "path": path,
                     "description": description,
                 })),
+                ChatMessage::Banner { .. } => None,
             })
             .collect();
 
+        // v3: full metadata for context preservation on resume
+        let now = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default();
+        let timestamp = format_timestamp(now.as_secs());
+
         let session = serde_json::json!({
-            "version": 2,
+            "version": 3,
+            "session_id": self.session_id,
+            "timestamp": timestamp,
+            "model": self.status_bar.model_name,
+            "permission_mode": self.permission_mode,
+            "cwd": std::env::current_dir().map(|p| p.to_string_lossy().to_string()).unwrap_or_default(),
             "messages": messages,
             "tokens": self.status_bar.total_tokens,
         });
 
         match serde_json::to_string_pretty(&session) {
-            Ok(json) => { let _ = std::fs::write(&path, json); }
+            Ok(json) => {
+                // Write timestamped file
+                let ts_path = sessions_dir.join(format!("{}.json", &self.session_id));
+                let _ = std::fs::write(&ts_path, &json);
+                // Write session-latest.json as a copy (no symlinks — Windows compat)
+                let latest_path = sessions_dir.join("session-latest.json");
+                let _ = std::fs::write(&latest_path, &json);
+                // Prune old sessions (keep latest 20)
+                prune_old_sessions(&sessions_dir, 20);
+            }
             Err(e) => {
                 eprintln!("[auto_save_session] Failed to serialize session: {e}");
             }
@@ -355,6 +360,32 @@ impl App {
         // Ignore empty or whitespace-only input
         if text.trim().is_empty() {
             return;
+        }
+
+        // Intercept common control words — execute locally without calling AI
+        let lower = text.trim().to_ascii_lowercase();
+        match lower.as_str() {
+            "exit" | "quit" | "q" => {
+                self.chat.push_user(text);
+                self.chat.push_system("Saving session and exiting...".to_string());
+                self.should_quit = true;
+                return;
+            }
+            "clear" => {
+                self.chat.messages.clear();
+                self.chat.scroll_offset = 0;
+                self.chat.focused_message = None;
+                self.status_bar.total_tokens = 0;
+                self.chat.push_system("Session cleared.".to_string());
+                return;
+            }
+            "help" => {
+                self.chat.push_user(text);
+                let help = commands::render_slash_command_help();
+                self.chat.push_system(help);
+                return;
+            }
+            _ => {}
         }
 
         // Record in history
@@ -662,6 +693,35 @@ impl App {
         self.handle_ui_event(UiEvent::Tick);
     }
 
+    /// Get the context tag for the input area (git branch, active agent, etc.).
+    fn get_context_tag(&self) -> Option<String> {
+        // Priority 1: Active agent name
+        if let Some(agent) = self.sidebar_state.agents.iter().find(|a| {
+            a.status == events::AgentStatus::Running
+        }) {
+            return Some(format!("{}", agent.agent_type));
+        }
+
+        // Priority 2: Git branch name (cached per render — fast enough for TUI)
+        static CACHED_BRANCH: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+        let branch = CACHED_BRANCH.get_or_init(|| {
+            std::process::Command::new("git")
+                .args(["branch", "--show-current"])
+                .output()
+                .ok()
+                .and_then(|o| {
+                    if o.status.success() {
+                        let s = String::from_utf8_lossy(&o.stdout).trim().to_string();
+                        if s.is_empty() { None } else { Some(s) }
+                    } else {
+                        None
+                    }
+                })
+        });
+
+        branch.clone()
+    }
+
     /// Determine the current input mode based on app state.
     fn current_input_mode(&self) -> tui_widgets::InputMode {
         if self.is_streaming {
@@ -697,8 +757,9 @@ impl App {
         let input_height = self.input_state.line_count();
         let layout = compute_layout(area, self.sidebar_visible, input_height);
 
-        // Chat panel
-        self.chat.render(layout.chat, buf);
+        // Chat panel — with focus-aware border
+        let chat_focused = self.focus == PanelId::Chat || self.scroll_mode;
+        self.chat.render_with_focus(layout.chat, buf, chat_focused);
 
         // Sidebar (if visible)
         if let Some(sidebar_area) = layout.sidebar {
@@ -716,10 +777,11 @@ impl App {
             );
         }
 
-        // Status line (full width, with hints)
+        // Status line (full width, with hints + animated spinner color)
         let hints = build_status_hints(self.is_streaming, self.scroll_mode, self.sidebar_visible);
         let mut status = self.status_bar.clone();
         status.hints = hints;
+        status.spinner_color = if self.is_streaming { Some(self.spinner_state.current_color()) } else { None };
         status.render(layout.status, buf);
 
         // Input box — voice mode or normal
@@ -737,7 +799,8 @@ impl App {
             Paragraph::new(voice_lines).render(inner, buf);
         } else {
             let input_mode = self.current_input_mode();
-            let input = InputBox::default().mode(input_mode);
+            let context_tag = self.get_context_tag();
+            let input = InputBox::default().mode(input_mode).context_tag(context_tag);
             input.render_with_state(layout.input, buf, &mut self.input_state);
         }
 
@@ -774,6 +837,75 @@ fn build_status_hints(is_streaming: bool, scroll_mode: bool, sidebar_visible: bo
         hints.push("Ctrl+B:sidebar");
     }
     hints.join(" · ")
+}
+
+/// Generate a unique session ID based on timestamp.
+fn generate_session_id() -> String {
+    let now = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default();
+    format_timestamp(now.as_secs()).replace([' ', ':'], "-").replace(',', "")
+}
+
+/// Format a Unix timestamp into "YYYY-MM-DD HH:MM:SS" (UTC-like, no TZ dependency).
+fn format_timestamp(epoch_secs: u64) -> String {
+    // Simple epoch → date conversion without chrono dependency
+    let secs_per_day: u64 = 86400;
+    let days = epoch_secs / secs_per_day;
+    let time_of_day = epoch_secs % secs_per_day;
+    let hours = time_of_day / 3600;
+    let minutes = (time_of_day % 3600) / 60;
+    let seconds = time_of_day % 60;
+
+    // Days since epoch to Y-M-D (simplified Gregorian)
+    let mut y = 1970u64;
+    let mut remaining_days = days;
+    loop {
+        let days_in_year = if is_leap_year(y) { 366 } else { 365 };
+        if remaining_days < days_in_year { break; }
+        remaining_days -= days_in_year;
+        y += 1;
+    }
+    let mut m = 1u64;
+    let days_in_months: [u64; 12] = [31, if is_leap_year(y) { 29 } else { 28 }, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+    for dim in &days_in_months {
+        if remaining_days < *dim { break; }
+        remaining_days -= dim;
+        m += 1;
+    }
+    let d = remaining_days + 1;
+
+    format!("{y:04}-{m:02}-{d:02} {hours:02}:{minutes:02}:{seconds:02}")
+}
+
+fn is_leap_year(y: u64) -> bool {
+    (y % 4 == 0 && y % 100 != 0) || y % 400 == 0
+}
+
+/// Prune old session files, keeping the most recent `keep` timestamped sessions.
+fn prune_old_sessions(dir: &std::path::Path, keep: usize) {
+    let mut entries: Vec<_> = std::fs::read_dir(dir)
+        .into_iter()
+        .flatten()
+        .filter_map(|e| e.ok())
+        .filter(|e| {
+            let name = e.file_name();
+            let s = name.to_string_lossy();
+            s.ends_with(".json") && s != "session-latest.json"
+        })
+        .collect();
+    if entries.len() <= keep {
+        return;
+    }
+    // Sort oldest first by modified time
+    entries.sort_by(|a, b| {
+        a.metadata().and_then(|m| m.modified()).ok()
+            .cmp(&b.metadata().and_then(|m| m.modified()).ok())
+    });
+    // Delete oldest beyond keep limit
+    for entry in entries.iter().take(entries.len() - keep) {
+        let _ = std::fs::remove_file(entry.path());
+    }
 }
 
 /// UTF-8 safe string truncation for display.

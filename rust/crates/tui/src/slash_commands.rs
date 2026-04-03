@@ -193,6 +193,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                     ChatMessage::Assistant { markdown, .. } => markdown.raw(),
                     ChatMessage::ToolCall { card } => card.input_preview.as_str(),
                     ChatMessage::FileOutput { description, .. } => description.as_str(),
+                    ChatMessage::Banner { .. } => "",
                 }).collect::<Vec<_>>().join("\n")
             );
 
@@ -1014,6 +1015,32 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system(output);
         }
 
+        SlashCommand::Trust { action } => {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let msg = match action.as_deref() {
+                Some("add") | Some("enable") => {
+                    match runtime::trust_folder(&cwd) {
+                        Ok(()) => format!("Workspace trusted: {}\nHooks and skills are now enabled.", cwd.display()),
+                        Err(e) => format!("Failed to trust workspace: {e}"),
+                    }
+                }
+                Some("remove") | Some("disable") => {
+                    match runtime::untrust_folder(&cwd) {
+                        Ok(()) => format!("Workspace untrusted: {}\nHooks and skills are now disabled.", cwd.display()),
+                        Err(e) => format!("Failed to untrust workspace: {e}"),
+                    }
+                }
+                _ => {
+                    let info = runtime::discover_trust(&cwd);
+                    format!(
+                        "Workspace trust: {:?}\nReason: {}\nPath: {}\n\nUsage: /trust add | /trust remove",
+                        info.level, info.reason, info.workspace_root.display()
+                    )
+                }
+            };
+            app.chat.push_system(msg);
+        }
+
         SlashCommand::Unknown(name) => {
             app.chat.push_system(format!("Unknown command: /{name}. Type /help for available commands."));
         }
@@ -1290,27 +1317,78 @@ fn list_sessions() -> String {
         .into_iter()
         .flatten()
         .filter_map(|e| e.ok())
-        .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+        .filter(|e| {
+            let s = e.file_name().to_string_lossy().to_string();
+            s.ends_with(".json") && s != "session-latest.json"
+        })
         .collect();
     if entries.is_empty() {
-        return "No saved sessions found.".to_string();
+        return "No saved sessions found.\nSessions are auto-saved when you exit.".to_string();
     }
     // Sort by modified time (newest first)
     entries.sort_by(|a, b| {
         b.metadata().and_then(|m| m.modified()).ok()
             .cmp(&a.metadata().and_then(|m| m.modified()).ok())
     });
-    let mut out = format!("Sessions ({}):\n\n", entries.len());
-    for (i, entry) in entries.iter().take(20).enumerate() {
-        let name = entry.file_name();
+
+    let current_cwd = std::env::current_dir()
+        .map(|p| p.to_string_lossy().to_lowercase())
+        .unwrap_or_default();
+
+    let mut this_project = Vec::new();
+    let mut other_projects = Vec::new();
+
+    for entry in entries.iter().take(50) {
+        let name = entry.file_name().to_string_lossy().to_string();
         let size = entry.metadata().map(|m| m.len()).unwrap_or(0);
-        out.push_str(&format!("  {}. {} ({:.1} KB)\n", i + 1, name.to_string_lossy(), size as f64 / 1024.0));
+        let (model, cwd, timestamp) = read_session_metadata(&entry.path());
+        let is_this_project = cwd.to_lowercase() == current_cwd;
+
+        let info = format!(
+            "  {} ({:.1} KB) [{}] {}",
+            name,
+            size as f64 / 1024.0,
+            if model.is_empty() { "default" } else { &model },
+            timestamp,
+        );
+
+        if is_this_project || cwd.is_empty() {
+            this_project.push(info);
+        } else {
+            other_projects.push((cwd, info));
+        }
     }
-    if entries.len() > 20 {
-        out.push_str(&format!("  ...and {} more\n", entries.len() - 20));
+
+    let mut out = String::new();
+    if !this_project.is_empty() {
+        out.push_str(&format!("This project ({} sessions):\n", this_project.len()));
+        for (i, s) in this_project.iter().enumerate() {
+            out.push_str(&format!("  {}. {s}\n", i + 1));
+        }
+    }
+    if !other_projects.is_empty() {
+        out.push_str(&format!("\nOther projects ({}):\n", other_projects.len()));
+        for (i, (cwd, s)) in other_projects.iter().take(10).enumerate() {
+            let short_cwd = cwd.rsplit(['/', '\\']).next().unwrap_or(cwd);
+            out.push_str(&format!("  {}. [{short_cwd}] {s}\n", i + 1));
+        }
+    }
+    if out.is_empty() {
+        return "No saved sessions found.".to_string();
     }
     out.push_str("\nUse /session switch <filename> or /resume <path> to load.");
     out
+}
+
+/// Read only top-level metadata from a session file (fast — no message parsing).
+fn read_session_metadata(path: &std::path::Path) -> (String, String, String) {
+    let content = std::fs::read_to_string(path).unwrap_or_default();
+    // Quick parse — only read first ~500 chars for metadata (avoid parsing huge message arrays)
+    let v: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
+    let model = v.get("model").and_then(|m| m.as_str()).unwrap_or("").to_string();
+    let cwd = v.get("cwd").and_then(|c| c.as_str()).unwrap_or("").to_string();
+    let ts = v.get("timestamp").and_then(|t| t.as_str()).unwrap_or("").to_string();
+    (model, cwd, ts)
 }
 
 /// /resume and /session switch — load a session JSON into the chat.
@@ -1364,6 +1442,39 @@ fn load_session_into_chat(app: &mut crate::app::App, path: &str) -> Result<usize
     if let Some(tokens) = session.get("tokens").and_then(|t| t.as_u64()) {
         app.status_bar.total_tokens = tokens;
     }
+
+    // v3: Restore model if saved
+    if let Some(model) = session.get("model").and_then(|m| m.as_str()) {
+        if !model.is_empty() {
+            app.status_bar.model_name = model.to_string();
+            app.router = orchestrator::router::ModelRouter::from_default_model(model);
+            let tx = app.action_tx.clone();
+            let m = model.to_string();
+            tokio::spawn(async move {
+                let _ = tx.send(Action::UpdateModel(m)).await;
+            });
+        }
+    }
+
+    // v3: Restore permission mode if saved
+    if let Some(perm) = session.get("permission_mode").and_then(|p| p.as_str()) {
+        if !perm.is_empty() {
+            app.permission_mode = perm.to_string();
+            let tx = app.action_tx.clone();
+            let m = perm.to_string();
+            tokio::spawn(async move {
+                let _ = tx.send(Action::UpdatePermissions(m)).await;
+            });
+        }
+    }
+
+    // Add system message confirming the resumed context
+    let saved_ts = session.get("timestamp").and_then(|t| t.as_str()).unwrap_or("unknown");
+    let model_display = session.get("model").and_then(|m| m.as_str()).unwrap_or("default");
+    let perm_display = session.get("permission_mode").and_then(|p| p.as_str()).unwrap_or("default");
+    app.chat.push_system(format!(
+        "Session resumed from {saved_ts}\nModel: {model_display} | Permissions: {perm_display} | Messages: {count}"
+    ));
 
     Ok(count)
 }
@@ -1444,6 +1555,7 @@ fn export_session(messages: &[crate::panels::chat::ChatMessage], dest: &str) -> 
                 md.push_str(&format!("### File Output\n\n{description}\nPath: {path}\n\n---\n\n"));
                 count += 1;
             }
+            ChatMessage::Banner { .. } => {} // Skip banner in export
         }
     }
     match std::fs::write(dest, &md) {
@@ -1503,6 +1615,30 @@ fn run_doctor() -> String {
     let git_ok = std::process::Command::new("git").args(["rev-parse", "--git-dir"]).output()
         .is_ok_and(|o| o.status.success());
     out.push_str(&format!("  {} Git repository\n", if git_ok { "\u{2713}" } else { "\u{2717}" }));
+
+    // IDE detection
+    out.push_str("\n── IDE ──\n\n");
+    let ide = runtime::detect_ide();
+    out.push_str(&format!("  Detected: {}\n", ide.display_name()));
+    out.push_str(&format!("  LSP support: {}\n", if ide.supports_lsp() { "yes" } else { "no" }));
+
+    // Folder trust
+    out.push_str("\n── Workspace Trust ──\n\n");
+    let cwd = std::env::current_dir().unwrap_or_default();
+    let trust = runtime::discover_trust(&cwd);
+    let trust_icon = match trust.level {
+        runtime::TrustLevel::Trusted => "\u{2713}",
+        runtime::TrustLevel::Untrusted => "\u{26A0}",
+        runtime::TrustLevel::Blocked => "\u{2717}",
+    };
+    out.push_str(&format!("  {trust_icon} {:?} — {}\n", trust.level, trust.reason));
+
+    // Policy engine
+    out.push_str("\n── Policy ──\n\n");
+    let workspace_rules = runtime::load_workspace_policy(&cwd);
+    let user_rules = runtime::load_user_policy();
+    out.push_str(&format!("  Workspace rules: {} (from .openanalyst/policy.toml)\n", workspace_rules.len()));
+    out.push_str(&format!("  User rules: {} (from ~/.openanalyst/policy.toml)\n", user_rules.len()));
 
     out
 }

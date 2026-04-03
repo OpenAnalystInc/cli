@@ -22,3 +22,5 @@ Thumbs.db
 # Upstream Claude Code artifacts (if running alongside)
 .claude/settings.local.json
 .claude/sessions/
+node_modules/
+package-lock.json

@@ -55,6 +55,8 @@ pub enum ChatMessage {
     ToolCall { card: ToolCallCard },
     /// System notice (e.g., "Agent spawned").
     System { text: String },
+    /// Styled banner (preserves colors from banner widget).
+    Banner { lines: Vec<Line<'static>> },
     /// File output from multimedia commands (/image, /speak, /diagram).
     FileOutput {
         path: String,
@@ -131,6 +133,14 @@ impl ChatPanel {
         }
     }
 
+    /// Add a styled banner (preserves colors).
+    pub fn push_banner(&mut self, lines: Vec<Line<'static>>) {
+        self.messages.push(ChatMessage::Banner { lines });
+        if self.auto_scroll {
+            self.scroll_to_bottom();
+        }
+    }
+
     /// Add a file output message from multimedia commands.
     pub fn push_file_output(&mut self, path: String, file_type: FileType, description: String) {
         self.messages.push(ChatMessage::FileOutput {
@@ -159,6 +169,28 @@ impl ChatPanel {
         self.scroll_offset = self.scroll_offset.saturating_add(n);
     }
 
+    /// Render the chat panel with focus-aware border.
+    pub fn render_with_focus(&self, area: Rect, buf: &mut Buffer, has_focus: bool) {
+        use ratatui::widgets::{Block, Borders, BorderType};
+
+        if has_focus {
+            // Draw a thin left border to indicate focus
+            let block = Block::default()
+                .borders(Borders::LEFT)
+                .border_type(BorderType::Plain)
+                .border_style(Style::default().fg(Color::Yellow))
+                .title(Line::from(vec![
+                    Span::styled(" SCROLL ", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+                    Span::styled("j/k:nav  Enter:expand  Esc:back ", Style::default().fg(Color::Indexed(240))),
+                ]));
+            let inner = block.inner(area);
+            block.render(area, buf);
+            self.render(inner, buf);
+        } else {
+            self.render(area, buf);
+        }
+    }
+
     /// Render the chat panel.
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
         let mut all_lines: Vec<Line<'_>> = Vec::new();
@@ -169,27 +201,90 @@ impl ChatPanel {
             match msg {
                 ChatMessage::User { text } => {
                     all_lines.push(Line::from(""));
+                    let focus_indicator = if is_focused { "▸ " } else { "  " };
+                    let bg = if is_focused { Color::Indexed(236) } else { Color::Reset };
                     all_lines.push(Line::from(vec![
-                        Span::styled("❯ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
-                        Span::styled(text.as_str(), Style::default().fg(Color::White)),
+                        Span::styled(focus_indicator, Style::default().fg(Color::Yellow).bg(bg)),
+                        Span::styled("❯ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD).bg(bg)),
+                        Span::styled(text.as_str(), Style::default().fg(Color::White).bg(bg)),
                     ]));
                     all_lines.push(Line::from(""));
                 }
-                ChatMessage::Assistant { markdown, .. } => {
+                ChatMessage::Assistant { markdown, streaming } => {
+                    // Status dot: blinking white while streaming, solid green when done
+                    let dot_color = if *streaming {
+                        // Blink: alternate between white and dark based on time
+                        let blink = (std::time::SystemTime::now()
+                            .duration_since(std::time::UNIX_EPOCH)
+                            .unwrap_or_default()
+                            .as_millis() / 500) % 2 == 0;
+                        if blink { Color::White } else { Color::Indexed(240) }
+                    } else {
+                        Color::Green
+                    };
+                    let dot = "● ";
+                    if is_focused {
+                        all_lines.push(Line::from(Span::styled(
+                            "▎ ─── response ───",
+                            Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD),
+                        )));
+                    }
+                    // First line gets the status dot
                     let text = markdown.to_text();
-                    all_lines.extend(text.lines);
+                    let mut first = true;
+                    for line in text.lines {
+                        if first {
+                            let mut spans = vec![Span::styled(dot, Style::default().fg(dot_color))];
+                            spans.extend(line.spans);
+                            all_lines.push(Line::from(spans));
+                            first = false;
+                        } else {
+                            all_lines.push(line);
+                        }
+                    }
+                    if is_focused {
+                        all_lines.push(Line::from(Span::styled(
+                            "▎ ──────────────",
+                            Style::default().fg(Color::Yellow),
+                        )));
+                    }
                     all_lines.push(Line::from(""));
                 }
                 ChatMessage::ToolCall { card } => {
                     render_tool_card_lines(card, is_focused, &mut all_lines);
                 }
                 ChatMessage::System { text } => {
+                    let bg = if is_focused { Color::Indexed(236) } else { Color::Reset };
+                    let fg = if is_focused { Color::Indexed(252) } else { Color::DarkGray };
+                    // Detect error messages for red dot, otherwise white dot
+                    let is_error = text.starts_with("Error") || text.starts_with("error")
+                        || text.contains("failed") || text.contains("Failed")
+                        || text.starts_with("[Agent") && text.contains("Error");
+                    let (dot, dot_color) = if is_error {
+                        ("● ", Color::Red)
+                    } else {
+                        ("● ", Color::Indexed(252)) // white dot
+                    };
+                    let focus_prefix = if is_focused { "▸ " } else { "" };
+                    let mut first = true;
                     for line in text.lines() {
-                        all_lines.push(Line::from(Span::styled(
-                            line.to_string(),
-                            Style::default().fg(Color::DarkGray),
-                        )));
+                        if first {
+                            all_lines.push(Line::from(vec![
+                                Span::styled(focus_prefix, Style::default().fg(Color::Yellow).bg(bg)),
+                                Span::styled(dot, Style::default().fg(dot_color).bg(bg)),
+                                Span::styled(line.to_string(), Style::default().fg(fg).bg(bg)),
+                            ]));
+                            first = false;
+                        } else {
+                            all_lines.push(Line::from(Span::styled(
+                                format!("  {line}"),
+                                Style::default().fg(fg).bg(bg),
+                            )));
+                        }
                     }
+                }
+                ChatMessage::Banner { lines } => {
+                    all_lines.extend(lines.iter().cloned());
                 }
                 ChatMessage::FileOutput {
                     path,
@@ -252,12 +347,19 @@ impl ChatPanel {
 /// green added lines, red removed lines, line numbers, and a summary.
 fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: &mut Vec<Line<'a>>) {
     let status_icon = match &card.status {
-        tui_widgets::ToolCallStatus::Running { .. } => "⠋",
-        tui_widgets::ToolCallStatus::Completed { .. } => "✓",
-        tui_widgets::ToolCallStatus::Failed { .. } => "✗",
+        tui_widgets::ToolCallStatus::Running { .. } => "●",
+        tui_widgets::ToolCallStatus::Completed { .. } => "●",
+        tui_widgets::ToolCallStatus::Failed { .. } => "●",
     };
     let status_color = match &card.status {
-        tui_widgets::ToolCallStatus::Running { .. } => Color::Blue,
+        tui_widgets::ToolCallStatus::Running { .. } => {
+            // Blinking white dot while running
+            let blink = (std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .unwrap_or_default()
+                .as_millis() / 500) % 2 == 0;
+            if blink { Color::White } else { Color::Indexed(240) }
+        }
         tui_widgets::ToolCallStatus::Completed { .. } => Color::Green,
         tui_widgets::ToolCallStatus::Failed { .. } => Color::Red,
     };

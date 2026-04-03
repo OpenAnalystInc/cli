@@ -52,7 +52,7 @@ impl Banner {
         // Column widths
         let left_w: usize = 40;
         let right_w: usize = 38;
-        let total_inner = left_w + 1 + right_w; // +1 for middle │
+        let _total_inner = left_w + 1 + right_w; // +1 for middle │
 
         let mut lines = Vec::new();
 

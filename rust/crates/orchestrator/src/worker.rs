@@ -15,6 +15,7 @@ use tokio::sync::Mutex;
 
 use api::{InputContentBlock, InputMessage, ToolResultContentBlock};
 
+use crate::loop_detection::LoopDetectionService;
 use crate::registry::AgentRegistry;
 use crate::OrchestratorConfig;
 
@@ -99,6 +100,11 @@ fn run_turn_blocking(
         .build()
         .map_err(|e| e.to_string())?;
 
+    // Loop detection service — prevents infinite agent loops
+    let loop_detector = std::sync::Arc::new(std::sync::Mutex::new(
+        LoopDetectionService::new(config.max_turns.unwrap_or(200))
+    ));
+
     // Create channel-based implementations
     let api_client = ChannelApiClient {
         agent_id: agent_id.clone(),
@@ -109,6 +115,7 @@ fn run_turn_blocking(
         tool_registry: tool_registry.clone(),
         ui_tx: ui_tx.clone(),
         effort_budget,
+        loop_detector: loop_detector.clone(),
     };
 
     let tool_executor = ChannelToolExecutor {
@@ -116,6 +123,7 @@ fn run_turn_blocking(
         tool_registry,
         ui_tx: ui_tx.clone(),
         mcp_connections,
+        loop_detector,
     };
 
     let permission_policy = runtime::PermissionPolicy::new(config.permission_mode);
@@ -159,6 +167,7 @@ struct ChannelApiClient {
     tool_registry: tools::GlobalToolRegistry,
     ui_tx: UiEventTx,
     effort_budget: Option<u32>,
+    loop_detector: std::sync::Arc<std::sync::Mutex<LoopDetectionService>>,
 }
 
 impl ApiClient for ChannelApiClient {
@@ -330,10 +339,24 @@ struct ChannelToolExecutor {
     tool_registry: tools::GlobalToolRegistry,
     ui_tx: UiEventTx,
     mcp_connections: Vec<runtime::mcp_bridge::McpConnection>,
+    loop_detector: std::sync::Arc<std::sync::Mutex<LoopDetectionService>>,
 }
 
 impl ToolExecutor for ChannelToolExecutor {
     fn execute(&mut self, tool_name: &str, input: &str) -> Result<String, ToolError> {
+        // Loop detection: check for repeated identical tool calls
+        {
+            if let Ok(mut detector) = self.loop_detector.lock() {
+                let result = detector.check_tool_call(tool_name, input);
+                if result.is_loop() {
+                    let detail = result.detail.unwrap_or_else(|| "Infinite loop detected".to_string());
+                    return Err(ToolError::new(format!(
+                        "Loop detected — aborting to prevent infinite execution. {detail}"
+                    )));
+                }
+            }
+        }
+
         let start = Instant::now();
 
         let input_value: serde_json::Value =
@@ -368,6 +391,12 @@ impl ToolExecutor for ChannelToolExecutor {
             Ok(output) => (output.clone(), false),
             Err(err) => (err.clone(), true),
         };
+
+        // Output masking: redact secrets before they reach the LLM or UI
+        if runtime::output_masking::likely_contains_secrets(&output) {
+            let (masked, _stats) = runtime::output_masking::mask_tool_output(&output);
+            output = masked.into_owned();
+        }
 
         if is_file_tool && !is_error {
             if let (Some(path), Some(before)) = (&file_path, mtime_before) {
