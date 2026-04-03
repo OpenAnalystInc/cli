@@ -28,3 +28,4 @@ Thumbs.db
 .claude/sessions/
 node_modules/
 package-lock.json
+kb_response.json
