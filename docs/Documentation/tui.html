@@ -47,7 +47,7 @@
       <div class="page-header">
         <span class="badge">Core Concepts</span>
         <h1>Terminal UI (TUI)</h1>
-        <p class="subtitle">A full-screen, interactive terminal interface built with Ratatui &mdash; the default experience for OpenAnalyst CLI.</p>
+        <p class="subtitle">A full-screen, interactive terminal interface &mdash; the default experience for OpenAnalyst CLI.</p>
       </div>
 
       <h2 id="overview">Overview</h2>
@@ -73,8 +73,8 @@ openanalyst --no-tui</code></pre>
       <div class="feature-card">
         <div class="icon">&#128196;</div>
         <div class="content">
-          <h4>Sidebar</h4>
-          <p>Toggleable panel showing file tree, background task status, and file actions (preview, edit, delete). Toggle with <code>/sidebar</code> or the keybinding.</p>
+          <h4>Sidebar (5 Sections)</h4>
+          <p>Interactive right panel with 5 navigable sections: <strong>Agents</strong> (running &amp; available project agents), <strong>Files</strong> (touched files with read/edit/create indicators), <strong>Plans</strong> (plan status tracking), <strong>Routing</strong> (per-category model selection from all configured providers), and <strong>Activity</strong> (token usage, tool calls, elapsed time, permission mode). Navigate with <kbd>Tab</kbd> to focus, <kbd>j/k</kbd> to select, <kbd>Enter</kbd> to activate.</p>
         </div>
       </div>
 
@@ -90,7 +90,7 @@ openanalyst --no-tui</code></pre>
         <div class="icon">&#9000;</div>
         <div class="content">
           <h4>Input Box</h4>
-          <p>Text input with vim-mode support (via edtui), slash command autocomplete, and input history navigation with up/down arrows.</p>
+          <p>Text input with vim-mode support (via edtui), slash command autocomplete, and input history navigation. Right-side badges show: <strong>permission mode</strong> (when not Default), <strong>active agent</strong> (purple badge), and <strong>git branch</strong> (blue badge). Border color changes with permission level.</p>
         </div>
       </div>
 
@@ -113,31 +113,61 @@ openanalyst --no-tui</code></pre>
 
       <h2 id="keybindings">Keybindings</h2>
 
-      <h3>General</h3>
+      <h3>Global (from any mode)</h3>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>Enter</kbd></td><td>Send message (insert mode)</td></tr>
-          <tr><td><kbd>Ctrl+C</kbd></td><td>Cancel generation / exit</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Normal mode (vim) / close dialog</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Send message</td></tr>
+          <tr><td><kbd>Shift+Enter</kbd></td><td>Newline in input</td></tr>
+          <tr><td><kbd>Ctrl+C</kbd></td><td>Cancel running agent (1st press) / Quit (2nd press)</td></tr>
+          <tr><td><kbd>Ctrl+P</kbd></td><td>Cycle permission mode: Default &rarr; Plan &rarr; Accept Edits &rarr; Danger</td></tr>
+          <tr><td><kbd>Ctrl+B</kbd></td><td>Run current input as background task</td></tr>
+          <tr><td><kbd>Ctrl+L</kbd></td><td>Clear chat</td></tr>
+          <tr><td><kbd>Ctrl+S</kbd></td><td>Submit (always, regardless of mode)</td></tr>
           <tr><td><kbd>Up</kbd> / <kbd>Down</kbd></td><td>Input history navigation</td></tr>
-          <tr><td><kbd>Scroll</kbd></td><td>Mouse scroll through chat</td></tr>
+          <tr><td><kbd>PageUp</kbd> / <kbd>PageDown</kbd></td><td>Scroll chat (works from any mode)</td></tr>
+          <tr><td><kbd>Ctrl+Home</kbd> / <kbd>Ctrl+End</kbd></td><td>Jump to top / bottom of chat</td></tr>
+          <tr><td><kbd>Mouse wheel</kbd></td><td>Scroll chat or sidebar (position-aware)</td></tr>
+          <tr><td><kbd>Space</kbd></td><td>Start voice recording (when input empty)</td></tr>
         </tbody>
       </table>
 
-      <h3>Vim Mode</h3>
-      <p>Enable with <code>/vim</code>. Full vim-style navigation in the input box:</p>
+      <h3>Sidebar Navigation</h3>
       <table>
         <thead><tr><th>Key</th><th>Action</th></tr></thead>
         <tbody>
-          <tr><td><kbd>h</kbd><kbd>j</kbd><kbd>k</kbd><kbd>l</kbd></td><td>Cursor movement</td></tr>
-          <tr><td><kbd>i</kbd></td><td>Enter insert mode</td></tr>
-          <tr><td><kbd>Esc</kbd></td><td>Return to normal mode</td></tr>
-          <tr><td><kbd>g</kbd><kbd>g</kbd></td><td>Scroll to top of chat</td></tr>
-          <tr><td><kbd>G</kbd></td><td>Scroll to bottom of chat</td></tr>
-          <tr><td><kbd>d</kbd><kbd>d</kbd></td><td>Delete line</td></tr>
-          <tr><td><kbd>y</kbd><kbd>y</kbd></td><td>Yank (copy) line</td></tr>
-          <tr><td><kbd>p</kbd></td><td>Paste</td></tr>
+          <tr><td><kbd>Tab</kbd></td><td>Focus sidebar (from input) / Cycle section (when in sidebar)</td></tr>
+          <tr><td><kbd>Shift+Tab</kbd></td><td>Focus sidebar / Previous section</td></tr>
+          <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>Navigate items within section</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Select agent / Cycle model in Routing / Expand file or plan</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Return to input</td></tr>
+          <tr><td><kbd>F2</kbd></td><td>Show+focus / Focus / Hide sidebar (smart toggle)</td></tr>
+          <tr><td><kbd>Ctrl+\</kbd></td><td>Toggle sidebar visibility</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Scroll Mode (vim-like)</h3>
+      <p>Press <kbd>Esc</kbd> from input to enter scroll mode:</p>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>j</kbd> / <kbd>k</kbd></td><td>Scroll down / up and navigate messages</td></tr>
+          <tr><td><kbd>G</kbd></td><td>Jump to bottom</td></tr>
+          <tr><td><kbd>g</kbd></td><td>Jump to top</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Expand/collapse tool call card</td></tr>
+          <tr><td><kbd>/</kbd></td><td>Exit scroll mode and start typing a slash command</td></tr>
+          <tr><td><kbd>i</kbd> / <kbd>Esc</kbd></td><td>Return to input mode</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Autocomplete</h3>
+      <table>
+        <thead><tr><th>Key</th><th>Action</th></tr></thead>
+        <tbody>
+          <tr><td><kbd>Tab</kbd> / <kbd>Down</kbd></td><td>Next suggestion</td></tr>
+          <tr><td><kbd>Shift+Tab</kbd> / <kbd>Up</kbd></td><td>Previous suggestion</td></tr>
+          <tr><td><kbd>Enter</kbd></td><td>Accept suggestion</td></tr>
+          <tr><td><kbd>Esc</kbd></td><td>Dismiss autocomplete</td></tr>
         </tbody>
       </table>
 
@@ -145,6 +175,24 @@ openanalyst --no-tui</code></pre>
         <div class="callout-title">Custom Keybindings</div>
         Customize keybindings by editing <code>~/.openanalyst/keybindings.json</code>. See <a href="configuration.html">Configuration</a> for details.
       </div>
+
+      <h2 id="input-box">Input Box</h2>
+      <p>The input box displays context-aware badges on the right side of the border:</p>
+      <ul>
+        <li><strong>Permission mode badge</strong> &mdash; Shows when not Default (Plan=yellow, Accept Edits=green, Danger=red)</li>
+        <li><strong>Agent badge</strong> &mdash; Purple badge when a project agent is selected from the sidebar</li>
+        <li><strong>Git branch badge</strong> &mdash; Blue badge showing the current branch (e.g., <code>main</code>)</li>
+      </ul>
+
+      <h2 id="routing">Model Routing</h2>
+      <p>The sidebar Routing section lets you assign specific models to each task category. Press <kbd>Enter</kbd> on a routing row to cycle through all models from your configured providers.</p>
+      <ul>
+        <li><strong>explore</strong> &mdash; File reading, listing, searching (defaults to fast model)</li>
+        <li><strong>research</strong> &mdash; Planning, architecture, analysis (defaults to balanced model)</li>
+        <li><strong>code</strong> &mdash; Complex coding, multi-step reasoning (defaults to capable model)</li>
+        <li><strong>write</strong> &mdash; Documentation, content generation (defaults to balanced model)</li>
+      </ul>
+      <p>Available models are auto-detected from your API keys: <code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, <code>XAI_API_KEY</code>, <code>GEMINI_API_KEY</code>, <code>OPENROUTER_API_KEY</code>, <code>BEDROCK_API_KEY</code>.</p>
 
       <h2 id="autocomplete">Slash Command Autocomplete</h2>
       <p>Type <code>/</code> in the input box to see a dropdown of available slash commands. Continue typing to filter. Press <kbd>Tab</kbd> to accept a suggestion.</p>
