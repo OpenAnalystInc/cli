@@ -4,7 +4,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap};
+use ratatui::widgets::{Paragraph, Widget, Wrap};
 
 use events::DiffLine;
 use tui_widgets::{MarkdownStream, ToolCallCard};
@@ -331,13 +331,18 @@ impl ChatPanel {
             .wrap(Wrap { trim: false });
         paragraph.render(area, buf);
 
-        // Scrollbar
+        // Minimal scroll indicators (▲/▼) instead of full scrollbar — like Claude Code
         if total_lines > visible_height {
-            let mut scrollbar_state = ScrollbarState::new(total_lines as usize)
-                .position(scroll as usize)
-                .viewport_content_length(visible_height as usize);
-            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight);
-            scrollbar.render(area, buf, &mut scrollbar_state);
+            let can_scroll_up = scroll > 0;
+            let can_scroll_down = scroll < max_scroll;
+            if can_scroll_up {
+                let pos = ratatui::layout::Position { x: area.right().saturating_sub(1), y: area.y };
+                buf.set_string(pos.x, pos.y, "▲", Style::default().fg(Color::DarkGray));
+            }
+            if can_scroll_down {
+                let y = area.y + area.height.saturating_sub(1);
+                buf.set_string(area.right().saturating_sub(1), y, "▼", Style::default().fg(Color::DarkGray));
+            }
         }
     }
 }

@@ -662,7 +662,8 @@ impl App {
                 self.chat.finish_assistant();
                 self.is_streaming = false;
                 self.chat.push_system(format!("Error: {error}"));
-                self.status_bar.phase = AgentPhase::Error;
+                // Show Error briefly, then reset to Idle so status bar returns to "Ready"
+                self.status_bar.phase = AgentPhase::Idle;
                 // Update background task matching this agent
                 if let Some(bt) = self.sidebar_state.background_tasks.iter_mut().find(|bt| bt.id == agent_id && bt.status == BackgroundTaskStatus::Running) {
                     bt.status = BackgroundTaskStatus::Failed;

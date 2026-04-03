@@ -161,7 +161,25 @@ impl SidebarState {
             }
         }
 
-        // Second: scan top-level source directories for code files (max 12 total)
+        // If no priority files found, scan CWD root for any files
+        if self.files.is_empty() {
+            if let Ok(entries) = std::fs::read_dir(&cwd) {
+                for entry in entries.flatten().take(15) {
+                    let name = entry.file_name().to_string_lossy().to_string();
+                    if name.starts_with('.') || name == "target" || name == "node_modules" {
+                        continue;
+                    }
+                    let is_dir = entry.path().is_dir();
+                    let display = if is_dir { format!("{name}/") } else { name };
+                    self.files.push(TouchedFile {
+                        path: display,
+                        action: FileAction::Read,
+                    });
+                }
+            }
+        }
+
+        // Second: scan top-level source directories for code files
         let source_dirs: &[&str] = &["src", "crates", "packages", "lib", "app", "rust"];
         for dir_name in source_dirs {
             let dir = cwd.join(dir_name);
