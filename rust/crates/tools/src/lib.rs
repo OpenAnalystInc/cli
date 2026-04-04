@@ -894,7 +894,7 @@ fn execute_knowledge(input: KnowledgeInput) -> Result<KnowledgeOutput, String> {
 
     // Synchronous HTTP call to the RAG endpoint
     let client = reqwest::blocking::Client::builder()
-        .timeout(std::time::Duration::from_secs(30))
+        .timeout(std::time::Duration::from_secs(90))
         .build()
         .map_err(|_| "Knowledge base is temporarily unavailable. Try again later.".to_string())?;
 
