@@ -119,7 +119,12 @@ impl ChatPanel {
     }
 
     /// Append a streaming delta to the current assistant message.
+    /// If no assistant message exists yet, auto-create one.
     pub fn push_delta(&mut self, delta: &str) {
+        // Ensure there's an Assistant message to push into
+        if !self.messages.last().is_some_and(|m| matches!(m, ChatMessage::Assistant { .. })) {
+            self.start_assistant();
+        }
         if let Some(ChatMessage::Assistant { markdown, .. }) = self.messages.last_mut() {
             markdown.push_delta(delta);
         }

@@ -325,13 +325,13 @@ impl App {
 
     /// Cycle to the next permission level (Default → Plan → AcceptEdits → Danger → Default).
     /// Sends Action::UpdatePermissions to the orchestrator.
+    /// Mode change is reflected in the input box border/icon — no chat clutter.
     pub fn cycle_permission_level(&mut self) {
         self.permission_level = self.permission_level.next();
         let mode_str = self.permission_level.to_permission_mode().to_string();
         self.permission_mode = mode_str.clone();
-        self.chat.push_system(format!(
-            "Mode: {} ({})", self.permission_level.label(), mode_str
-        ));
+        // Update status bar with mode info (no system message in chat)
+        self.status_bar.phase = AgentPhase::Idle;
         let tx = self.action_tx.clone();
         tokio::spawn(async move {
             if tx.send(Action::UpdatePermissions(mode_str)).await.is_err() {
