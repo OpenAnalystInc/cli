@@ -83,25 +83,32 @@ impl Display for ApiError {
             Self::InvalidApiKeyEnv(error) => {
                 write!(f, "failed to read credential environment variable: {error}")
             }
-            Self::Http(error) => write!(f, "http error: {error}"),
-            Self::Io(error) => write!(f, "io error: {error}"),
-            Self::Json(error) => write!(f, "json error: {error}"),
+            Self::Http(error) => {
+                if error.is_timeout() {
+                    write!(f, "Request timed out. The server may be busy — try again.")
+                } else if error.is_connect() {
+                    write!(f, "Could not connect to the API. Check your internet connection.")
+                } else {
+                    write!(f, "Network error. Check your connection and try again.")
+                }
+            }
+            Self::Io(_) => write!(f, "I/O error occurred. Please try again."),
+            Self::Json(_) => write!(f, "Received an unexpected response from the API."),
             Self::Api {
                 status,
                 error_type,
                 message,
-                body,
                 ..
             } => match (error_type, message) {
                 (Some(error_type), Some(message)) => {
-                    write!(f, "api returned {status} ({error_type}): {message}")
+                    write!(f, "{status} ({error_type}): {message}")
                 }
-                _ => write!(f, "api returned {status}: {body}"),
+                _ => write!(f, "API error ({status}). Please try again."),
             },
             Self::RetriesExhausted {
                 attempts,
                 last_error,
-            } => write!(f, "api failed after {attempts} attempts: {last_error}"),
+            } => write!(f, "Request failed after {attempts} attempts. {last_error}"),
             Self::InvalidSseFrame(message) => write!(f, "invalid sse frame: {message}"),
             Self::BackoffOverflow {
                 attempt,

@@ -1974,14 +1974,21 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
         fs::remove_file(&creds_path)?;
     }
 
+    // Clear env vars
+    env::remove_var("OPENANALYST_AUTH_TOKEN");
+    env::remove_var("OPENANALYST_API_KEY");
+    env::remove_var("OPENANALYST_MODE");
+    env::remove_var("ANTHROPIC_API_KEY");
+    env::remove_var("OPENAI_API_KEY");
+    env::remove_var("GEMINI_API_KEY");
+    env::remove_var("XAI_API_KEY");
+
     println!();
-    println!("  \x1b[38;5;45m\u{2713} All credentials cleared.\x1b[0m");
-    println!("  \x1b[2mRemoved:\x1b[0m {}", creds_path.display());
+    println!("  \x1b[38;5;45m\u{2713}\x1b[0m \x1b[1mLogged out successfully.\x1b[0m");
     println!();
-    println!("  \x1b[2mNote: Keys in \x1b[0m~/.openanalyst/.env\x1b[2m are not removed.\x1b[0m");
-    println!("  \x1b[2mRun \x1b[0m\x1b[1mopenanalyst login\x1b[0m\x1b[2m to authenticate with a different provider.\x1b[0m");
-    println!();
-    Ok(())
+
+    // Redirect to login
+    run_login()
 }
 
 fn run_update() -> Result<(), Box<dyn std::error::Error>> {

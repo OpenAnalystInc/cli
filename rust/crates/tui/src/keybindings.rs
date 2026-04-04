@@ -24,21 +24,29 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
     // Autocomplete popup takes priority when active
     if app.suggestions.active {
         match key.code {
-            // Tab / Down → next suggestion
-            KeyCode::Tab | KeyCode::Down => {
+            // Down → next suggestion
+            KeyCode::Down => {
                 app.suggestions.next();
                 return;
             }
-            // Shift+Tab / Up → previous suggestion
+            // Up → previous suggestion
             KeyCode::BackTab | KeyCode::Up => {
                 app.suggestions.prev();
                 return;
             }
-            // Enter → accept selected suggestion
-            KeyCode::Enter => {
+            // Tab → accept suggestion into input (fill, don't submit)
+            KeyCode::Tab => {
                 if let Some(cmd) = app.suggestions.accept() {
                     app.input_state.set_text(&cmd);
                     app.suggestions.dismiss();
+                }
+                return;
+            }
+            // Enter → accept and submit immediately
+            KeyCode::Enter => {
+                if let Some(cmd) = app.suggestions.accept() {
+                    app.suggestions.dismiss();
+                    app.submit_prompt(cmd);
                 }
                 return;
             }
