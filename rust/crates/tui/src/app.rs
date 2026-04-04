@@ -939,16 +939,25 @@ impl App {
                 }
                 self.chat.finish_assistant();
                 self.is_streaming = false;
-                // Show error without agent prefix — clean message
-                self.chat.push_system(format!("Error: {error}"));
+                // Show clean error — strip technical details
+                let err_msg = format!("{error}");
+                let clean_error = if err_msg.len() > 120 {
+                    format!("{}...", &err_msg[..120])
+                } else {
+                    err_msg
+                };
+                self.chat.push_system(format!("Error: {clean_error}"));
                 // Inject inline error status at end of response
                 if let Some(start) = self.turn_start.take() {
                     let elapsed = start.elapsed();
                     self.status_bar.elapsed = elapsed;
                     let time_str = format_duration_short(&elapsed);
-                    self.chat.push_inline_status(format!(
-                        "Errored after {time_str}"
-                    ), true);
+                    let status_msg = if elapsed.as_secs() < 1 {
+                        "Error".to_string()
+                    } else {
+                        format!("Errored after {time_str}")
+                    };
+                    self.chat.push_inline_status(status_msg, true);
                 }
                 self.status_bar.phase = AgentPhase::Idle;
                 // Update background task matching this agent
