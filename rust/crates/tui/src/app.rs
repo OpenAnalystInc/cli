@@ -552,6 +552,26 @@ impl App {
         self.status_bar.phase = AgentPhase::Thinking;
         self.chat.auto_scroll = true;
 
+        // If an agent is selected, prepend its system prompt as context
+        let text = if let Some(ref agent_name) = self.active_agent_name {
+            if let Some(agent_def) = self.sidebar_state.available_agents.iter()
+                .find(|a| a.name == *agent_name)
+            {
+                if !agent_def.system_prompt.is_empty() {
+                    format!(
+                        "[System: You are acting as the \"{}\" agent. Follow these instructions:\n{}\n]\n\n{}",
+                        agent_name, agent_def.system_prompt, text
+                    )
+                } else {
+                    text
+                }
+            } else {
+                text
+            }
+        } else {
+            text
+        };
+
         // Smart routing: classify prompt → pick (model, effort) from routing table
         let route = self.router.route_prompt(&text);
         let model_override = self.model_override.take().or(Some(route.model));

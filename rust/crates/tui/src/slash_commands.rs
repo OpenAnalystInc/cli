@@ -1112,7 +1112,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                     if spawn_tx.send(events::Action::SubmitPrompt {
                         text: explore_prompt,
                         effort_budget: Some(1_024), // low effort for exploration
-                        model_override: Some("claude-haiku-4-5".to_string()),
+                        model_override: None, // use default model from router
                     }).await.is_err() {
                         eprintln!("[tui] orchestrator channel closed");
                     }
