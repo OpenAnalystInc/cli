@@ -227,30 +227,10 @@ impl App {
         self.banner_info = Some(info);
     }
 
-    /// Check for recent sessions and offer to resume on startup.
+    /// Check for recent sessions — silent on startup (use /resume to load).
     pub fn check_resume_on_startup(&mut self) {
-        let latest = std::path::Path::new(".openanalyst").join("sessions").join("session-latest.json");
-        if !latest.exists() {
-            return;
-        }
-        let size = std::fs::metadata(&latest).map(|m| m.len()).unwrap_or(0);
-        if size == 0 {
-            return;
-        }
-
-        // Read metadata from the latest session (v3 fields)
-        let content = std::fs::read_to_string(&latest).unwrap_or_default();
-        let v: serde_json::Value = serde_json::from_str(&content).unwrap_or_default();
-        let model = v.get("model").and_then(|m| m.as_str()).unwrap_or("default");
-        let timestamp = v.get("timestamp").and_then(|t| t.as_str()).unwrap_or("unknown");
-        let msg_count = v.get("messages").and_then(|m| m.as_array()).map(|a| a.len()).unwrap_or(0);
-
-        self.chat.push_system(format!(
-            "Recent session available: {msg_count} messages ({:.1} KB)\n\
-             Model: {model} | Saved: {timestamp}\n\
-             Type /resume session-latest.json to continue, or start a new conversation.",
-            size as f64 / 1024.0,
-        ));
+        // No-op: clean startup without session noise.
+        // Users can type /resume to load a previous session.
     }
 
     /// Auto-save current session to disk (v3 format with full metadata).
