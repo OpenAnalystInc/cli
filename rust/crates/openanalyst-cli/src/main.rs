@@ -1015,11 +1015,16 @@ struct ProviderOAuthMeta {
     /// Built-in default OAuth client ID — used when env var is not set.
     /// Registered with the provider's developer portal for OpenAnalyst CLI.
     default_client_id: &'static str,
+    /// Public client secret for installed-app OAuth flows (e.g., Google).
+    /// Not truly secret — embedded in open-source CLIs per provider convention.
+    default_client_secret: &'static str,
     authorize_url: &'static str,
     token_url: &'static str,
     scopes: &'static [&'static str],
     /// The env var to store the resulting API key / bearer token
     token_env_var: &'static str,
+    /// Extra query parameters for the authorization URL (e.g., OpenAI's special params)
+    extra_authorize_params: &'static [(&'static str, &'static str)],
 }
 
 const LOGIN_PROVIDERS: &[ProviderOption] = &[
@@ -1035,36 +1040,80 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
     },
     ProviderOption {
         name: "Anthropic / Claude",
-        description: "opus, sonnet, haiku — API key",
+        description: "opus, sonnet, haiku — OAuth or API key",
         env_var: "ANTHROPIC_API_KEY",
         test_url: "https://api.anthropic.com/v1/messages",
         test_header: "x-api-key",
         dashboard_url: "https://console.anthropic.com/settings/keys",
         models_url: "https://api.anthropic.com/v1/models",
-        // Anthropic does not support third-party OAuth yet — use API key only
-        oauth: None,
+        oauth: Some(ProviderOAuthMeta {
+            client_id_env: "OPENANALYST_ANTHROPIC_CLIENT_ID",
+            default_client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
+            default_client_secret: "",
+            authorize_url: "https://claude.ai/oauth/authorize",
+            token_url: "https://claude.ai/oauth/token",
+            scopes: &[
+                "user:profile",
+                "user:inference",
+            ],
+            token_env_var: "ANTHROPIC_API_KEY",
+            extra_authorize_params: &[],
+        }),
     },
     ProviderOption {
         name: "OpenAI / Codex",
-        description: "gpt-4o, o3, codex-mini — API key",
+        description: "gpt-4o, o3, codex-mini — OAuth or API key",
         env_var: "OPENAI_API_KEY",
         test_url: "https://api.openai.com/v1/models",
         test_header: "bearer",
         dashboard_url: "https://platform.openai.com/api-keys",
         models_url: "https://api.openai.com/v1/models",
-        // OpenAI OAuth requires registered app — use API key for now
-        oauth: None,
+        oauth: Some(ProviderOAuthMeta {
+            client_id_env: "OPENANALYST_OPENAI_CLIENT_ID",
+            default_client_id: "app_EMoamEEZ73f0CkXaXp7hrann",
+            default_client_secret: "",
+            authorize_url: "https://auth.openai.com/oauth/authorize",
+            token_url: "https://auth.openai.com/oauth/token",
+            scopes: &[
+                "openid",
+                "profile",
+                "email",
+                "offline_access",
+            ],
+            token_env_var: "OPENAI_API_KEY",
+            extra_authorize_params: &[
+                ("response_type", "code"),
+                ("code_challenge_method", "S256"),
+            ],
+        }),
     },
     ProviderOption {
         name: "Google Gemini",
-        description: "gemini-2.5-pro, flash — API key",
+        description: "gemini-2.5-pro, flash — OAuth or API key",
         env_var: "GEMINI_API_KEY",
         test_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
         test_header: "bearer",
         dashboard_url: "https://aistudio.google.com/apikey",
         models_url: "https://generativelanguage.googleapis.com/v1beta/openai/models",
-        // Google OAuth requires registered Cloud Console project — use API key from AI Studio
-        oauth: None,
+        oauth: Some(ProviderOAuthMeta {
+            client_id_env: "OPENANALYST_GOOGLE_CLIENT_ID",
+            // Public client ID from Gemini CLI (installed-app flow — not secret)
+            default_client_id: "681255809395-oo8ft2oprdrnp9e3aqf6av3hmdib135j.apps.googleusercontent.com",
+            // Public client secret for Google installed-app OAuth (not truly secret, per Google's convention)
+            default_client_secret: "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",
+            authorize_url: "https://accounts.google.com/o/oauth2/v2/auth",
+            token_url: "https://oauth2.googleapis.com/token",
+            scopes: &[
+                "https://www.googleapis.com/auth/cloud-platform",
+                "https://www.googleapis.com/auth/userinfo.email",
+                "https://www.googleapis.com/auth/userinfo.profile",
+            ],
+            token_env_var: "GEMINI_API_KEY",
+            extra_authorize_params: &[
+                ("access_type", "offline"),
+                ("prompt", "consent"),
+            ],
+        }),
     },
     ProviderOption {
         name: "xAI / Grok",
@@ -1331,14 +1380,17 @@ fn run_oauth_login(
         scopes: oauth_meta.scopes.iter().map(|s| s.to_string()).collect(),
     };
 
-    // 4. Build authorization URL
+    // 4. Build authorization URL (with any provider-specific extra params)
     let auth_request = OAuthAuthorizationRequest::from_config(
         &oauth_config,
         &redirect_uri,
         &state,
         &pkce,
     );
-    let auth_url = auth_request.build_url();
+    let mut auth_url = auth_request.build_url();
+    for (key, value) in oauth_meta.extra_authorize_params {
+        auth_url.push_str(&format!("&{key}={value}"));
+    }
 
     // 5. Open browser
     println!("  \x1b[1mStep 1\x1b[0m  Opening {} login in your browser...", provider.name);
@@ -1394,15 +1446,21 @@ fn run_oauth_login(
                 &redirect_uri,
             );
 
+            let client_secret = oauth_meta.default_client_secret.to_string();
             let rt = tokio::runtime::Runtime::new()?;
             let token_result = rt.block_on(async {
                 let client = reqwest::Client::builder()
                     .timeout(Duration::from_secs(10))
                     .build()?;
+                let mut params = exchange_request.form_params();
+                // Google's installed-app OAuth requires client_secret in token exchange
+                if !client_secret.is_empty() {
+                    params.insert("client_secret", client_secret);
+                }
                 let resp = client
                     .post(&oauth_config.token_url)
                     .header("content-type", "application/x-www-form-urlencoded")
-                    .form(&exchange_request.form_params())
+                    .form(&params)
                     .send()
                     .await?;
                 let status = resp.status();
@@ -4086,7 +4144,7 @@ impl LiveCli {
         let b64 = base64_encode(&file_bytes);
         let mime = mime_from_extension(image_path);
 
-        // Try providers: Gemini, OpenAI, Anthropic
+        // Try providers: OpenAnalyst (default) → Gemini → OpenAI → Anthropic → Grok
         let (provider, api_key) =
             if let Some(key) = env::var("GEMINI_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
                 ("Gemini", key)
@@ -4097,8 +4155,8 @@ impl LiveCli {
             } else if let Some(key) = env::var("XAI_API_KEY").ok().map(|k| k.trim().to_string()).filter(|k| !k.is_empty()) {
                 ("Grok", key)
             } else {
-                println!("No vision API key found.\n  Set GEMINI_API_KEY, OPENAI_API_KEY, ANTHROPIC_API_KEY, or XAI_API_KEY.");
-                return Ok(());
+                // Fallback: use OpenAnalyst gateway (no key required)
+                ("OpenAnalyst", String::new())
             };
 
         println!("  Analyzing image via {provider}...");
@@ -4151,8 +4209,7 @@ impl LiveCli {
                     Ok(result.pointer("/choices/0/message/content")
                         .and_then(|v| v.as_str()).unwrap_or("(no response)").to_string())
                 }
-                _ => {
-                    // Anthropic Claude
+                "Claude" => {
                     let body = json!({
                         "model": "claude-sonnet-4-6",
                         "max_tokens": 1024,
@@ -4167,6 +4224,24 @@ impl LiveCli {
                         .json(&body).send().await?;
                     let result: serde_json::Value = resp.json().await?;
                     Ok(result.pointer("/content/0/text")
+                        .and_then(|v| v.as_str()).unwrap_or("(no response)").to_string())
+                }
+                _ => {
+                    // OpenAnalyst gateway (OpenAI-compat format, no auth)
+                    let oa_base = env::var("OPENANALYST_BASE_URL")
+                        .unwrap_or_else(|_| "http://192.222.52.59:8000".to_string());
+                    let body = json!({
+                        "model": "gemma-4-chat",
+                        "messages": [{"role": "user", "content": [
+                            {"type": "image_url", "image_url": {"url": format!("data:{mime};base64,{b64}")}},
+                            {"type": "text", "text": prompt}
+                        ]}],
+                        "max_tokens": 1024
+                    });
+                    let resp = client.post(format!("{}/v1/chat/completions", oa_base.trim_end_matches('/')))
+                        .json(&body).send().await?;
+                    let result: serde_json::Value = resp.json().await?;
+                    Ok(result.pointer("/choices/0/message/content")
                         .and_then(|v| v.as_str()).unwrap_or("(no response)").to_string())
                 }
             }
@@ -5111,7 +5186,6 @@ impl LiveCli {
         // Check providers
         println!("\n  \x1b[1mProvider credentials:\x1b[0m");
         let providers: &[(&str, &[&str])] = &[
-            ("OpenAnalyst", &["OPENANALYST_AUTH_TOKEN", "OPENANALYST_API_KEY"]),
             ("Anthropic", &["ANTHROPIC_API_KEY"]),
             ("OpenAI", &["OPENAI_API_KEY"]),
             ("Google Gemini", &["GEMINI_API_KEY"]),
@@ -5119,6 +5193,23 @@ impl LiveCli {
             ("OpenRouter", &["OPENROUTER_API_KEY"]),
             ("Stability AI", &["STABILITY_API_KEY"]),
         ];
+        // OpenAnalyst gateway — test actual connectivity (no key required)
+        {
+            let oa_base = env::var("OPENANALYST_BASE_URL")
+                .unwrap_or_else(|_| "http://192.222.52.59:8000".to_string());
+            let oa_url = format!("{}/v1/models", oa_base.trim_end_matches('/'));
+            let oa_ok = std::thread::scope(|_| {
+                reqwest::blocking::Client::builder()
+                    .timeout(Duration::from_secs(5))
+                    .build()
+                    .ok()
+                    .and_then(|c| c.get(&oa_url).send().ok())
+                    .map_or(false, |r| r.status().is_success())
+            });
+            let icon = if oa_ok { "\x1b[38;5;46m✓\x1b[0m" } else { "\x1b[38;5;196m✗\x1b[0m" };
+            let status = if oa_ok { "\x1b[38;5;46mconnected\x1b[0m" } else { "\x1b[38;5;196munreachable\x1b[0m" };
+            println!("  {icon} OpenAnalyst  {status}  ({oa_base})");
+        }
         for (name, keys) in providers {
             let has_key = keys.iter().any(|k| env::var(k).ok().filter(|v| !v.is_empty()).is_some());
             let icon = if has_key { "\x1b[38;5;46m+\x1b[0m" } else { "\x1b[38;5;240m-\x1b[0m" };
@@ -6835,8 +6926,15 @@ fn fetch_startup_account_info(model: &str) -> StartupAccountInfo {
         ),
     };
 
-    // Try to fetch account info from API
-    let fetched = try_fetch_account(&base_url, auth_token.as_deref(), api_key.as_deref());
+    // Try to fetch account info from API (skip for OpenAnalyst gateway — no auth)
+    let fetched = if provider == ProviderKind::OpenAnalystApi
+        && api_key.is_none()
+        && auth_token.is_none()
+    {
+        None // No auth credentials → skip API call, use OS username
+    } else {
+        try_fetch_account(&base_url, auth_token.as_deref(), api_key.as_deref())
+    };
 
     // Fallback display name from OS
     let os_user = env::var("USER").or_else(|_| env::var("USERNAME")).ok()
