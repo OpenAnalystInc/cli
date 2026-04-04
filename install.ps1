@@ -66,18 +66,15 @@ try {
     $Version = $Release.tag_name -replace "^v", ""
     Write-Host " v$Version" -ForegroundColor Green
 
-    # Find the correct asset — try exact match first, then fallback patterns
-    $Asset = $Release.assets | Where-Object { $_.name -like "*$Target*" -or $_.name -like "*windows*x64*" -or $_.name -eq $BinaryName } | Select-Object -First 1
+    # Find the binary asset — match openanalyst.exe or any windows exe
+    $Asset = $Release.assets | Where-Object { $_.name -eq "openanalyst.exe" } | Select-Object -First 1
+    if (-not $Asset) {
+        $Asset = $Release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
+    }
 
     if ($Asset) {
         $AssetUrl = $Asset.browser_download_url
-        # For private repos, use the API URL with auth
-        if ($GhHeaders.ContainsKey("Authorization")) {
-            $AssetUrl = $Asset.url
-            $GhHeaders["Accept"] = "application/octet-stream"
-        }
     } else {
-        # Fallback: construct the URL directly
         $AssetUrl = "https://github.com/$Repo/releases/download/$($Release.tag_name)/openanalyst.exe"
     }
 
@@ -98,27 +95,16 @@ try {
     Write-Host ""
 }
 
-# Fallback — build from source
+# If download failed, exit with instructions
 if (-not $Downloaded) {
-    if (-not (Get-Command cargo -ErrorAction SilentlyContinue)) {
-        Write-Host ""
-        Write-Host "   Rust is required to build from source." -ForegroundColor Red
-        Write-Host ""
-        Write-Host "   Install:" -ForegroundColor White
-        Write-Host "   winget install Rustlang.Rustup" -ForegroundColor Cyan
-        Write-Host ""
-        exit 1
-    }
-
-    Write-Host "   › Building from source (a few minutes)..." -ForegroundColor Cyan -NoNewline
-    $TempDir = Join-Path $env:TEMP "openanalyst-build-$(Get-Random)"
-    git clone --depth 1 "https://github.com/$Repo.git" $TempDir 2>$null
-    Push-Location "$TempDir\rust"
-    cargo build --release -p openanalyst-cli 2>&1 | Out-Null
-    Pop-Location
-    Copy-Item "$TempDir\rust\target\release\$BinaryName" "$InstallDir\$BinaryName" -Force
-    Remove-Item -Recurse -Force $TempDir -ErrorAction SilentlyContinue
-    Write-Host " ✓" -ForegroundColor Green
+    Write-Host ""
+    Write-Host "   Download failed. Try manually:" -ForegroundColor Red
+    Write-Host ""
+    Write-Host "   1. Go to: https://github.com/$Repo/releases/latest" -ForegroundColor White
+    Write-Host "   2. Download openanalyst.exe" -ForegroundColor White
+    Write-Host "   3. Move it to: $InstallDir" -ForegroundColor White
+    Write-Host ""
+    exit 1
 }
 
 # Step 2 — PATH
