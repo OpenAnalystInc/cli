@@ -10,15 +10,22 @@ $BinaryName = "openanalyst.exe"
 $InstallDir = "$env:USERPROFILE\.openanalyst\bin"
 $ConfigDir = "$env:USERPROFILE\.openanalyst"
 
-# ── Colors ──
+# ── Helpers ──
+function Rp([string]$c, [int]$n) { if ($n -le 0) { return "" }; return ($c * $n) }
+function Pad([int]$n) { if ($n -le 0) { return "" }; return (" " * $n) }
 function W([string]$t) { Write-Host $t -NoNewline -ForegroundColor White }
-function WB([string]$t) { Write-Host $t -NoNewline -ForegroundColor White; }
 function Dim([string]$t) { Write-Host $t -NoNewline -ForegroundColor DarkGray }
 function Br([string]$t) { Write-Host $t -NoNewline -ForegroundColor DarkCyan }
 function Grn([string]$t) { Write-Host $t -NoNewline -ForegroundColor Green }
 function Yl([string]$t) { Write-Host $t -NoNewline -ForegroundColor Yellow }
 function Acc([string]$t) { Write-Host $t -NoNewline -ForegroundColor Cyan }
 function Nl { Write-Host "" }
+$H = [string][char]0x2500  # ─
+$TL = [string][char]0x250C # ┌
+$TR = [string][char]0x2510 # ┐
+$BL = [string][char]0x2514 # └
+$BR = [string][char]0x2518 # ┘
+$VL = [string][char]0x2502 # │
 
 # ── Fetch version ──
 $GhHeaders = @{ "User-Agent" = "openanalyst-cli" }
@@ -48,17 +55,18 @@ Dim "  v$Version"
 Nl
 Dim "   The Universal AI Agent for Your Terminal"
 Nl; Nl
-Dim "   "; Dim ([char]0x2500 * 44); Nl; Nl
+Dim "   $(Rp $H 44)"; Nl; Nl
 
 # ── System info ──
 $OsLabel = "Windows"
 $ArchLabel = if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
+$BoxW = 42
 
-Dim "   "; Dim ([char]0x250C); Dim ([char]0x2500 * 42); Dim ([char]0x2510); Nl
-Dim "   "; Dim ([char]0x2502); W "  System       "; Dim "$OsLabel $ArchLabel"; Dim (" " * (42 - 15 - "$OsLabel $ArchLabel".Length)); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2502); W "  Install to   "; Dim "~\.openanalyst\bin"; Dim (" " * (42 - 15 - 18)); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2502); W "  Config at    "; Dim "~\.openanalyst"; Dim (" " * (42 - 15 - 14)); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2514); Dim ([char]0x2500 * 42); Dim ([char]0x2518); Nl
+Dim "   $TL$(Rp $H $BoxW)$TR"; Nl
+Dim "   $VL"; W "  System       "; Dim "$OsLabel $ArchLabel"; Dim (Pad ($BoxW - 15 - "$OsLabel $ArchLabel".Length)); Dim $VL; Nl
+Dim "   $VL"; W "  Install to   "; Dim "~\.openanalyst\bin"; Dim (Pad ($BoxW - 15 - 18)); Dim $VL; Nl
+Dim "   $VL"; W "  Config at    "; Dim "~\.openanalyst"; Dim (Pad ($BoxW - 15 - 14)); Dim $VL; Nl
+Dim "   $BL$(Rp $H $BoxW)$BR"; Nl
 Nl
 
 # ── Setup ──
@@ -70,7 +78,7 @@ $Downloaded = $false
 Get-Process -Name "openanalyst" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 300
 
-Dim "   "; Acc ([char]0x203A); Dim " Downloading binary..."
+Dim "   "; Acc "$([char]0x203A)"; Dim " Downloading binary..."
 if ($Release) {
     $Asset = $Release.assets | Where-Object { $_.name -eq "openanalyst.exe" } | Select-Object -First 1
     if (-not $Asset) { $Asset = $Release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1 }
@@ -79,7 +87,7 @@ if ($Release) {
     try {
         Invoke-WebRequest -Uri $AssetUrl -OutFile "$InstallDir\$BinaryName" -UseBasicParsing -ErrorAction Stop
         $Downloaded = $true
-        Write-Host " " -NoNewline; Grn ([char]0x2713); Dim " done"; Nl
+        Write-Host " " -NoNewline; Grn "$([char]0x2713)"; Dim " done"; Nl
     } catch {
         Write-Host " " -NoNewline; Yl "failed"; Nl
     }
@@ -97,18 +105,18 @@ if (-not $Downloaded) {
 }
 
 # ── Step 2: PATH ──
-Dim "   "; Acc ([char]0x203A); Dim " Configuring PATH..."
+Dim "   "; Acc "$([char]0x203A)"; Dim " Configuring PATH..."
 $CurrentPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($CurrentPath -notlike "*$InstallDir*") {
     [Environment]::SetEnvironmentVariable("Path", "$InstallDir;$CurrentPath", "User")
     $env:Path = "$InstallDir;$env:Path"
-    Write-Host " " -NoNewline; Grn ([char]0x2713); Dim " added"; Nl
+    Write-Host " " -NoNewline; Grn "$([char]0x2713)"; Dim " added"; Nl
 } else {
-    Write-Host " " -NoNewline; Grn ([char]0x2713); Dim " already configured"; Nl
+    Write-Host " " -NoNewline; Grn "$([char]0x2713)"; Dim " already configured"; Nl
 }
 
 # ── Step 3: Config ──
-Dim "   "; Acc ([char]0x203A); Dim " Creating config..."
+Dim "   "; Acc "$([char]0x203A)"; Dim " Creating config..."
 $EnvFile = "$ConfigDir\.env"
 if (-not (Test-Path $EnvFile)) {
     @"
@@ -118,24 +126,28 @@ if (-not (Test-Path $EnvFile)) {
 # OPENAI_API_KEY=sk-...
 # GEMINI_API_KEY=AIza...
 "@ | Out-File -FilePath $EnvFile -Encoding utf8
-    Write-Host " " -NoNewline; Grn ([char]0x2713); Dim " ~\.openanalyst\.env"; Nl
+    Write-Host " " -NoNewline; Grn "$([char]0x2713)"; Dim " ~\.openanalyst\.env"; Nl
 } else {
-    Write-Host " " -NoNewline; Grn ([char]0x2713); Dim " already exists"; Nl
+    Write-Host " " -NoNewline; Grn "$([char]0x2713)"; Dim " already exists"; Nl
 }
 
 # ── Summary ──
 Nl; Nl
-Dim "   "; Dim ([char]0x2500 * 44); Nl; Nl
-Grn "   "; Write-Host "$([char]0x2713) Installation complete" -ForegroundColor Green
+Dim "   $(Rp $H 44)"; Nl; Nl
+Write-Host "   $([char]0x2713) Installation complete" -ForegroundColor Green
 Nl; Nl
 
-Dim "   "; Dim ([char]0x250C); Dim ([char]0x2500 * 42); Dim ([char]0x2510); Nl
-Dim "   "; Dim ([char]0x2502); Dim (" " * 42); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2502); W "  Binary     "; Dim "~\.openanalyst\bin\openanalyst.exe"; Dim (" " * (42 - 13 - 33)); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2502); W "  Config     "; Dim "~\.openanalyst\.env"; Dim (" " * (42 - 13 - 19)); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2502); W "  Version    "; Dim "v$Version"; Dim (" " * (42 - 13 - "v$Version".Length)); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2502); Dim (" " * 42); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2514); Dim ([char]0x2500 * 42); Dim ([char]0x2518); Nl
+$BinPath = "~\.openanalyst\bin\openanalyst"
+$CfgPath = "~\.openanalyst\.env"
+$VerStr = "v$Version"
+
+Dim "   $TL$(Rp $H $BoxW)$TR"; Nl
+Dim "   $VL$(Pad $BoxW)$VL"; Nl
+Dim "   $VL"; W "  Binary     "; Dim $BinPath; Dim (Pad ($BoxW - 13 - $BinPath.Length)); Dim $VL; Nl
+Dim "   $VL"; W "  Config     "; Dim $CfgPath; Dim (Pad ($BoxW - 13 - $CfgPath.Length)); Dim $VL; Nl
+Dim "   $VL"; W "  Version    "; Dim $VerStr; Dim (Pad ($BoxW - 13 - $VerStr.Length)); Dim $VL; Nl
+Dim "   $VL$(Pad $BoxW)$VL"; Nl
+Dim "   $BL$(Rp $H $BoxW)$BR"; Nl
 Nl
 
 # ── Next steps ──
@@ -149,47 +161,43 @@ Dim "      Select a provider, use the free model"
 Nl
 Dim "      or paste your API key."
 Nl; Nl
-
 Acc "   2."; W " Start coding"; Nl
 Nl
 Acc "      `$ openanalyst"; Nl
 Nl; Nl
 
 # ── Provider list ──
-Dim "   "; Dim ([char]0x250C); Dim ([char]0x2500 * 42); Dim ([char]0x2510); Nl
-Dim "   "; Dim ([char]0x2502); Dim (" " * 42); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2502); W "  7 LLM Providers. One Interface."; Dim (" " * (42 - 34)); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2502); Dim (" " * 42); Dim ([char]0x2502); Nl
+Dim "   $TL$(Rp $H $BoxW)$TR"; Nl
+Dim "   $VL$(Pad $BoxW)$VL"; Nl
+Dim "   $VL"; W "  7 LLM Providers. One Interface."; Dim (Pad ($BoxW - 34)); Dim $VL; Nl
+Dim "   $VL$(Pad $BoxW)$VL"; Nl
+
 $providers = @(
-    @("OpenAnalyst", "(default)"),
-    @("Anthropic / Claude", "direct API"),
-    @("OpenAI / Codex", "direct API"),
-    @("Google Gemini", "direct API"),
-    @("xAI / Grok", ""),
-    @("OpenRouter", "350+ models"),
-    @("Amazon Bedrock", "")
+    @{ n="OpenAnalyst"; d="(default)" },
+    @{ n="Anthropic / Claude"; d="direct API" },
+    @{ n="OpenAI / Codex"; d="direct API" },
+    @{ n="Google Gemini"; d="direct API" },
+    @{ n="xAI / Grok"; d="" },
+    @{ n="OpenRouter"; d="350+ models" },
+    @{ n="Amazon Bedrock"; d="" }
 )
 foreach ($p in $providers) {
-    $name = $p[0]
-    $desc = $p[1]
-    $line = "  "
-    Dim "   "; Dim ([char]0x2502)
+    $name = $p.n
+    $desc = $p.d
+    Dim "   $VL"
     Acc "  $([char]0x25A0)"
     W " $name"
     if ($desc) {
-        $pad = 42 - 4 - $name.Length - 3 - $desc.Length
-        if ($pad -lt 0) { $pad = 1 }
-        Dim (" " * $pad)
+        $used = 4 + $name.Length + 3 + $desc.Length
+        Dim (Pad ($BoxW - $used))
         Dim $desc
     } else {
-        $pad = 42 - 4 - $name.Length
-        if ($pad -lt 0) { $pad = 1 }
-        Dim (" " * $pad)
+        Dim (Pad ($BoxW - 4 - $name.Length))
     }
-    Dim ([char]0x2502); Nl
+    Dim $VL; Nl
 }
-Dim "   "; Dim ([char]0x2502); Dim (" " * 42); Dim ([char]0x2502); Nl
-Dim "   "; Dim ([char]0x2514); Dim ([char]0x2500 * 42); Dim ([char]0x2518); Nl
+Dim "   $VL$(Pad $BoxW)$VL"; Nl
+Dim "   $BL$(Rp $H $BoxW)$BR"; Nl
 Nl
 
 Dim "   Documentation:  "

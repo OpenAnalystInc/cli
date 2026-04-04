@@ -108,31 +108,27 @@ impl Banner {
             ])
         };
 
-        // ── Blank spacer after top border ──
+        // ── Row: Welcome | Tips header ──
+        let welcome_text = format!("  Welcome back, {}!", self.info.display_name);
+        lines.push(brow(&welcome_text, white_bold, " Tips for getting started", green));
+
+        // ── Blank spacer ──
         lines.push(brow("", dim, "", dim));
 
-        // ── Row: Welcome (centered) | Tips header ──
-        let welcome_text = format!("Welcome back, {}!", self.info.display_name);
-        let welcome_pad = left_w.saturating_sub(welcome_text.len()) / 2;
-        let welcome = format!("{}{}", " ".repeat(welcome_pad), welcome_text);
-        lines.push(brow(&welcome, white_bold, " Tips for getting started", green));
-
-        // ── OA block logo centered in orange (5 rows) ──
-        let logo: [&str; 6] = [
-            "                            ",
-            "       ████████   ████      ",
-            "       ██    ██  ██  ██     ",
-            "       ██    ██  ██████     ",
-            "       ██    ██  ██  ██     ",
-            "       ████████  ██  ██     ",
+        // ── OA block logo in orange (5 rows) ──
+        let logo: [&str; 5] = [
+            "   ████████   ████         ",
+            "   ██    ██  ██  ██        ",
+            "   ██    ██  ██████        ",
+            "   ██    ██  ██  ██        ",
+            "   ████████  ██  ██        ",
         ];
 
-        let tip_lines: [(&str, Style); 6] = if self.info.is_openanalyst() {
+        let tip_lines: [(&str, Style); 5] = if self.info.is_openanalyst() {
             [
                 (" Run /init to create an", dim),
                 (" OPENANALYST.md file with", dim),
                 (" instructions for OpenAnalyst", dim),
-                ("", dim),       // separator
                 (" Recent activity", green),
                 (" No recent activity", dim),
             ]
@@ -141,37 +137,23 @@ impl Banner {
                 (" Run /init to create a", dim),
                 (" project config file with", dim),
                 (" instructions for the agent", dim),
-                ("", dim),       // separator
                 (" Recent activity", green),
                 (" No recent activity", dim),
             ]
         };
 
-        for (i, (logo_line, (tip, tip_style))) in logo.iter().zip(tip_lines.iter()).enumerate() {
+        for (logo_line, (tip, tip_style)) in logo.iter().zip(tip_lines.iter()) {
             let lp = left_w.saturating_sub(logo_line.chars().count());
-
-            if i == 3 {
-                // Separator row — horizontal line in right column
-                lines.push(Line::from(vec![
-                    Span::styled("│", brand),
-                    Span::styled(logo_line.to_string(), logo_color),
-                    Span::raw(" ".repeat(lp)),
-                    Span::styled("│", brand),
-                    Span::styled("─".repeat(right_w), brand),
-                    Span::styled("│", brand),
-                ]));
-            } else {
-                let rp = right_w.saturating_sub(tip.chars().count());
-                lines.push(Line::from(vec![
-                    Span::styled("│", brand),
-                    Span::styled(logo_line.to_string(), logo_color),
-                    Span::raw(" ".repeat(lp)),
-                    Span::styled("│", brand),
-                    Span::styled(tip.to_string(), *tip_style),
-                    Span::raw(" ".repeat(rp)),
-                    Span::styled("│", brand),
-                ]));
-            }
+            let rp = right_w.saturating_sub(tip.chars().count());
+            lines.push(Line::from(vec![
+                Span::styled("│", brand),
+                Span::styled(logo_line.to_string(), logo_color),
+                Span::raw(" ".repeat(lp)),
+                Span::styled("│", brand),
+                Span::styled(tip.to_string(), *tip_style),
+                Span::raw(" ".repeat(rp)),
+                Span::styled("│", brand),
+            ]));
         }
 
         // ── Blank separator ──
