@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 
-use events::{AgentId, AgentStatus, AgentType, PermissionResponseTx};
+use events::{AgentId, AgentStatus, AgentType, AskUserResponseTx, PermissionResponseTx};
 use tokio::task::JoinHandle;
 
 use crate::agent::ManagedAgent;
@@ -12,6 +12,8 @@ pub struct AgentRegistry {
     agents: HashMap<AgentId, ManagedAgent>,
     /// Pending permission responses: request_id → oneshot sender.
     permission_pending: HashMap<String, PermissionResponseTx>,
+    /// Pending AskUser responses: request_id → oneshot sender.
+    ask_user_pending: HashMap<String, AskUserResponseTx>,
     /// Task handles for spawned agents — used for cancellation.
     task_handles: HashMap<AgentId, JoinHandle<()>>,
     next_id: u64,
@@ -22,6 +24,7 @@ impl Default for AgentRegistry {
         Self {
             agents: HashMap::new(),
             permission_pending: HashMap::new(),
+            ask_user_pending: HashMap::new(),
             task_handles: HashMap::new(),
             next_id: 0,
         }
@@ -76,6 +79,20 @@ impl AgentRegistry {
             // Send the decision — if the receiver was dropped, the error is harmless.
             if tx.send(allow).is_err() {
                 eprintln!("[registry] Permission response dropped — worker thread may have been cancelled");
+            }
+        }
+    }
+
+    /// Register a pending AskUser request.
+    pub fn register_ask_user(&mut self, request_id: String, tx: AskUserResponseTx) {
+        self.ask_user_pending.insert(request_id, tx);
+    }
+
+    /// Resolve a pending AskUser request by sending the user's response.
+    pub fn resolve_ask_user(&mut self, request_id: &str, response: String) {
+        if let Some(tx) = self.ask_user_pending.remove(request_id) {
+            if tx.send(response).is_err() {
+                eprintln!("[registry] AskUser response dropped — worker thread may have been cancelled");
             }
         }
     }

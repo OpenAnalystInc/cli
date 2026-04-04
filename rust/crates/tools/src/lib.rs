@@ -590,6 +590,58 @@ pub fn mvp_tool_specs() -> Vec<ToolSpec> {
             }),
             required_permission: PermissionMode::DangerFullAccess,
         },
+        ToolSpec {
+            name: "Knowledge",
+            description: "Query the OpenAnalyst knowledge base for expert strategies, course insights, and actionable guidance via Agentic RAG. Returns ranked results from the knowledge graph. Requires OPENANALYST_API_KEY.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "query": {
+                        "type": "string",
+                        "description": "The search query for the knowledge base"
+                    },
+                    "max_results": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 20,
+                        "description": "Maximum number of results to return (default 5)"
+                    },
+                    "mode": {
+                        "type": "string",
+                        "enum": ["fast", "progressive", "deep"],
+                        "description": "Search mode: fast (vector only), progressive (vector+graph), deep (full agentic pipeline)"
+                    }
+                },
+                "required": ["query"],
+                "additionalProperties": false
+            }),
+            required_permission: PermissionMode::ReadOnly,
+        },
+        ToolSpec {
+            name: "AskUser",
+            description: "Ask the user a question and wait for their response. Use this to gather information, confirm actions, or request configuration values like API keys. The question is displayed to the user and their response is returned.",
+            input_schema: json!({
+                "type": "object",
+                "properties": {
+                    "question": {
+                        "type": "string",
+                        "description": "The question to ask the user"
+                    },
+                    "options": {
+                        "type": "array",
+                        "items": { "type": "string" },
+                        "description": "Optional list of choices for the user to pick from. If omitted, user provides free-form text."
+                    },
+                    "default": {
+                        "type": "string",
+                        "description": "Default value if user presses Enter without typing"
+                    }
+                },
+                "required": ["question"],
+                "additionalProperties": false
+            }),
+            required_permission: PermissionMode::ReadOnly,
+        },
     ]
 }
 
@@ -616,6 +668,8 @@ pub fn execute_tool(name: &str, input: &Value) -> Result<String, String> {
         }
         "REPL" => from_value::<ReplInput>(input).and_then(run_repl),
         "PowerShell" => from_value::<PowerShellInput>(input).and_then(run_powershell),
+        "Knowledge" => from_value::<KnowledgeInput>(input).and_then(run_knowledge),
+        "AskUser" => from_value::<AskUserInput>(input).and_then(run_ask_user),
         _ => Err(format!("unsupported tool: {name}")),
     }
 }
@@ -714,6 +768,195 @@ fn run_repl(input: ReplInput) -> Result<String, String> {
 
 fn run_powershell(input: PowerShellInput) -> Result<String, String> {
     to_pretty_json(execute_powershell(input).map_err(|error| error.to_string())?)
+}
+
+fn run_knowledge(input: KnowledgeInput) -> Result<String, String> {
+    to_pretty_json(execute_knowledge(input)?)
+}
+
+fn run_ask_user(input: AskUserInput) -> Result<String, String> {
+    to_pretty_json(execute_ask_user(input)?)
+}
+
+#[derive(Debug, Deserialize)]
+struct AskUserInput {
+    question: String,
+    options: Option<Vec<String>>,
+    default: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct AskUserOutput {
+    question: String,
+    response: String,
+    selected_option: Option<String>,
+}
+
+fn execute_ask_user(input: AskUserInput) -> Result<AskUserOutput, String> {
+    use std::io::{self, BufRead, Write};
+
+    // Display question
+    let mut stdout = io::stdout();
+    let _ = writeln!(stdout, "\n  \x1b[38;5;45m\x1b[1m?\x1b[0m \x1b[1m{}\x1b[0m", input.question);
+
+    // Show options if provided
+    if let Some(ref options) = input.options {
+        for (i, opt) in options.iter().enumerate() {
+            let _ = writeln!(stdout, "    \x1b[38;5;45m{}\x1b[0m) {opt}", i + 1);
+        }
+        let _ = write!(stdout, "  \x1b[2mEnter choice (1-{}):\x1b[0m ", options.len());
+    } else if let Some(ref default) = input.default {
+        let _ = write!(stdout, "  \x1b[2m[{default}]\x1b[0m \x1b[38;5;45m>\x1b[0m ");
+    } else {
+        let _ = write!(stdout, "  \x1b[38;5;45m>\x1b[0m ");
+    }
+    let _ = stdout.flush();
+
+    // Read response
+    let mut response = String::new();
+    io::stdin()
+        .lock()
+        .read_line(&mut response)
+        .map_err(|e| format!("Failed to read input: {e}"))?;
+    let response = response.trim().to_string();
+
+    // Apply default if empty
+    let response = if response.is_empty() {
+        input.default.clone().unwrap_or_default()
+    } else {
+        response
+    };
+
+    // Resolve option selection
+    let selected_option = if let Some(ref options) = input.options {
+        if let Ok(idx) = response.parse::<usize>() {
+            options.get(idx.saturating_sub(1)).cloned()
+        } else {
+            // Try matching by name
+            options.iter().find(|o| o.eq_ignore_ascii_case(&response)).cloned()
+        }
+    } else {
+        None
+    };
+
+    let final_response = selected_option.clone().unwrap_or(response);
+
+    Ok(AskUserOutput {
+        question: input.question,
+        response: final_response,
+        selected_option,
+    })
+}
+
+#[derive(Debug, Deserialize)]
+struct KnowledgeInput {
+    query: String,
+    max_results: Option<usize>,
+    mode: Option<String>,
+}
+
+#[derive(Debug, Serialize)]
+struct KnowledgeOutput {
+    query: String,
+    results: Vec<KnowledgeResultItem>,
+    total_count: usize,
+    mode: String,
+    #[serde(rename = "durationMs")]
+    duration_ms: u128,
+}
+
+#[derive(Debug, Serialize)]
+struct KnowledgeResultItem {
+    chunk_id: String,
+    text: String,
+    snippet: String,
+    score: f64,
+    category: String,
+    citation: String,
+}
+
+fn execute_knowledge(input: KnowledgeInput) -> Result<KnowledgeOutput, String> {
+    let started = std::time::Instant::now();
+    let max_results = input.max_results.unwrap_or(5);
+    let mode = input.mode.unwrap_or_else(|| "progressive".to_string());
+
+    // Check for API key
+    let api_key = std::env::var("OPENANALYST_API_KEY")
+        .or_else(|_| std::env::var("OA_API_KEY"))
+        .map_err(|_| "OPENANALYST_API_KEY not set. Run `openanalyst login` and select OpenAnalyst to set your API key.".to_string())?;
+
+    // KB endpoint
+    let kb_endpoint = std::env::var("OPENANALYST_KB_URL")
+        .unwrap_or_else(|_| "https://kb.openanalyst.ai/v1/knowledge/query".to_string());
+
+    // Synchronous HTTP call to the RAG endpoint
+    let client = reqwest::blocking::Client::builder()
+        .timeout(std::time::Duration::from_secs(30))
+        .build()
+        .map_err(|e| format!("HTTP client error: {e}"))?;
+
+    let body = serde_json::json!({
+        "query": input.query,
+        "mode": mode,
+        "max_results": max_results,
+    });
+
+    let response = client
+        .post(&kb_endpoint)
+        .header("Authorization", format!("Bearer {api_key}"))
+        .header("Content-Type", "application/json")
+        .json(&body)
+        .send()
+        .map_err(|e| format!("Knowledge base request failed: {e}"))?;
+
+    let status = response.status();
+    if status.as_u16() == 401 {
+        return Err("Authentication failed. Check your OPENANALYST_API_KEY.".to_string());
+    }
+    if status.as_u16() == 503 {
+        return Ok(KnowledgeOutput {
+            query: input.query,
+            results: Vec::new(),
+            total_count: 0,
+            mode,
+            duration_ms: started.elapsed().as_millis(),
+        });
+    }
+    if !status.is_success() {
+        return Err(format!("Knowledge base returned {status}"));
+    }
+
+    let resp_body: serde_json::Value = response
+        .json()
+        .map_err(|e| format!("Failed to parse KB response: {e}"))?;
+
+    // Parse results from the agentic RAG response
+    let mut results = Vec::new();
+    if let Some(sub_questions) = resp_body.get("sub_questions").and_then(|v| v.as_array()) {
+        for sq in sub_questions {
+            if let Some(sq_results) = sq.get("results").and_then(|v| v.as_array()) {
+                for r in sq_results.iter().take(max_results.saturating_sub(results.len())) {
+                    results.push(KnowledgeResultItem {
+                        chunk_id: r.get("chunk_id").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        text: r.get("text").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        snippet: r.get("snippet").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                        score: r.get("score").and_then(|v| v.as_f64()).unwrap_or(0.0),
+                        category: r.get("category_label").and_then(|v| v.as_str()).unwrap_or("general").to_string(),
+                        citation: r.get("citation_label").and_then(|v| v.as_str()).unwrap_or("").to_string(),
+                    });
+                }
+            }
+        }
+    }
+
+    let total_count = results.len();
+    Ok(KnowledgeOutput {
+        query: input.query,
+        results,
+        total_count,
+        mode,
+        duration_ms: started.elapsed().as_millis(),
+    })
 }
 
 fn to_pretty_json<T: serde::Serialize>(value: T) -> Result<String, String> {
@@ -1795,6 +2038,8 @@ fn allowed_tools_for_subagent(subagent_type: &str) -> BTreeSet<String> {
             "StructuredOutput",
             "REPL",
             "PowerShell",
+            "Knowledge",
+            "AskUser",
         ],
     };
     tools.into_iter().map(str::to_string).collect()
