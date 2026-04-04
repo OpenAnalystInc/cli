@@ -26,6 +26,15 @@ pub enum ExitState {
     ConfirmExit,
 }
 
+/// Current mode of the AskUser dialog.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum AskUserMode {
+    /// Selecting from multiple-choice options.
+    Choice,
+    /// Typing a custom free-text response.
+    Type,
+}
+
 /// AskUser dialog state — modal that blocks the agent until user responds.
 #[derive(Debug, Clone)]
 pub struct AskUserDialog {
@@ -35,6 +44,8 @@ pub struct AskUserDialog {
     pub default: Option<String>,
     pub selected_index: usize,
     pub text_input: String,
+    /// Current interaction mode (choice or type).
+    pub mode: AskUserMode,
 }
 
 impl AskUserDialog {
@@ -44,6 +55,7 @@ impl AskUserDialog {
         options: Option<Vec<String>>,
         default: Option<String>,
     ) -> Self {
+        let has_options = options.as_ref().map_or(false, |o| !o.is_empty());
         Self {
             request_id,
             question,
@@ -51,22 +63,23 @@ impl AskUserDialog {
             default,
             selected_index: 0,
             text_input: String::new(),
+            mode: if has_options { AskUserMode::Choice } else { AskUserMode::Type },
         }
-    }
-
-    /// Is this a multiple-choice dialog?
-    pub fn is_choice(&self) -> bool {
-        !self.options.is_empty()
     }
 
     /// Get the current response text.
     pub fn response(&self) -> String {
-        if self.is_choice() {
-            self.options.get(self.selected_index).cloned().unwrap_or_default()
-        } else if self.text_input.is_empty() {
-            self.default.clone().unwrap_or_default()
-        } else {
-            self.text_input.clone()
+        match self.mode {
+            AskUserMode::Choice => {
+                self.options.get(self.selected_index).cloned().unwrap_or_default()
+            }
+            AskUserMode::Type => {
+                if self.text_input.is_empty() {
+                    self.default.clone().unwrap_or_default()
+                } else {
+                    self.text_input.clone()
+                }
+            }
         }
     }
 }
@@ -703,6 +716,30 @@ impl App {
         }
     }
 
+    /// Resolve AskUser with "chat about this" — user wants to discuss in the main chat instead.
+    pub fn resolve_ask_user_chat(&mut self) {
+        if let Some(dialog) = self.ask_user_dialog.take() {
+            self.chat.push_system("Switching to chat — discuss your answer below.".to_string());
+            let tx = self.action_tx.clone();
+            let request_id = dialog.request_id;
+            let question = dialog.question;
+            tokio::spawn(async move {
+                let response = format!(
+                    "User chose to discuss this in chat instead of selecting an option. \
+                     The question was: \"{question}\". \
+                     Please ask the user in your next response and wait for their reply."
+                );
+                if tx
+                    .send(Action::AskUserResponse { request_id, response })
+                    .await
+                    .is_err()
+                {
+                    eprintln!("[tui] orchestrator channel closed");
+                }
+            });
+        }
+    }
+
     /// Resolve a permission dialog.
     pub fn resolve_permission(&self, request_id: String, allow: bool) {
         let tx = self.action_tx.clone();
@@ -1134,7 +1171,7 @@ fn render_ask_user_dialog(dialog: &AskUserDialog, area: Rect, buf: &mut Buffer) 
     use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap};
 
     let dialog_width = area.width.min(60);
-    let dialog_height = if dialog.is_choice() {
+    let dialog_height = if dialog.mode == AskUserMode::Choice {
         (dialog.options.len() as u16 + 6).min(area.height.saturating_sub(4))
     } else {
         8u16.min(area.height.saturating_sub(4))
@@ -1169,46 +1206,61 @@ fn render_ask_user_dialog(dialog: &AskUserDialog, area: Rect, buf: &mut Buffer) 
     )));
     lines.push(Line::from(""));
 
-    if dialog.is_choice() {
-        // Multiple choice options
-        for (i, option) in dialog.options.iter().enumerate() {
-            let is_selected = i == dialog.selected_index;
-            let prefix = if is_selected { " > " } else { "   " };
-            let style = if is_selected {
-                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
-            } else {
-                Style::default().fg(Color::Indexed(252))
-            };
+    match dialog.mode {
+        AskUserMode::Choice => {
+            // Multiple choice options
+            for (i, option) in dialog.options.iter().enumerate() {
+                let is_selected = i == dialog.selected_index;
+                let prefix = if is_selected { " > " } else { "   " };
+                let style = if is_selected {
+                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                } else {
+                    Style::default().fg(Color::Indexed(252))
+                };
+                lines.push(Line::from(vec![
+                    Span::styled(prefix, style),
+                    Span::styled(format!("{}) {option}", i + 1), style),
+                ]));
+            }
+            lines.push(Line::from(""));
+            // Action bar: Type · Chat about this · Navigate · Select
             lines.push(Line::from(vec![
-                Span::styled(prefix, style),
-                Span::styled(format!("{}) {option}", i + 1), style),
+                Span::styled(" t", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(" Type  ", Style::default().fg(Color::Indexed(240))),
+                Span::styled("c", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
+                Span::styled(" Chat about this  ", Style::default().fg(Color::Indexed(240))),
+                Span::styled("↑↓", Style::default().fg(Color::Cyan)),
+                Span::styled(" navigate  ", Style::default().fg(Color::Indexed(240))),
+                Span::styled("Enter", Style::default().fg(Color::Cyan)),
+                Span::styled(" select", Style::default().fg(Color::Indexed(240))),
             ]));
         }
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            " ↑↓ navigate · Enter select · 1-9 shortcut",
-            Style::default().fg(Color::Indexed(240)),
-        )));
-    } else {
-        // Text input
-        let display_text = if dialog.text_input.is_empty() {
-            if let Some(ref default) = dialog.default {
-                format!("{default}▍")
+        AskUserMode::Type => {
+            // Free-text input
+            let display_text = if dialog.text_input.is_empty() {
+                if let Some(ref default) = dialog.default {
+                    format!("{default}▍")
+                } else {
+                    "▍".to_string()
+                }
             } else {
-                "▍".to_string()
-            }
-        } else {
-            format!("{}▍", dialog.text_input)
-        };
-        lines.push(Line::from(vec![
-            Span::styled(" > ", Style::default().fg(Color::Cyan)),
-            Span::styled(display_text, Style::default().fg(Color::White)),
-        ]));
-        lines.push(Line::from(""));
-        lines.push(Line::from(Span::styled(
-            " Type your answer · Enter submit",
-            Style::default().fg(Color::Indexed(240)),
-        )));
+                format!("{}▍", dialog.text_input)
+            };
+            lines.push(Line::from(vec![
+                Span::styled(" > ", Style::default().fg(Color::Cyan)),
+                Span::styled(display_text, Style::default().fg(Color::White)),
+            ]));
+            lines.push(Line::from(""));
+            let hint = if !dialog.options.is_empty() {
+                " Type your answer · Enter submit · Esc back to options"
+            } else {
+                " Type your answer · Enter submit"
+            };
+            lines.push(Line::from(Span::styled(
+                hint,
+                Style::default().fg(Color::Indexed(240)),
+            )));
+        }
     }
 
     let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
