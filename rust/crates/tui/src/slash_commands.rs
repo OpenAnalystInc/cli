@@ -223,7 +223,9 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                     Err(e) => app.chat.push_system(format!("Failed to load session: {e}")),
                 }
             } else {
-                app.chat.push_system("Usage: /resume <session-path>".to_string());
+                // List available sessions
+                let output = list_sessions();
+                app.chat.push_system(output);
             }
         }
         SlashCommand::Session { action, target } => {
