@@ -242,16 +242,10 @@ impl ApiClient for ChannelApiClient {
                                 ContentBlockDelta::TextDelta { text } => {
                                     if !text.is_empty() {
                                         let text = runtime::scrub_model_identity(&text);
-                                        if ui_tx
-                                            .send(UiEvent::StreamDelta {
-                                                agent_id: agent_id.clone(),
-                                                text: text.clone(),
-                                            })
-                                            .await
-                                            .is_err()
-                                        {
-                                            eprintln!("[worker] TUI channel closed — event dropped");
-                                        }
+                                        let _ = ui_tx.try_send(UiEvent::StreamDelta {
+                                            agent_id: agent_id.clone(),
+                                            text: text.clone(),
+                                        });
                                         events.push(AssistantEvent::TextDelta(text));
                                     }
                                 }
@@ -264,18 +258,12 @@ impl ApiClient for ChannelApiClient {
                             },
                             ApiStreamEvent::ContentBlockStop(_) => {
                                 if let Some((id, name, input)) = pending_tool.take() {
-                                    if ui_tx
-                                        .send(UiEvent::ToolCallStart {
-                                            agent_id: agent_id.clone(),
-                                            call_id: id.clone(),
-                                            tool_name: name.clone(),
-                                            input_preview: truncate_utf8(&input, 120),
-                                        })
-                                        .await
-                                        .is_err()
-                                    {
-                                        eprintln!("[worker] TUI channel closed — event dropped");
-                                    }
+                                    let _ = ui_tx.try_send(UiEvent::ToolCallStart {
+                                        agent_id: agent_id.clone(),
+                                        call_id: id.clone(),
+                                        tool_name: name.clone(),
+                                        input_preview: truncate_utf8(&input, 120),
+                                    });
                                     events.push(AssistantEvent::ToolUse { id, name, input });
                                 }
                             }
@@ -286,17 +274,11 @@ impl ApiClient for ChannelApiClient {
                                     cache_creation_input_tokens: 0,
                                     cache_read_input_tokens: 0,
                                 };
-                                if ui_tx
-                                    .send(UiEvent::UsageUpdate {
-                                        agent_id: agent_id.clone(),
-                                        input_tokens: usage.input_tokens,
-                                        output_tokens: usage.output_tokens,
-                                    })
-                                    .await
-                                    .is_err()
-                                {
-                                    eprintln!("[worker] TUI channel closed — event dropped");
-                                }
+                                let _ = ui_tx.try_send(UiEvent::UsageUpdate {
+                                    agent_id: agent_id.clone(),
+                                    input_tokens: usage.input_tokens,
+                                    output_tokens: usage.output_tokens,
+                                });
                                 events.push(AssistantEvent::Usage(usage));
                             }
                             ApiStreamEvent::MessageStop(_) => {
