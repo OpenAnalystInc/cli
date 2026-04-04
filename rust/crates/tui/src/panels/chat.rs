@@ -4,7 +4,7 @@ use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Paragraph, Widget, Wrap};
+use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap};
 
 use events::DiffLine;
 use tui_widgets::{KnowledgeCard, MarkdownStream, ToolCallCard};
@@ -419,6 +419,17 @@ impl ChatPanel {
         let paragraph = Paragraph::new(Text::from(visible_lines))
             .wrap(Wrap { trim: false });
         paragraph.render(area, buf);
+
+        // Scrollbar (right edge)
+        if total_lines > visible_height {
+            let mut scrollbar_state = ScrollbarState::new(total_lines as usize)
+                .position(scroll as usize)
+                .viewport_content_length(visible_height as usize);
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .thumb_style(Style::default().fg(Color::Indexed(240)))
+                .track_style(Style::default().fg(Color::Indexed(236)));
+            scrollbar.render(area, buf, &mut scrollbar_state);
+        }
     }
 }
 
