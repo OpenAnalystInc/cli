@@ -91,12 +91,12 @@ if ($Release) {
     try {
         Invoke-WebRequest -Uri $AssetUrl -OutFile "$InstallDir\$BinaryName" -UseBasicParsing -ErrorAction Stop
         $Downloaded = $true
-        Write-Host -NoNewline "`u{2713}" -ForegroundColor Green
+        Write-Host -NoNewline "✓" -ForegroundColor Green
     } catch {
-        Write-Host -NoNewline "`u{2717}" -ForegroundColor Red
+        Write-Host -NoNewline "✗" -ForegroundColor Red
     }
 } else {
-    Write-Host -NoNewline "`u{2717}" -ForegroundColor Red
+    Write-Host -NoNewline "✗" -ForegroundColor Red
 }
 Write-Host "   $B" -ForegroundColor DarkGray
 
@@ -123,7 +123,7 @@ if ($CurrentPath -notlike "*$InstallDir*") {
     [Environment]::SetEnvironmentVariable("Path", "$InstallDir;$CurrentPath", "User")
     $env:Path = "$InstallDir;$env:Path"
 }
-Write-Host -NoNewline "`u{2713}" -ForegroundColor Green
+Write-Host -NoNewline "✓" -ForegroundColor Green
 Write-Host "   $B" -ForegroundColor DarkGray
 
 # ── Step 3: Config ──
@@ -143,13 +143,13 @@ if (-not (Test-Path $EnvFile)) {
 # XAI_API_KEY=xai-...
 "@ | Out-File -FilePath $EnvFile -Encoding utf8
 }
-Write-Host -NoNewline "`u{2713}" -ForegroundColor Green
+Write-Host -NoNewline "✓" -ForegroundColor Green
 Write-Host "   $B" -ForegroundColor DarkGray
 
 # ── Result ──
 Write-Host "  $B                                            $B" -ForegroundColor DarkGray
 Write-Host -NoNewline "  $B  " -ForegroundColor DarkGray
-Write-Host -NoNewline "`u{2713} Installed to " -ForegroundColor Green
+Write-Host -NoNewline "✓ Installed to " -ForegroundColor Green
 Write-Host -NoNewline "~/.openanalyst/bin        " -ForegroundColor White
 Write-Host "$B" -ForegroundColor DarkGray
 Write-Host "  $B                                            $B" -ForegroundColor DarkGray
