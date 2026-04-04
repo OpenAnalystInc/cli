@@ -880,9 +880,11 @@ fn execute_knowledge(input: KnowledgeInput) -> Result<KnowledgeOutput, String> {
     let max_results = input.max_results.unwrap_or(5);
     let mode = input.mode.unwrap_or_else(|| "progressive".to_string());
 
-    // Check for API key (supports all OpenAnalyst credential env vars)
-    let api_key = std::env::var("OPENANALYST_API_KEY")
+    // Check for API key — KB server requires oa_ prefix keys
+    // Priority: OPENANALYST_KB_KEY (dedicated KB key) > OA_API_KEY > OPENANALYST_API_KEY > OPENANALYST_AUTH_TOKEN
+    let api_key = std::env::var("OPENANALYST_KB_KEY")
         .or_else(|_| std::env::var("OA_API_KEY"))
+        .or_else(|_| std::env::var("OPENANALYST_API_KEY"))
         .or_else(|_| std::env::var("OPENANALYST_AUTH_TOKEN"))
         .map_err(|_| "OPENANALYST_API_KEY not set. Run `openanalyst login` and select OpenAnalyst to set your API key.".to_string())?;
 

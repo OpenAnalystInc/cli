@@ -37,12 +37,22 @@ impl ProviderClient {
     ) -> Result<Self, ApiError> {
         let resolved_model = providers::resolve_model_alias(model);
         match providers::detect_provider_kind(&resolved_model) {
-            // OpenAnalyst API (Anthropic-compatible format)
-            ProviderKind::OpenAnalystApi => {
-                Ok(Self::OpenAnalystApi(match default_auth {
-                    Some(auth) => OpenAnalystApiClient::from_auth(auth),
-                    None => OpenAnalystApiClient::from_env()?,
-                }))
+            // OpenAnalyst: route by mode
+            //   mode=free → H100 gpt-oss-120b (OpenAI-compat)
+            //   mode=api  → api.openanalyst.com (Anthropic format, credits)
+            kind @ ProviderKind::OpenAnalystApi => {
+                let mode = std::env::var("OPENANALYST_MODE").unwrap_or_default();
+                if mode == "free" {
+                    Ok(Self::OpenAiCompat(
+                        OpenAiCompatClient::from_env(OpenAiCompatConfig::openanalyst())?,
+                        kind,
+                    ))
+                } else {
+                    Ok(Self::OpenAnalystApi(match default_auth {
+                        Some(auth) => OpenAnalystApiClient::from_auth(auth),
+                        None => OpenAnalystApiClient::from_env()?,
+                    }))
+                }
             }
             // Anthropic direct (user's own ANTHROPIC_API_KEY → api.anthropic.com)
             ProviderKind::Anthropic => {

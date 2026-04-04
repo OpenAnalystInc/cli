@@ -368,6 +368,12 @@ fn load_saved_provider_credentials() {
                         }
                     }
                 }
+                // Load OpenAnalyst routing mode (free or api)
+                if let Some(mode) = creds.get("openanalyst_mode").and_then(|v| v.as_str()) {
+                    if env::var("OPENANALYST_MODE").ok().filter(|v| !v.is_empty()).is_none() {
+                        env::set_var("OPENANALYST_MODE", mode);
+                    }
+                }
             }
         }
     }
@@ -1030,13 +1036,24 @@ struct ProviderOAuthMeta {
 const LOGIN_PROVIDERS: &[ProviderOption] = &[
     ProviderOption {
         name: "OpenAnalyst",
-        description: "OpenAnalyst API (default)",
+        description: "gpt-oss-120b free model or API key with credits",
         env_var: "OPENANALYST_AUTH_TOKEN",
         test_url: "https://api.openanalyst.com/api/health",
         test_header: "bearer",
         dashboard_url: "https://10x.in/dashboard",
         models_url: "",
-        oauth: None,
+        // OAuth = free model (oa_ key, H100 gpt-oss-120b, no browser redirect)
+        // API key = credits (sk-oa- key, api.openanalyst.com)
+        oauth: Some(ProviderOAuthMeta {
+            client_id_env: "",
+            default_client_id: "",
+            default_client_secret: "",
+            authorize_url: "",
+            token_url: "",
+            scopes: &[],
+            token_env_var: "OPENANALYST_AUTH_TOKEN",
+            extra_authorize_params: &[],
+        }),
     },
     ProviderOption {
         name: "Anthropic / Claude",
@@ -1261,10 +1278,17 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── For Claude/Codex/Gemini: ask OAuth vs API key ──
     if provider.oauth.is_some() {
-        let auth_methods = [
-            ("Login with browser", "sign in with your account (recommended)"),
-            ("Use API key", "paste an API key manually"),
-        ];
+        let auth_methods = if provider.name == "OpenAnalyst" {
+            [
+                ("Use free model", "gpt-oss-120b — no credits needed"),
+                ("Use API key", "OpenAnalyst API with credits"),
+            ]
+        } else {
+            [
+                ("Login with browser", "sign in with your account (recommended)"),
+                ("Use API key", "paste an API key manually"),
+            ]
+        };
 
         println!("  \x1b[2mHow would you like to authenticate?\x1b[0m");
         println!();
@@ -1331,17 +1355,23 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
         }
         println!();
 
-        if method_sel == 0 {
-            // OAuth browser login
+        if method_sel == 0 && provider.name == "OpenAnalyst" {
+            // OpenAnalyst free model — auto-generate sk-oa- key, route to H100
+            run_openanalyst_free_login(provider)?;
+        } else if method_sel == 0 {
+            // Other providers: OAuth browser login
             let oauth_meta = provider.oauth.as_ref().unwrap();
-            // Use env var override if set, otherwise use the built-in default client ID
             let client_id = env::var(oauth_meta.client_id_env)
                 .ok()
                 .filter(|v| !v.is_empty())
                 .unwrap_or_else(|| oauth_meta.default_client_id.to_string());
             run_oauth_login(provider, oauth_meta, &client_id)?;
         } else {
-            // API key
+            // API key (for OpenAnalyst: credits mode via api.openanalyst.com)
+            if provider.name == "OpenAnalyst" {
+                // Save mode=api so client routes to api.openanalyst.com
+                save_openanalyst_mode("api");
+            }
             run_apikey_login(provider)?;
         }
     } else {
@@ -1638,6 +1668,82 @@ fn run_apikey_login(provider: &ProviderOption) -> Result<(), Box<dyn std::error:
 
     print_login_summary(provider, &api_key, &models);
     Ok(())
+}
+
+/// OpenAnalyst free model login — auto-generate sk-oa- key, route to H100 gpt-oss-120b.
+fn run_openanalyst_free_login(provider: &ProviderOption) -> Result<(), Box<dyn std::error::Error>> {
+    println!("  \x1b[1mStep 1\x1b[0m  Setting up free model access...");
+    println!();
+
+    // Generate a unique sk-oa- key for this machine
+    let machine_id = env::var("COMPUTERNAME")
+        .or_else(|_| env::var("HOSTNAME"))
+        .unwrap_or_else(|_| "cli".to_string())
+        .to_lowercase();
+    let timestamp = SystemTime::now()
+        .duration_since(UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_secs();
+    let api_key = format!("sk-oa-free-{machine_id}-{timestamp}");
+
+    // Save mode=free so client routes to H100
+    save_openanalyst_mode("free");
+
+    // Verify H100 is reachable
+    print!("  \x1b[1mStep 2\x1b[0m  Connecting to OpenAnalyst model server... ");
+    io::stdout().flush()?;
+
+    let base_url = env::var("OPENANALYST_BASE_URL")
+        .unwrap_or_else(|_| "https://aquatic-temperatures-regularly-favourite.trycloudflare.com/v1".to_string());
+    let health_ok = reqwest::blocking::Client::builder()
+        .timeout(Duration::from_secs(10))
+        .build()
+        .ok()
+        .and_then(|c| c.get(format!("{}/models", base_url)).send().ok())
+        .map_or(false, |r| r.status().is_success());
+
+    if health_ok {
+        println!("\x1b[38;5;46m\u{2713} Connected\x1b[0m");
+        println!("  \x1b[2mModel: openai/gpt-oss-120b (117B params, H100 GPU)\x1b[0m");
+    } else {
+        println!("\x1b[38;5;208m\u{26a0} Server may be starting up\x1b[0m");
+        println!("  \x1b[2mThe free model server may take a moment to warm up.\x1b[0m");
+    }
+
+    // Save credentials
+    save_provider_credential(provider, &api_key)?;
+    env::set_var(provider.env_var, &api_key);
+
+    println!();
+    println!("  \x1b[38;5;46m\u{2713}\x1b[0m \x1b[1mFree model access configured\x1b[0m");
+    println!();
+    println!("  \x1b[2mModel:    openai/gpt-oss-120b\x1b[0m");
+    println!("  \x1b[2mCredits:  unlimited (free tier)\x1b[0m");
+    println!("  \x1b[2mKey:      {}...{}\x1b[0m", &api_key[..12], &api_key[api_key.len()-4..]);
+
+    Ok(())
+}
+
+/// Save OpenAnalyst routing mode (free or api) to credentials and env.
+fn save_openanalyst_mode(mode: &str) {
+    env::set_var("OPENANALYST_MODE", mode);
+    // Also persist to credentials.json so it survives restarts
+    let config_dir = runtime::credentials_config_home().ok()
+        .or_else(|| {
+            env::var("HOME").or_else(|_| env::var("USERPROFILE")).ok()
+                .map(|h| PathBuf::from(h).join(".openanalyst"))
+        });
+    if let Some(config_dir) = config_dir {
+        let creds_path = config_dir.join("credentials.json");
+        if let Ok(content) = fs::read_to_string(&creds_path) {
+            if let Ok(mut creds) = serde_json::from_str::<serde_json::Value>(&content) {
+                creds["openanalyst_mode"] = json!(mode);
+                let _ = fs::write(&creds_path, serde_json::to_string_pretty(&creds).unwrap_or_default());
+            }
+        }
+        // Also persist to .env
+        let _ = upsert_dotenv_key(&config_dir.join(".env"), "OPENANALYST_MODE", mode);
+    }
 }
 
 /// Save a provider's API key to ~/.openanalyst/credentials.json.
