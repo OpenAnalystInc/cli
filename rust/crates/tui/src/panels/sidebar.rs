@@ -120,6 +120,7 @@ impl SidebarSection {
 #[derive(Debug, Clone)]
 pub struct PlanInfo {
     pub name: String,
+    pub path: String, // full filesystem path to the .md file
     pub status: PlanStatus,
     pub source: String, // "file" or "session"
 }
@@ -157,6 +158,8 @@ pub struct SidebarState {
     /// Per-category model index for cycling through available_models.
     /// [explore, research, code, write] — each indexes into available_models.
     pub routing_model_index: [usize; 4],
+    /// Index of the active plan (selected by user from sidebar).
+    pub active_plan_index: Option<usize>,
 }
 
 impl Default for SidebarState {
@@ -182,6 +185,7 @@ impl Default for SidebarState {
             expanded_agent: None,
             available_models,
             routing_model_index: [0; 4],
+            active_plan_index: None,
         }
     }
 }
@@ -305,6 +309,7 @@ impl SidebarState {
                 };
                 self.plans.push(PlanInfo {
                     name,
+                    path: path.to_string_lossy().to_string(),
                     status,
                     source: "file".to_string(),
                 });
@@ -578,6 +583,7 @@ pub fn render_sidebar(
     // ── Plans Section ──
     render_plans_section(
         &state.plans,
+        state.active_plan_index,
         focused && state.active_section == SidebarSection::Plans,
         state.selected_index,
         sections[2],
@@ -771,6 +777,7 @@ fn render_files_section(
 
 fn render_plans_section(
     plans: &[PlanInfo],
+    active_plan_idx: Option<usize>,
     is_focused: bool,
     selected: usize,
     area: Rect,
@@ -799,10 +806,15 @@ fn render_plans_section(
         for (i, plan) in plans.iter().enumerate().skip(plan_scroll).take(5) {
             let is_selected = is_focused && i == selected;
             let bg = if is_selected { Color::Indexed(239) } else { Color::Reset };
-            let (icon, icon_color) = match plan.status {
-                PlanStatus::Done => ("✓", Color::Green),
-                PlanStatus::InProgress => ("●", Color::Yellow),
-                PlanStatus::Todo => ("○", Color::Indexed(245)),
+            let is_active_plan = active_plan_idx == Some(i);
+            let (icon, icon_color) = if is_active_plan {
+                ("◆", Color::Rgb(50, 130, 255))
+            } else {
+                match plan.status {
+                    PlanStatus::Done => ("✓", Color::Green),
+                    PlanStatus::InProgress => ("●", Color::Yellow),
+                    PlanStatus::Todo => ("○", Color::Indexed(245)),
+                }
             };
             let sel_prefix = if is_selected { "▸" } else { " " };
             let text_color = if is_selected { Color::White } else { Color::Indexed(252) };

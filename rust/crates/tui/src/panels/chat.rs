@@ -464,18 +464,20 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
         ),
     ]));
 
-    // For diff cards, show summary and diff lines
+    // For diff cards, show summary and diff lines only when expanded
     if let Some(ref diff) = card.diff {
-        // Summary: └  Added 38 lines, removed 3 lines
-        let summary = match (diff.added, diff.removed) {
-            (a, 0) => format!("└  Added {a} lines"),
-            (0, r) => format!("└  Removed {r} lines"),
-            (a, r) => format!("└  Added {a} lines, removed {r} lines"),
-        };
-        lines.push(Line::from(Span::styled(
-            summary,
-            Style::default().fg(Color::DarkGray),
-        )));
+        if card.expanded {
+            // Summary: └  Added 38 lines, removed 3 lines
+            let summary = match (diff.added, diff.removed) {
+                (a, 0) => format!("└  Added {a} lines"),
+                (0, r) => format!("└  Removed {r} lines"),
+                (a, r) => format!("└  Added {a} lines, removed {r} lines"),
+            };
+            lines.push(Line::from(Span::styled(
+                summary,
+                Style::default().fg(Color::DarkGray),
+            )));
+        }
 
         // Render diff hunks with line numbers and colors
         if card.expanded {
@@ -539,11 +541,13 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
 
         lines.push(Line::from(""));
     } else {
-        // Non-diff tool card — input preview + optional raw output
-        lines.push(Line::from(Span::styled(
-            format!("  {}", card.input_preview),
-            Style::default().fg(Color::Indexed(252)),
-        )));
+        // Non-diff tool card — input preview + optional raw output (only when expanded)
+        if card.expanded {
+            lines.push(Line::from(Span::styled(
+                format!("  {}", card.input_preview),
+                Style::default().fg(Color::Indexed(252)),
+            )));
+        }
 
         if card.expanded {
             if let Some(ref output) = card.output {

@@ -1,5 +1,7 @@
 //! Keybinding dispatch for the TUI.
 
+use std::time::Duration;
+
 use ratatui::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 
 use crate::app::App;
@@ -164,9 +166,38 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
                 }
             }
         }
-        // Esc → return from sidebar/scroll to input, or enter scroll mode
+        // Esc → double-Esc undo, or return from sidebar/scroll, or enter scroll mode
         KeyCode::Esc => {
-            if app.focus == events::PanelId::Sidebar {
+            let now = std::time::Instant::now();
+            let is_double_esc = app.last_esc_time
+                .map(|t| now.duration_since(t) < Duration::from_millis(350))
+                .unwrap_or(false);
+            app.last_esc_time = Some(now);
+
+            if is_double_esc {
+                // Double-Esc: undo last action
+                if let Some(action) = app.undo_stack.pop() {
+                    match action {
+                        crate::app::UndoAction::AddContextFile(path) => {
+                            app.context_files.retain(|f| f != &path);
+                            let short = path.rsplit(['/', '\\']).next().unwrap_or(&path).to_string();
+                            app.chat.push_system(format!("Undone: removed @{short}"));
+                        }
+                        crate::app::UndoAction::RemoveContextFile(path) => {
+                            app.context_files.push(path.clone());
+                            let short = path.rsplit(['/', '\\']).next().unwrap_or(&path).to_string();
+                            app.chat.push_system(format!("Undone: re-added @{short}"));
+                        }
+                        crate::app::UndoAction::SelectAgent(prev) => {
+                            app.set_active_agent(prev);
+                        }
+                        crate::app::UndoAction::SelectPlan(prev) => {
+                            app.sidebar_state.active_plan_index = prev;
+                            app.chat.push_system("Undone: plan selection reverted".to_string());
+                        }
+                    }
+                }
+            } else if app.focus == events::PanelId::Sidebar {
                 // Return from sidebar to input
                 app.focus = events::PanelId::Input;
                 app.sidebar_state.has_focus = false;
@@ -210,6 +241,19 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
         }
         // Everything else → delegate to input box
         _ => {
+            // Backspace on empty input → remove last context file
+            if key.code == KeyCode::Backspace
+                && app.input_state.text().is_empty()
+                && !app.context_files.is_empty()
+            {
+                if let Some(removed) = app.context_files.pop() {
+                    let short = removed.rsplit(['/', '\\']).next().unwrap_or(&removed).to_string();
+                    app.chat.push_system(format!("Removed @{short} from context"));
+                    app.undo_stack.push(crate::app::UndoAction::RemoveContextFile(removed));
+                    if app.undo_stack.len() > 20 { app.undo_stack.remove(0); }
+                }
+                return;
+            }
             if let Some(submitted) = app.input_state.handle_key(key) {
                 app.submit_prompt(submitted);
             } else {
@@ -370,8 +414,11 @@ fn handle_sidebar_key(key: KeyEvent, app: &mut App) {
                     let idx = app.sidebar_state.selected_index;
                     if idx >= running_count {
                         let def_idx = idx - running_count;
+                        let prev_agent = app.active_agent_name.clone();
                         let name = app.sidebar_state.toggle_agent_selection(def_idx);
                         app.set_active_agent(name);
+                        app.undo_stack.push(crate::app::UndoAction::SelectAgent(prev_agent));
+                        if app.undo_stack.len() > 20 { app.undo_stack.remove(0); }
                     } else {
                         app.sidebar_state.toggle_expand();
                     }
@@ -404,6 +451,50 @@ fn handle_sidebar_key(key: KeyEvent, app: &mut App) {
                         } else {
                             app.chat.push_system("No models available. Set an API key first.".to_string());
                         }
+                    }
+                }
+                SidebarSection::Files => {
+                    let idx = app.sidebar_state.selected_index;
+                    if let Some(file) = app.sidebar_state.files.get(idx) {
+                        let path = file.path.clone();
+                        if app.context_files.contains(&path) {
+                            app.context_files.retain(|f| f != &path);
+                            let short = path.rsplit(['/', '\\']).next().unwrap_or(&path).to_string();
+                            app.chat.push_system(format!("Removed @{short} from context"));
+                            app.undo_stack.push(crate::app::UndoAction::RemoveContextFile(path));
+                        } else {
+                            let short = path.rsplit(['/', '\\']).next().unwrap_or(&path).to_string();
+                            app.context_files.push(path.clone());
+                            app.chat.push_system(format!("Added @{short} as context"));
+                            app.undo_stack.push(crate::app::UndoAction::AddContextFile(path));
+                        }
+                        if app.undo_stack.len() > 20 { app.undo_stack.remove(0); }
+                    }
+                }
+                SidebarSection::Plans => {
+                    let idx = app.sidebar_state.selected_index;
+                    if let Some(plan) = app.sidebar_state.plans.get(idx) {
+                        let prev = app.sidebar_state.active_plan_index;
+                        app.sidebar_state.active_plan_index = Some(idx);
+                        app.undo_stack.push(crate::app::UndoAction::SelectPlan(prev));
+                        if app.undo_stack.len() > 20 { app.undo_stack.remove(0); }
+                        let path = plan.path.clone();
+                        let name = plan.name.clone();
+                        // Open in external editor
+                        #[cfg(target_os = "windows")]
+                        {
+                            let _ = std::process::Command::new("cmd")
+                                .args(["/C", "start", "", &path])
+                                .spawn();
+                        }
+                        #[cfg(not(target_os = "windows"))]
+                        {
+                            let editor = std::env::var("EDITOR").unwrap_or_else(|_| "xdg-open".to_string());
+                            let _ = std::process::Command::new(&editor)
+                                .arg(&path)
+                                .spawn();
+                        }
+                        app.chat.push_system(format!("Opened plan: {name}"));
                     }
                 }
                 _ => {
