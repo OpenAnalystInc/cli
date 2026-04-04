@@ -6,8 +6,7 @@ use events::{Action, ActionTx, AgentStatus, PanelId, UiEvent, UiEventRx};
 use orchestrator::router::ModelRouter;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::style::{Color, Style};
-use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget};
+use ratatui::widgets::{Paragraph, Widget};
 
 use tui_widgets::status_bar::AgentPhase;
 use tui_widgets::{InputBox, InputBoxState, PermissionDialog, PermissionLevel, StatusBar, ToolCallCard, ToolCallStatus};
@@ -1017,7 +1016,7 @@ impl App {
         }
 
         // Priority 2: Git branch name (cached per render — fast enough for TUI)
-        static CACHED_BRANCH: std::sync::OnceLock<Option<String>> = std::sync::OnceLock::new();
+        static CACHED_BRANCH: std::sync::OnceLock<String> = std::sync::OnceLock::new();
         let branch = CACHED_BRANCH.get_or_init(|| {
             std::process::Command::new("git")
                 .args(["branch", "--show-current"])
@@ -1031,9 +1030,10 @@ impl App {
                         None
                     }
                 })
+                .unwrap_or_else(|| "No-Git".to_string())
         });
 
-        branch.clone()
+        Some(branch.clone())
     }
 
     /// Determine the current input mode based on app state.
@@ -1130,26 +1130,6 @@ impl App {
                 .active_agent(self.active_agent_name.clone())
                 .context_files(self.context_files.clone());
             input.render_with_state(layout.input, buf, &mut self.input_state);
-        }
-
-        // Full-window scrollbar — always visible when content exceeds viewport (like terminal native scrollbar)
-        if self.chat.last_total_lines.get() > self.chat.last_visible_height.get() {
-            let scrollbar_area = Rect {
-                x: area.x + area.width.saturating_sub(1),
-                y: area.y,
-                width: 1,
-                height: area.height,
-            };
-            let mut scrollbar_state = ScrollbarState::new(self.chat.last_total_lines.get() as usize)
-                .position(self.chat.last_scroll_pos.get() as usize)
-                .viewport_content_length(self.chat.last_visible_height.get() as usize);
-            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                .symbols(ratatui::symbols::scrollbar::VERTICAL)
-                .thumb_style(Style::default().fg(Color::Indexed(245)))
-                .track_style(Style::default().fg(Color::Indexed(235)))
-                .begin_style(Style::default().fg(Color::Indexed(235)))
-                .end_style(Style::default().fg(Color::Indexed(235)));
-            scrollbar.render(scrollbar_area, buf, &mut scrollbar_state);
         }
 
         // Slash command autocomplete overlay (above input)
