@@ -1036,14 +1036,14 @@ struct ProviderOAuthMeta {
 const LOGIN_PROVIDERS: &[ProviderOption] = &[
     ProviderOption {
         name: "OpenAnalyst",
-        description: "gpt-oss-120b free model or API key with credits",
+        description: "Free model or API key with credits",
         env_var: "OPENANALYST_AUTH_TOKEN",
         test_url: "https://api.openanalyst.com/api/health",
         test_header: "bearer",
         dashboard_url: "https://10x.in/dashboard",
         models_url: "",
-        // OAuth = free model (oa_ key, H100 gpt-oss-120b, no browser redirect)
-        // API key = credits (sk-oa- key, api.openanalyst.com)
+        // OAuth = free model (auto key, no browser)
+        // API key = credits (sk-oa- key)
         oauth: Some(ProviderOAuthMeta {
             client_id_env: "",
             default_client_id: "",
@@ -1356,7 +1356,7 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
         println!();
 
         if method_sel == 0 && provider.name == "OpenAnalyst" {
-            // OpenAnalyst free model — auto-generate sk-oa- key, route to H100
+            // OpenAnalyst free model — auto key, goes through api.openanalyst.com
             run_openanalyst_free_login(provider)?;
         } else if method_sel == 0 {
             // Other providers: OAuth browser login
@@ -1670,12 +1670,9 @@ fn run_apikey_login(provider: &ProviderOption) -> Result<(), Box<dyn std::error:
     Ok(())
 }
 
-/// OpenAnalyst free model login — auto-generate sk-oa- key, route to H100 gpt-oss-120b.
+/// OpenAnalyst free model login — auto-generate key, connect through api.openanalyst.com.
 fn run_openanalyst_free_login(provider: &ProviderOption) -> Result<(), Box<dyn std::error::Error>> {
-    println!("  \x1b[1mStep 1\x1b[0m  Setting up free model access...");
-    println!();
-
-    // Generate a unique sk-oa- key for this machine
+    // Generate a unique sk-oa-free key
     let machine_id = env::var("COMPUTERNAME")
         .or_else(|_| env::var("HOSTNAME"))
         .unwrap_or_else(|_| "cli".to_string())
@@ -1686,28 +1683,21 @@ fn run_openanalyst_free_login(provider: &ProviderOption) -> Result<(), Box<dyn s
         .as_secs();
     let api_key = format!("sk-oa-free-{machine_id}-{timestamp}");
 
-    // Save mode=free so client routes to H100
-    save_openanalyst_mode("free");
-
-    // Verify H100 is reachable
-    print!("  \x1b[1mStep 2\x1b[0m  Connecting to OpenAnalyst model server... ");
+    print!("  \x1b[1mStep 1\x1b[0m  Connecting to OpenAnalyst... ");
     io::stdout().flush()?;
 
-    let base_url = env::var("OPENANALYST_BASE_URL")
-        .unwrap_or_else(|_| "https://aquatic-temperatures-regularly-favourite.trycloudflare.com/v1".to_string());
+    // Verify API is reachable
     let health_ok = reqwest::blocking::Client::builder()
-        .timeout(Duration::from_secs(10))
+        .timeout(Duration::from_secs(5))
         .build()
         .ok()
-        .and_then(|c| c.get(format!("{}/models", base_url)).send().ok())
+        .and_then(|c| c.get("https://api.openanalyst.com/api/health").send().ok())
         .map_or(false, |r| r.status().is_success());
 
     if health_ok {
         println!("\x1b[38;5;46m\u{2713} Connected\x1b[0m");
-        println!("  \x1b[2mModel: openai/gpt-oss-120b (117B params, H100 GPU)\x1b[0m");
     } else {
-        println!("\x1b[38;5;208m\u{26a0} Server may be starting up\x1b[0m");
-        println!("  \x1b[2mThe free model server may take a moment to warm up.\x1b[0m");
+        println!("\x1b[38;5;208m\u{26a0} API may be starting up\x1b[0m");
     }
 
     // Save credentials
@@ -1717,8 +1707,7 @@ fn run_openanalyst_free_login(provider: &ProviderOption) -> Result<(), Box<dyn s
     println!();
     println!("  \x1b[38;5;46m\u{2713}\x1b[0m \x1b[1mFree model access configured\x1b[0m");
     println!();
-    println!("  \x1b[2mModel:    openai/gpt-oss-120b\x1b[0m");
-    println!("  \x1b[2mCredits:  unlimited (free tier)\x1b[0m");
+    println!("  \x1b[2mCredits:  free tier\x1b[0m");
     println!("  \x1b[2mKey:      {}...{}\x1b[0m", &api_key[..12], &api_key[api_key.len()-4..]);
 
     Ok(())
