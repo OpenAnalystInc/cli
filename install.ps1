@@ -1,234 +1,170 @@
-# ─────────────────────────────────────────────────
 # OpenAnalyst CLI Installer — Windows PowerShell
-#
-# Usage:
-#   irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex
-# ─────────────────────────────────────────────────
+# Usage: irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex
 
-# Prevent the script from closing the terminal on errors
 $ErrorActionPreference = "Continue"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
-try { $OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
 $Repo = "AnitChaudhry/openanalyst-cli"
 $BinaryName = "openanalyst.exe"
 $InstallDir = "$env:USERPROFILE\.openanalyst\bin"
 $ConfigDir = "$env:USERPROFILE\.openanalyst"
-$Target = "x86_64-pc-windows-msvc"
+$W = 44  # box inner width
 
-Write-Host ""
-Write-Host ""
-Write-Host "    ████████    ████   " -ForegroundColor Blue
-Write-Host "    ██    ██   ██  ██  " -ForegroundColor Cyan
-Write-Host "    ██    ██  ██    ██ " -ForegroundColor Cyan
-Write-Host "    ██    ██  ████████ " -ForegroundColor Cyan
-Write-Host "    ██    ██  ██    ██ " -ForegroundColor Blue
-Write-Host "    ████████  ██    ██ " -ForegroundColor Blue
-Write-Host ""
-Write-Host "   OpenAnalyst CLI  " -ForegroundColor White -NoNewline
-Write-Host "v1.0.91" -ForegroundColor DarkGray
-Write-Host "   The Universal AI Agent for Your Terminal" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "   ────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "   ┌──────────────────────────────────────────┐" -ForegroundColor DarkGray
-Write-Host "   │  System       Windows x64                │" -ForegroundColor DarkGray
-Write-Host "   │  Install to   $InstallDir" -ForegroundColor DarkGray
-Write-Host "   │  Config at    $ConfigDir" -ForegroundColor DarkGray
-Write-Host "   └──────────────────────────────────────────┘" -ForegroundColor DarkGray
-Write-Host ""
-
-# Create directories
-New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
-New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
-
-$Downloaded = $false
-
-# Step 1 — Download from GitHub Release
-Write-Host "   › Fetching latest release..." -ForegroundColor Cyan -NoNewline
-
-# Build headers — use GITHUB_TOKEN for private repos if available
+# ── Fetch version before rendering ──
 $GhHeaders = @{ "User-Agent" = "openanalyst-cli" }
-if ($env:GITHUB_TOKEN) {
-    $GhHeaders["Authorization"] = "Bearer $env:GITHUB_TOKEN"
-} elseif ($env:GH_TOKEN) {
-    $GhHeaders["Authorization"] = "Bearer $env:GH_TOKEN"
-} else {
-    # Try gh CLI auth token
-    try {
-        $GhAuthToken = (gh auth token 2>$null)
-        if ($GhAuthToken) { $GhHeaders["Authorization"] = "Bearer $GhAuthToken" }
-    } catch {}
-}
+if ($env:GITHUB_TOKEN) { $GhHeaders["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
+elseif ($env:GH_TOKEN) { $GhHeaders["Authorization"] = "Bearer $env:GH_TOKEN" }
+else { try { $t = (gh auth token 2>$null); if ($t) { $GhHeaders["Authorization"] = "Bearer $t" } } catch {} }
 
+$Version = "latest"
 try {
     $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $GhHeaders -ErrorAction Stop
     $Version = $Release.tag_name -replace "^v", ""
-    Write-Host " v$Version" -ForegroundColor Green
+} catch {}
 
-    # Find the binary asset — match openanalyst.exe or any windows exe
+# ── Header ──
+$B = [char]0x2502  # │
+$TL = [char]0x250C  # ┌
+$TR = [char]0x2510  # ┐
+$BL = [char]0x2514  # └
+$BR = [char]0x2518  # ┘
+$H = [char]0x2500   # ─
+$ML = [char]0x251C  # ├
+$MR = [char]0x2524  # ┤
+$Bar = "$H" * $W
+
+Write-Host ""
+Write-Host "  $TL$Bar$TR" -ForegroundColor DarkGray
+Write-Host "  $B                                            $B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  $B" -ForegroundColor DarkGray
+Write-Host -NoNewline "   " -ForegroundColor DarkGray
+Write-Host -NoNewline "██████  █████" -ForegroundColor Cyan
+Write-Host -NoNewline "   OpenAnalyst CLI       " -ForegroundColor White
+Write-Host "$B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  $B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  " -ForegroundColor DarkGray
+Write-Host -NoNewline "██    ██ ██   ██" -ForegroundColor Cyan
+Write-Host -NoNewline "  v$($Version.PadRight(25))" -ForegroundColor DarkGray
+Write-Host "$B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  $B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  " -ForegroundColor DarkGray
+Write-Host -NoNewline "██    ██ ███████" -ForegroundColor Cyan
+Write-Host -NoNewline "                           " -ForegroundColor DarkGray
+Write-Host "$B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  $B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  " -ForegroundColor DarkGray
+Write-Host -NoNewline "██    ██ ██   ██" -ForegroundColor Cyan
+Write-Host -NoNewline "  Windows x64             " -ForegroundColor DarkGray
+Write-Host "$B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  $B" -ForegroundColor DarkGray
+Write-Host -NoNewline "   " -ForegroundColor DarkGray
+Write-Host -NoNewline "██████  ██   ██" -ForegroundColor Cyan
+Write-Host -NoNewline "                          " -ForegroundColor DarkGray
+Write-Host "$B" -ForegroundColor DarkGray
+Write-Host "  $B                                            $B" -ForegroundColor DarkGray
+Write-Host "  $ML$Bar$MR" -ForegroundColor DarkGray
+
+# ── Create directories ──
+New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
+New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
+
+# ── Step 1: Download ──
+$Downloaded = $false
+Write-Host -NoNewline "  $B  [1/3] Download " -ForegroundColor DarkGray
+$dots = "." * 22
+Write-Host -NoNewline "$dots " -ForegroundColor DarkGray
+
+# Kill running instance
+Get-Process -Name "openanalyst" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
+Start-Sleep -Milliseconds 300
+
+if ($Release) {
     $Asset = $Release.assets | Where-Object { $_.name -eq "openanalyst.exe" } | Select-Object -First 1
-    if (-not $Asset) {
-        $Asset = $Release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1
-    }
+    if (-not $Asset) { $Asset = $Release.assets | Where-Object { $_.name -like "*.exe" } | Select-Object -First 1 }
 
-    if ($Asset) {
+    if ($Asset -and $Asset.browser_download_url) {
         $AssetUrl = $Asset.browser_download_url
     } else {
         $AssetUrl = "https://github.com/$Repo/releases/download/$($Release.tag_name)/openanalyst.exe"
     }
 
-    Write-Host "   › Downloading binary..." -ForegroundColor Cyan -NoNewline
     try {
-        Invoke-WebRequest -Uri $AssetUrl -OutFile "$InstallDir\$BinaryName" -Headers $GhHeaders -ErrorAction Stop
+        Invoke-WebRequest -Uri $AssetUrl -OutFile "$InstallDir\$BinaryName" -UseBasicParsing -ErrorAction Stop
         $Downloaded = $true
-        Write-Host " ✓ done" -ForegroundColor Green
+        Write-Host -NoNewline "`u{2713}" -ForegroundColor Green
     } catch {
-        Write-Host " download failed" -ForegroundColor Yellow
+        Write-Host -NoNewline "`u{2717}" -ForegroundColor Red
     }
-} catch {
-    Write-Host " release not found" -ForegroundColor Yellow
-    Write-Host ""
-    Write-Host "   Note: If this is a private repo, set GITHUB_TOKEN:" -ForegroundColor DarkGray
-    Write-Host "     `$env:GITHUB_TOKEN = 'ghp_your_token'" -ForegroundColor DarkGray
-    Write-Host "   Or login with: gh auth login" -ForegroundColor DarkGray
-    Write-Host ""
+} else {
+    Write-Host -NoNewline "`u{2717}" -ForegroundColor Red
 }
+Write-Host "   $B" -ForegroundColor DarkGray
 
-# If download failed, exit with instructions
 if (-not $Downloaded) {
-    Write-Host ""
-    Write-Host "   Download failed. Try manually:" -ForegroundColor Red
-    Write-Host ""
-    Write-Host "   1. Go to: https://github.com/$Repo/releases/latest" -ForegroundColor White
-    Write-Host "   2. Download openanalyst.exe" -ForegroundColor White
-    Write-Host "   3. Move it to: $InstallDir" -ForegroundColor White
+    Write-Host "  $B                                            $B" -ForegroundColor DarkGray
+    Write-Host -NoNewline "  $B" -ForegroundColor DarkGray
+    Write-Host -NoNewline "  Download failed. Visit:                  " -ForegroundColor Red
+    Write-Host "$B" -ForegroundColor DarkGray
+    Write-Host -NoNewline "  $B" -ForegroundColor DarkGray
+    Write-Host -NoNewline "  github.com/$Repo/releases  " -ForegroundColor White
+    Write-Host "$B" -ForegroundColor DarkGray
+    Write-Host "  $B                                            $B" -ForegroundColor DarkGray
+    Write-Host "  $BL$Bar$BR" -ForegroundColor DarkGray
     Write-Host ""
     exit 1
 }
 
-# Step 2 — PATH
-Write-Host "   › Configuring PATH..." -ForegroundColor Cyan -NoNewline
+# ── Step 2: PATH ──
+Write-Host -NoNewline "  $B  [2/3] PATH " -ForegroundColor DarkGray
+$dots = "." * 26
+Write-Host -NoNewline "$dots " -ForegroundColor DarkGray
 $CurrentPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($CurrentPath -notlike "*$InstallDir*") {
     [Environment]::SetEnvironmentVariable("Path", "$InstallDir;$CurrentPath", "User")
     $env:Path = "$InstallDir;$env:Path"
-    Write-Host " ✓ added" -ForegroundColor Green
-} else {
-    Write-Host " ✓ already set" -ForegroundColor DarkGray
 }
+Write-Host -NoNewline "`u{2713}" -ForegroundColor Green
+Write-Host "   $B" -ForegroundColor DarkGray
 
-# Step 3 — .env config
-Write-Host "   › Creating config..." -ForegroundColor Cyan -NoNewline
+# ── Step 3: Config ──
+Write-Host -NoNewline "  $B  [3/3] Config " -ForegroundColor DarkGray
+$dots = "." * 24
+Write-Host -NoNewline "$dots " -ForegroundColor DarkGray
 $EnvFile = "$ConfigDir\.env"
 if (-not (Test-Path $EnvFile)) {
     @"
-# ═══════════════════════════════════════════════════════════════════
-#  OpenAnalyst CLI — Environment Configuration
-# ═══════════════════════════════════════════════════════════════════
-#
-#  Add your API keys below. The CLI loads this file on every startup.
-#  Uncomment and fill in the providers you want to use.
-#  Or run ``openanalyst login`` for interactive browser-based setup.
-#
-#  Docs: https://github.com/AnitChaudhry/openanalyst-cli
-# ═══════════════════════════════════════════════════════════════════
+# OpenAnalyst CLI — Environment Configuration
+# Add API keys below or run: openanalyst login
 
-# ── Provider API Keys ─────────────────────────────────────────────
-
-# OpenAnalyst (default provider)
 # OPENANALYST_API_KEY=
-# OPENANALYST_AUTH_TOKEN=
-
-# Anthropic / Claude (opus, sonnet, haiku)
 # ANTHROPIC_API_KEY=sk-ant-...
-
-# OpenAI / Codex (gpt-4o, o3, codex-mini)
 # OPENAI_API_KEY=sk-...
-
-# Google Gemini (gemini-2.5-pro, flash)
 # GEMINI_API_KEY=AIza...
-
-# xAI / Grok (grok-3, grok-mini)
 # XAI_API_KEY=xai-...
-
-# OpenRouter (350+ models via one key)
-# OPENROUTER_API_KEY=sk-or-...
-
-# Amazon Bedrock
-# BEDROCK_API_KEY=
-
-# Stability AI (image generation via /image)
-# STABILITY_API_KEY=sk-...
-
-# ── Base URL Overrides (optional) ─────────────────────────────────
-
-# OPENANALYST_BASE_URL=https://api.openanalyst.com/api
-# ANTHROPIC_BASE_URL=https://api.anthropic.com
-# OPENAI_BASE_URL=https://api.openai.com/v1
-
-# ── Model Override ────────────────────────────────────────────────
-
-# OPENANALYST_MODEL=claude-sonnet-4-6
 "@ | Out-File -FilePath $EnvFile -Encoding utf8
-    Write-Host " ✓ created" -ForegroundColor Green
-} else {
-    Write-Host " ✓ exists" -ForegroundColor DarkGray
 }
+Write-Host -NoNewline "`u{2713}" -ForegroundColor Green
+Write-Host "   $B" -ForegroundColor DarkGray
 
-# ═══════════════════════════════════════════════════
-#  Summary
-# ═══════════════════════════════════════════════════
-Write-Host ""
-Write-Host "   ────────────────────────────────────────────" -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "   ✓ Installation complete" -ForegroundColor Green
-Write-Host ""
-Write-Host "   ┌──────────────────────────────────────────┐" -ForegroundColor DarkGray
+# ── Result ──
+Write-Host "  $B                                            $B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  $B  " -ForegroundColor DarkGray
+Write-Host -NoNewline "`u{2713} Installed to " -ForegroundColor Green
+Write-Host -NoNewline "~/.openanalyst/bin        " -ForegroundColor White
+Write-Host "$B" -ForegroundColor DarkGray
+Write-Host "  $B                                            $B" -ForegroundColor DarkGray
 
-try {
-    $VersionOutput = & "$InstallDir\$BinaryName" --version 2>&1 | Select-Object -Skip 1 -First 1
-    Write-Host "   │  Version    $($VersionOutput.Trim().PadRight(29))│" -ForegroundColor DarkGray
-} catch {}
-
-Write-Host "   │  Binary     $("$InstallDir\$BinaryName".PadRight(29))│" -ForegroundColor DarkGray
-Write-Host "   │  Config     $("$EnvFile".PadRight(29))│" -ForegroundColor DarkGray
-Write-Host "   └──────────────────────────────────────────┘" -ForegroundColor DarkGray
-
-Write-Host ""
-Write-Host "   Next steps" -ForegroundColor White
-Write-Host ""
-Write-Host "   1. Login to your LLM provider" -ForegroundColor White
-Write-Host ""
-Write-Host "      › openanalyst login" -ForegroundColor Cyan
-Write-Host ""
-Write-Host "      Select a provider, authenticate via browser" -ForegroundColor DarkGray
-Write-Host "      or paste your API key. Credentials are saved" -ForegroundColor DarkGray
-Write-Host "      and remembered across sessions." -ForegroundColor DarkGray
-Write-Host ""
-Write-Host "   2. Start coding" -ForegroundColor White
-Write-Host ""
-Write-Host "      › openanalyst" -ForegroundColor Cyan
-Write-Host ""
-Write-Host ""
-Write-Host "   ┌──────────────────────────────────────────┐" -ForegroundColor DarkGray
-Write-Host "   │                                          │" -ForegroundColor DarkGray
-Write-Host "   │  7 LLM Providers. One Interface.         │" -ForegroundColor White
-Write-Host "   │                                          │" -ForegroundColor DarkGray
-Write-Host "   │  ■ OpenAnalyst (default)                 │" -ForegroundColor DarkGray
-Write-Host "   │  ■ Anthropic / Claude  · direct API      │" -ForegroundColor DarkGray
-Write-Host "   │  ■ OpenAI / Codex     · direct API       │" -ForegroundColor DarkGray
-Write-Host "   │  ■ Google Gemini      · direct API       │" -ForegroundColor DarkGray
-Write-Host "   │  ■ xAI / Grok                            │" -ForegroundColor DarkGray
-Write-Host "   │  ■ OpenRouter         · 350+ models      │" -ForegroundColor DarkGray
-Write-Host "   │  ■ Amazon Bedrock                        │" -ForegroundColor DarkGray
-Write-Host "   │                                          │" -ForegroundColor DarkGray
-Write-Host "   │  Switch: /model gpt-4o                   │" -ForegroundColor DarkGray
-Write-Host "   │  Update: openanalyst update              │" -ForegroundColor DarkGray
-Write-Host "   │                                          │" -ForegroundColor DarkGray
-Write-Host "   └──────────────────────────────────────────┘" -ForegroundColor DarkGray
-
-Write-Host ""
-Write-Host "   Restart terminal for PATH changes." -ForegroundColor DarkGray
-Write-Host "   Docs: github.com/AnitChaudhry/openanalyst-cli" -ForegroundColor DarkGray
+# ── Footer ──
+Write-Host "  $ML$Bar$MR" -ForegroundColor DarkGray
+Write-Host "  $B                                            $B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  $B  " -ForegroundColor DarkGray
+Write-Host -NoNewline "openanalyst login" -ForegroundColor Cyan
+Write-Host -NoNewline "    authenticate           " -ForegroundColor DarkGray
+Write-Host "$B" -ForegroundColor DarkGray
+Write-Host -NoNewline "  $B  " -ForegroundColor DarkGray
+Write-Host -NoNewline "openanalyst" -ForegroundColor Cyan
+Write-Host -NoNewline "          start coding           " -ForegroundColor DarkGray
+Write-Host "$B" -ForegroundColor DarkGray
+Write-Host "  $B                                            $B" -ForegroundColor DarkGray
+Write-Host "  $BL$Bar$BR" -ForegroundColor DarkGray
 Write-Host ""
