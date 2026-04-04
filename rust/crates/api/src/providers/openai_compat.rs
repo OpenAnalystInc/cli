@@ -14,6 +14,8 @@ use crate::types::{
 
 use super::{Provider, ProviderFuture};
 
+// TODO: restore to production URL once auth is ready
+pub const DEFAULT_OPENANALYST_BASE_URL: &str = "http://192.222.52.59:8000/v1";
 pub const DEFAULT_XAI_BASE_URL: &str = "https://api.x.ai/v1";
 pub const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 pub const DEFAULT_OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
@@ -31,6 +33,8 @@ pub struct OpenAiCompatConfig {
     pub api_key_env: &'static str,
     pub base_url_env: &'static str,
     pub default_base_url: &'static str,
+    /// If set, override the model name in requests (e.g. map "openanalyst-beta" → "gemma-4-chat")
+    pub model_override: Option<&'static str>,
 }
 
 const XAI_ENV_VARS: &[&str] = &["XAI_API_KEY"];
@@ -40,6 +44,19 @@ const BEDROCK_ENV_VARS: &[&str] = &["BEDROCK_API_KEY"];
 const GEMINI_ENV_VARS: &[&str] = &["GEMINI_API_KEY"];
 
 impl OpenAiCompatConfig {
+    /// OpenAnalyst test gateway — no auth required, maps to gemma-4-chat
+    #[must_use]
+    pub const fn openanalyst() -> Self {
+        Self {
+            provider_name: "OpenAnalyst",
+            api_key_env: "OPENANALYST_API_KEY",
+            base_url_env: "OPENANALYST_BASE_URL",
+            default_base_url: DEFAULT_OPENANALYST_BASE_URL,
+            // TODO: remove model_override once production API supports openanalyst-beta natively
+            model_override: Some("gemma-4-chat"),
+        }
+    }
+
     #[must_use]
     pub const fn xai() -> Self {
         Self {
@@ -47,6 +64,7 @@ impl OpenAiCompatConfig {
             api_key_env: "XAI_API_KEY",
             base_url_env: "XAI_BASE_URL",
             default_base_url: DEFAULT_XAI_BASE_URL,
+            model_override: None,
         }
     }
 
@@ -57,6 +75,7 @@ impl OpenAiCompatConfig {
             api_key_env: "OPENAI_API_KEY",
             base_url_env: "OPENAI_BASE_URL",
             default_base_url: DEFAULT_OPENAI_BASE_URL,
+            model_override: None,
         }
     }
 
@@ -67,6 +86,7 @@ impl OpenAiCompatConfig {
             api_key_env: "OPENROUTER_API_KEY",
             base_url_env: "OPENROUTER_BASE_URL",
             default_base_url: DEFAULT_OPENROUTER_BASE_URL,
+            model_override: None,
         }
     }
 
@@ -77,6 +97,7 @@ impl OpenAiCompatConfig {
             api_key_env: "BEDROCK_API_KEY",
             base_url_env: "BEDROCK_BASE_URL",
             default_base_url: DEFAULT_BEDROCK_BASE_URL,
+            model_override: None,
         }
     }
 
@@ -87,6 +108,7 @@ impl OpenAiCompatConfig {
             api_key_env: "GEMINI_API_KEY",
             base_url_env: "GEMINI_BASE_URL",
             default_base_url: DEFAULT_GEMINI_BASE_URL,
+            model_override: None,
         }
     }
 
@@ -108,6 +130,7 @@ pub struct OpenAiCompatClient {
     http: reqwest::Client,
     api_key: String,
     base_url: String,
+    model_override: Option<&'static str>,
     max_retries: u32,
     initial_backoff: Duration,
     max_backoff: Duration,
@@ -120,6 +143,7 @@ impl OpenAiCompatClient {
             http: reqwest::Client::new(),
             api_key: api_key.into(),
             base_url: read_base_url(config),
+            model_override: config.model_override,
             max_retries: DEFAULT_MAX_RETRIES,
             initial_backoff: DEFAULT_INITIAL_BACKOFF,
             max_backoff: DEFAULT_MAX_BACKOFF,
@@ -127,7 +151,12 @@ impl OpenAiCompatClient {
     }
 
     pub fn from_env(config: OpenAiCompatConfig) -> Result<Self, ApiError> {
-        let Some(api_key) = read_env_non_empty(config.api_key_env)? else {
+        let api_key = read_env_non_empty(config.api_key_env)?;
+        // TODO: restore auth requirement for OpenAnalyst once production auth is ready
+        if config.provider_name == "OpenAnalyst" {
+            return Ok(Self::new(api_key.unwrap_or_default(), config));
+        }
+        let Some(api_key) = api_key else {
             return Err(ApiError::missing_credentials(
                 config.provider_name,
                 config.credential_env_vars(),
@@ -227,11 +256,15 @@ impl OpenAiCompatClient {
         request: &MessageRequest,
     ) -> Result<reqwest::Response, ApiError> {
         let request_url = chat_completions_endpoint(&self.base_url);
+        let mut payload = build_chat_completion_request(request);
+        if let Some(model) = self.model_override {
+            payload["model"] = serde_json::Value::String(model.to_string());
+        }
         self.http
             .post(&request_url)
             .header("content-type", "application/json")
             .bearer_auth(&self.api_key)
-            .json(&build_chat_completion_request(request))
+            .json(&payload)
             .send()
             .await
             .map_err(ApiError::from)

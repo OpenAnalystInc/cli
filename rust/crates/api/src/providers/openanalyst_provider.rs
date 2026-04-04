@@ -13,7 +13,8 @@ use super::{Provider, ProviderFuture};
 use crate::sse::SseParser;
 use crate::types::{MessageRequest, MessageResponse, StreamEvent};
 
-pub const DEFAULT_BASE_URL: &str = "https://api.openanalyst.com/api";
+// TODO: restore to "https://api.openanalyst.com/api" once production auth is ready
+pub const DEFAULT_BASE_URL: &str = "http://192.222.52.59:8000";
 pub const DEFAULT_ANTHROPIC_BASE_URL: &str = "https://api.anthropic.com";
 const ANTHROPIC_VERSION: &str = "2023-06-01";
 const REQUEST_ID_HEADER: &str = "request-id";
@@ -44,13 +45,8 @@ impl AuthSource {
             }),
             (Some(api_key), None) => Ok(Self::ApiKey(api_key)),
             (None, Some(bearer_token)) => Ok(Self::BearerToken(bearer_token)),
-            (None, None) => Err(ApiError::missing_credentials(
-                "OpenAnalyst",
-                &[
-                    "OPENANALYST_AUTH_TOKEN",
-                    "OPENANALYST_API_KEY",
-                ],
-            )),
+            // TODO: restore auth requirement once production auth is ready
+            (None, None) => Ok(Self::None),
         }
     }
 
@@ -387,6 +383,8 @@ impl AuthSource {
         if let Some(bearer_token) = auth_token {
             return Ok(Self::BearerToken(bearer_token));
         }
+        // TODO: restore auth requirement once production auth is ready
+        // For now, fall through to None if no saved OAuth token either
         match load_saved_oauth_token() {
             Ok(Some(token_set)) if oauth_token_is_expired(&token_set) => {
                 if token_set.refresh_token.is_some() {
@@ -399,13 +397,8 @@ impl AuthSource {
                 }
             }
             Ok(Some(token_set)) => Ok(Self::BearerToken(token_set.access_token)),
-            Ok(None) => Err(ApiError::missing_credentials(
-                "OpenAnalyst",
-                &[
-                    "OPENANALYST_AUTH_TOKEN",
-                    "OPENANALYST_API_KEY",
-                ],
-            )),
+            // TODO: restore auth requirement once production auth is ready
+            Ok(None) => Ok(Self::None),
             Err(error) => Err(error),
         }
     }
@@ -426,9 +419,9 @@ pub fn resolve_saved_oauth_token(config: &OAuthConfig) -> Result<Option<OAuthTok
 }
 
 pub fn has_auth_from_env_or_saved() -> Result<bool, ApiError> {
-    Ok(read_env_non_empty("OPENANALYST_API_KEY")?.is_some()
-        || read_env_non_empty("OPENANALYST_AUTH_TOKEN")?.is_some()
-        || load_saved_oauth_token()?.is_some())
+    // TODO: restore auth check once production auth is ready
+    // For now, always return true so the OA provider is selectable without credentials
+    Ok(true)
 }
 
 pub fn resolve_startup_auth_source<F>(load_oauth_config: F) -> Result<AuthSource, ApiError>
@@ -451,14 +444,9 @@ where
         return Ok(AuthSource::BearerToken(bearer_token));
     }
 
+    // TODO: restore auth requirement once production auth is ready
     let Some(token_set) = load_saved_oauth_token()? else {
-        return Err(ApiError::missing_credentials(
-            "OpenAnalyst",
-            &[
-                "OPENANALYST_AUTH_TOKEN",
-                "OPENANALYST_API_KEY",
-            ],
-        ));
+        return Ok(AuthSource::None);
     };
     if !oauth_token_is_expired(&token_set) {
         return Ok(AuthSource::BearerToken(token_set.access_token));

@@ -1,5 +1,6 @@
 mod bash;
 mod bootstrap;
+pub mod branding;
 mod compact;
 mod config;
 mod conversation;
@@ -103,6 +104,7 @@ pub use compression::{
     CompressionResult, CompressionStatus, COMPRESSION_SYSTEM_PROMPT, VERIFICATION_PROMPT,
 };
 pub use folder_trust::{discover_trust, trust_folder, untrust_folder, TrustLevel, TrustInfo};
+pub use branding::scrub_model_identity;
 pub use ide_detect::{detect_ide, ide_context_string, Ide};
 pub use output_masking::{mask_tool_output, likely_contains_secrets, MaskingStats};
 pub use policy::{
