@@ -9,6 +9,24 @@ $BinaryName = "openanalyst.exe"
 $InstallDir = "$env:USERPROFILE\.openanalyst\bin"
 $ConfigDir = "$env:USERPROFILE\.openanalyst"
 
+# ── Helpers ──
+function Row($text, $fg) {
+    $pad = 42 - $text.Length; if ($pad -lt 0) { $pad = 0 }
+    Write-Host "  | " -ForegroundColor DarkGray -NoNewline
+    Write-Host "$text$(" " * $pad)" -ForegroundColor $fg -NoNewline
+    Write-Host " |" -ForegroundColor DarkGray
+}
+function Row2($a, $af, $b, $bf) {
+    $pad = 42 - $a.Length - $b.Length; if ($pad -lt 0) { $pad = 0 }
+    Write-Host "  | " -ForegroundColor DarkGray -NoNewline
+    Write-Host $a -ForegroundColor $af -NoNewline
+    Write-Host "$(" " * $pad)" -ForegroundColor DarkGray -NoNewline
+    Write-Host $b -ForegroundColor $bf -NoNewline
+    Write-Host " |" -ForegroundColor DarkGray
+}
+function Line { Write-Host "  +--------------------------------------------+" -ForegroundColor DarkGray }
+function Empty { Write-Host "  |                                            |" -ForegroundColor DarkGray }
+
 # ── Fetch version ──
 $GhHeaders = @{ "User-Agent" = "openanalyst-cli" }
 if ($env:GITHUB_TOKEN) { $GhHeaders["Authorization"] = "Bearer $env:GITHUB_TOKEN" }
@@ -22,24 +40,19 @@ try {
     $Version = $Release.tag_name -replace "^v", ""
 } catch {}
 
+# ── Header ──
 Write-Host ""
-Write-Host "  +----------------------------------------------+" -ForegroundColor DarkGray
-Write-Host "  |                                              |" -ForegroundColor DarkGray
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host " ######   #####  " -ForegroundColor Cyan -NoNewline; Write-Host " OpenAnalyst CLI    |" -ForegroundColor White
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host "##    ## ##   ## " -ForegroundColor Cyan -NoNewline; Write-Host " v$($Version.PadRight(19))|" -ForegroundColor DarkGray
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host "##    ## ####### " -ForegroundColor Cyan -NoNewline; Write-Host "                    |" -ForegroundColor DarkGray
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host "##    ## ##   ## " -ForegroundColor Cyan -NoNewline; Write-Host " Windows x64        |" -ForegroundColor DarkGray
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host " ######  ##   ## " -ForegroundColor Cyan -NoNewline; Write-Host "                    |" -ForegroundColor DarkGray
-Write-Host "  |                                              |" -ForegroundColor DarkGray
-Write-Host "  +----------------------------------------------+" -ForegroundColor DarkGray
+Line; Empty
+Row "        OpenAnalyst CLI" White
+Row "        v$Version - Windows x64" DarkGray
+Empty; Line
 
 # ── Create directories ──
 New-Item -ItemType Directory -Force -Path $InstallDir | Out-Null
 New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
 
 # ── Step 1: Download ──
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline
-Write-Host "[1/3] Download ......................" -ForegroundColor DarkGray -NoNewline
+Empty
 $Downloaded = $false
 Get-Process -Name "openanalyst" -ErrorAction SilentlyContinue | Stop-Process -Force -ErrorAction SilentlyContinue
 Start-Sleep -Milliseconds 300
@@ -52,39 +65,32 @@ if ($Release) {
     try {
         Invoke-WebRequest -Uri $AssetUrl -OutFile "$InstallDir\$BinaryName" -UseBasicParsing -ErrorAction Stop
         $Downloaded = $true
-        Write-Host " done" -ForegroundColor Green -NoNewline
+        Row2 "  [1/3] Download ...................." DarkGray "done" Green
     } catch {
-        Write-Host " FAIL" -ForegroundColor Red -NoNewline
+        Row2 "  [1/3] Download ...................." DarkGray "FAIL" Red
     }
 } else {
-    Write-Host " FAIL" -ForegroundColor Red -NoNewline
+    Row2 "  [1/3] Download ...................." DarkGray "FAIL" Red
 }
-Write-Host " |" -ForegroundColor DarkGray
 
 if (-not $Downloaded) {
-    Write-Host "  |                                              |" -ForegroundColor DarkGray
-    Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host "Download failed. Visit:" -ForegroundColor Red -NoNewline; Write-Host "                   |" -ForegroundColor DarkGray
-    Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host "github.com/$Repo/releases" -ForegroundColor White -NoNewline; Write-Host "  |" -ForegroundColor DarkGray
-    Write-Host "  |                                              |" -ForegroundColor DarkGray
-    Write-Host "  +----------------------------------------------+" -ForegroundColor DarkGray
+    Empty
+    Row "  Download failed. Visit:" Red
+    Row "  github.com/$Repo/releases" White
+    Empty; Line
     Write-Host ""
     exit 1
 }
 
 # ── Step 2: PATH ──
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline
-Write-Host "[2/3] PATH .........................." -ForegroundColor DarkGray -NoNewline
 $CurrentPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($CurrentPath -notlike "*$InstallDir*") {
     [Environment]::SetEnvironmentVariable("Path", "$InstallDir;$CurrentPath", "User")
     $env:Path = "$InstallDir;$env:Path"
 }
-Write-Host " done" -ForegroundColor Green -NoNewline
-Write-Host " |" -ForegroundColor DarkGray
+Row2 "  [2/3] PATH ........................" DarkGray "done" Green
 
 # ── Step 3: Config ──
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline
-Write-Host "[3/3] Config ........................" -ForegroundColor DarkGray -NoNewline
 $EnvFile = "$ConfigDir\.env"
 if (-not (Test-Path $EnvFile)) {
     @"
@@ -95,19 +101,16 @@ if (-not (Test-Path $EnvFile)) {
 # GEMINI_API_KEY=AIza...
 "@ | Out-File -FilePath $EnvFile -Encoding utf8
 }
-Write-Host " done" -ForegroundColor Green -NoNewline
-Write-Host " |" -ForegroundColor DarkGray
+Row2 "  [3/3] Config ......................" DarkGray "done" Green
 
 # ── Result ──
-Write-Host "  |                                              |" -ForegroundColor DarkGray
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host "Installed to ~/.openanalyst/bin" -ForegroundColor Green -NoNewline; Write-Host "            |" -ForegroundColor DarkGray
-Write-Host "  |                                              |" -ForegroundColor DarkGray
-Write-Host "  +----------------------------------------------+" -ForegroundColor DarkGray
+Empty
+Row "  Installed to ~/.openanalyst/bin" Green
+Empty; Line
 
 # ── Footer ──
-Write-Host "  |                                              |" -ForegroundColor DarkGray
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host "openanalyst login" -ForegroundColor Cyan -NoNewline; Write-Host "     authenticate       |" -ForegroundColor DarkGray
-Write-Host "  |  " -ForegroundColor DarkGray -NoNewline; Write-Host "openanalyst" -ForegroundColor Cyan -NoNewline; Write-Host "           start coding       |" -ForegroundColor DarkGray
-Write-Host "  |                                              |" -ForegroundColor DarkGray
-Write-Host "  +----------------------------------------------+" -ForegroundColor DarkGray
+Empty
+Row2 "  openanalyst login" Cyan "authenticate" DarkGray
+Row2 "  openanalyst" Cyan "start coding" DarkGray
+Empty; Line
 Write-Host ""
