@@ -2778,6 +2778,19 @@ fn run_tui(
         orchestrator_handle.abort();
         let _ = orchestrator_handle.await;
 
+        // If user logged out (credentials cleared), show re-login instructions
+        let has_creds = env::var("OPENANALYST_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some()
+            || env::var("ANTHROPIC_API_KEY").ok().filter(|v| !v.is_empty()).is_some()
+            || env::var("OPENAI_API_KEY").ok().filter(|v| !v.is_empty()).is_some()
+            || env::var("GEMINI_API_KEY").ok().filter(|v| !v.is_empty()).is_some();
+        if !has_creds {
+            println!();
+            println!("  \x1b[38;5;45m\u{2713}\x1b[0m \x1b[1mLogged out.\x1b[0m");
+            println!();
+            println!("  Run \x1b[1mopenanalyst login\x1b[0m to authenticate again.");
+            println!();
+        }
+
         result
     })?;
 

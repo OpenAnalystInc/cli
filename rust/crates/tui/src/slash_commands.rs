@@ -922,7 +922,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system(output);
         }
         SlashCommand::Logout => {
-            // Clear credentials.json
+            // Clear credentials and exit TUI — user must re-login from terminal
             let config_dir = std::env::var("OPENANALYST_CONFIG_HOME")
                 .or_else(|_| std::env::var("HOME").map(|h| format!("{h}/.openanalyst")))
                 .or_else(|_| std::env::var("USERPROFILE").map(|h| format!("{h}/.openanalyst")))
@@ -930,10 +930,16 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             let creds_path = std::path::Path::new(&config_dir).join("credentials.json");
             if creds_path.exists() {
                 let _ = std::fs::remove_file(&creds_path);
-                app.chat.push_system(format!("Credentials cleared: {}\nRun `openanalyst login` from the terminal to re-authenticate.", creds_path.display()));
-            } else {
-                app.chat.push_system("No saved credentials to clear.".to_string());
             }
+            // Clear env vars
+            std::env::remove_var("OPENANALYST_AUTH_TOKEN");
+            std::env::remove_var("OPENANALYST_API_KEY");
+            std::env::remove_var("OPENANALYST_MODE");
+            std::env::remove_var("ANTHROPIC_API_KEY");
+            std::env::remove_var("OPENAI_API_KEY");
+            std::env::remove_var("GEMINI_API_KEY");
+            // Exit TUI — return to terminal
+            app.should_quit = true;
         }
         SlashCommand::Vim => {
             app.chat.push_system("Vim mode: toggle with Ctrl+V in the input editor.".to_string());
