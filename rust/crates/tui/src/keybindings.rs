@@ -546,55 +546,77 @@ fn handle_permission_dialog_key(key: KeyEvent, app: &mut App) {
 
 /// Handle key events when the AskUser dialog is active.
 fn handle_ask_user_dialog_key(key: KeyEvent, app: &mut App) {
+    use crate::app::AskUserMode;
+
     if let Some(ref mut dialog) = app.ask_user_dialog {
-        if dialog.is_choice() {
-            // Multiple-choice mode: navigate and select
-            match key.code {
-                KeyCode::Up | KeyCode::Char('k') => {
-                    if dialog.selected_index > 0 {
-                        dialog.selected_index -= 1;
+        match dialog.mode {
+            AskUserMode::Choice => {
+                // Multiple-choice mode: navigate, select, or switch to Type/Chat
+                match key.code {
+                    KeyCode::Up | KeyCode::Char('k') => {
+                        if dialog.selected_index > 0 {
+                            dialog.selected_index -= 1;
+                        }
                     }
-                }
-                KeyCode::Down | KeyCode::Char('j') => {
-                    if dialog.selected_index < dialog.options.len().saturating_sub(1) {
-                        dialog.selected_index += 1;
+                    KeyCode::Down | KeyCode::Char('j') => {
+                        if dialog.selected_index < dialog.options.len().saturating_sub(1) {
+                            dialog.selected_index += 1;
+                        }
                     }
+                    KeyCode::Enter => {
+                        app.resolve_ask_user();
+                    }
+                    KeyCode::Char('t') | KeyCode::Char('T') => {
+                        // Switch to Type mode — user wants to type a custom answer
+                        if let Some(ref mut d) = app.ask_user_dialog {
+                            d.mode = AskUserMode::Type;
+                        }
+                    }
+                    KeyCode::Char('c') | KeyCode::Char('C') => {
+                        // Chat about this — dismiss dialog, discuss in main chat
+                        app.resolve_ask_user_chat();
+                    }
+                    KeyCode::Char(c) => {
+                        // Number key shortcut: 1-9 selects option directly
+                        if let Some(idx) = c.to_digit(10) {
+                            let idx = idx as usize;
+                            if idx >= 1 && idx <= app.ask_user_dialog.as_ref().map_or(0, |d| d.options.len()) {
+                                if let Some(ref mut d) = app.ask_user_dialog {
+                                    d.selected_index = idx - 1;
+                                }
+                                app.resolve_ask_user();
+                            }
+                        }
+                    }
+                    KeyCode::Esc => {
+                        app.resolve_ask_user();
+                    }
+                    _ => {}
                 }
-                KeyCode::Enter => {
-                    app.resolve_ask_user();
-                }
-                KeyCode::Char(c) => {
-                    // Number key shortcut: 1-9 selects option directly
-                    if let Some(idx) = c.to_digit(10) {
-                        let idx = idx as usize;
-                        if idx >= 1 && idx <= dialog.options.len() {
-                            dialog.selected_index = idx - 1;
+            }
+            AskUserMode::Type => {
+                // Free-text mode: type response, or switch back
+                match key.code {
+                    KeyCode::Char(c) => {
+                        dialog.text_input.push(c);
+                    }
+                    KeyCode::Backspace => {
+                        dialog.text_input.pop();
+                    }
+                    KeyCode::Enter => {
+                        app.resolve_ask_user();
+                    }
+                    KeyCode::Esc => {
+                        // If options exist, Esc goes back to choice mode; otherwise submit
+                        if !dialog.options.is_empty() {
+                            dialog.mode = AskUserMode::Choice;
+                            dialog.text_input.clear();
+                        } else {
                             app.resolve_ask_user();
                         }
                     }
+                    _ => {}
                 }
-                KeyCode::Esc => {
-                    // Cancel — send default or empty
-                    app.resolve_ask_user();
-                }
-                _ => {}
-            }
-        } else {
-            // Free-text mode: type response
-            match key.code {
-                KeyCode::Char(c) => {
-                    dialog.text_input.push(c);
-                }
-                KeyCode::Backspace => {
-                    dialog.text_input.pop();
-                }
-                KeyCode::Enter => {
-                    app.resolve_ask_user();
-                }
-                KeyCode::Esc => {
-                    app.resolve_ask_user();
-                }
-                _ => {}
             }
         }
     }
