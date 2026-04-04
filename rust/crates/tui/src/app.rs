@@ -6,7 +6,8 @@ use events::{Action, ActionTx, AgentStatus, PanelId, UiEvent, UiEventRx};
 use orchestrator::router::ModelRouter;
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
-use ratatui::widgets::{Paragraph, Widget};
+use ratatui::style::{Color, Style};
+use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget};
 
 use tui_widgets::status_bar::AgentPhase;
 use tui_widgets::{InputBox, InputBoxState, PermissionDialog, PermissionLevel, StatusBar, ToolCallCard, ToolCallStatus};
@@ -181,7 +182,7 @@ impl App {
             sidebar_state: SidebarState::default(),
             permission_dialog: None,
             ask_user_dialog: None,
-            sidebar_visible: true,
+            sidebar_visible: false,
             focus: PanelId::Input,
             scroll_mode: false,
             should_quit: false,
@@ -220,7 +221,9 @@ impl App {
     pub fn set_banner(&mut self, info: BannerAccountInfo) {
         if !self.banner_shown {
             let banner = Banner::new(info.clone());
-            let lines = banner.to_lines();
+            // Use terminal width for banner so project path isn't truncated
+            let width = crossterm::terminal::size().map(|(w, _)| w as usize).unwrap_or(0);
+            let lines = banner.to_lines_with_width(width);
             self.chat.push_banner(lines);
             self.banner_shown = true;
         }
@@ -927,17 +930,10 @@ impl App {
                     err_msg
                 };
                 self.chat.push_system(format!("Error: {clean_error}"));
-                // Inject inline error status at end of response
+                // Update elapsed timer (skip redundant inline error — system message is sufficient)
                 if let Some(start) = self.turn_start.take() {
                     let elapsed = start.elapsed();
                     self.status_bar.elapsed = elapsed;
-                    let time_str = format_duration_short(&elapsed);
-                    let status_msg = if elapsed.as_secs() < 1 {
-                        "Error".to_string()
-                    } else {
-                        format!("Errored after {time_str}")
-                    };
-                    self.chat.push_inline_status(status_msg, true);
                 }
                 self.status_bar.phase = AgentPhase::Idle;
                 // Update background task matching this agent
@@ -1134,6 +1130,26 @@ impl App {
                 .active_agent(self.active_agent_name.clone())
                 .context_files(self.context_files.clone());
             input.render_with_state(layout.input, buf, &mut self.input_state);
+        }
+
+        // Full-window scrollbar — always visible when content exceeds viewport (like terminal native scrollbar)
+        if self.chat.last_total_lines.get() > self.chat.last_visible_height.get() {
+            let scrollbar_area = Rect {
+                x: area.x + area.width.saturating_sub(1),
+                y: area.y,
+                width: 1,
+                height: area.height,
+            };
+            let mut scrollbar_state = ScrollbarState::new(self.chat.last_total_lines.get() as usize)
+                .position(self.chat.last_scroll_pos.get() as usize)
+                .viewport_content_length(self.chat.last_visible_height.get() as usize);
+            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
+                .symbols(ratatui::symbols::scrollbar::VERTICAL)
+                .thumb_style(Style::default().fg(Color::Indexed(245)))
+                .track_style(Style::default().fg(Color::Indexed(235)))
+                .begin_style(Style::default().fg(Color::Indexed(235)))
+                .end_style(Style::default().fg(Color::Indexed(235)));
+            scrollbar.render(scrollbar_area, buf, &mut scrollbar_state);
         }
 
         // Slash command autocomplete overlay (above input)

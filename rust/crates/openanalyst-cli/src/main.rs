@@ -61,7 +61,13 @@ fn resolve_default_model() -> String {
     if env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty()).is_some()
         || env::var("OPENANALYST_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some()
     {
-        return DEFAULT_MODEL.to_string(); // openanalyst-beta
+        // Free tier uses gpt-oss-120b; API credits use openanalyst-beta
+        let mode = env::var("OPENANALYST_MODE").unwrap_or_else(|_| "api".to_string());
+        return if mode == "free" {
+            "gpt-oss-120b".to_string()
+        } else {
+            DEFAULT_MODEL.to_string()
+        };
     }
     if env::var("ANTHROPIC_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
         return "claude-sonnet-4-6".to_string();
@@ -94,7 +100,7 @@ fn max_tokens_for_model(model: &str) -> u32 {
     }
 }
 const DEFAULT_DATE: &str = "2026-03-31";
-const VERSION: &str = env!("CARGO_PKG_VERSION");
+const VERSION: &str = env!("OA_BUILD_VERSION");
 const BUILD_TARGET: Option<&str> = option_env!("TARGET");
 const GIT_SHA: Option<&str> = option_env!("GIT_SHA");
 const INTERNAL_PROGRESS_HEARTBEAT_INTERVAL: Duration = Duration::from_secs(3);
@@ -104,7 +110,7 @@ type AllowedToolSet = BTreeSet<String>;
 /// Background update check — silently notifies if a newer version is available.
 /// Does NOT auto-download; just creates a marker file that the TUI/REPL can read.
 fn background_update_check() {
-    const CURRENT_VERSION: &str = "1.0.89";
+    const CURRENT_VERSION: &str = VERSION;
     const REPO: &str = "AnitChaudhry/openanalyst-cli";
 
     // Only check once per day
@@ -449,7 +455,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             permission_mode,
         } => LiveCli::new(model, true, allowed_tools, permission_mode)?
             .run_turn_with_output(&prompt, output_format)?,
-        CliAction::Login => run_login()?,
+        CliAction::Login => {
+            if let Some(model) = run_login()? {
+                run_tui(model, None, PermissionMode::WorkspaceWrite)?;
+            }
+        }
         CliAction::Logout => run_logout()?,
         CliAction::WhoAmI => run_whoami()?,
         CliAction::Update => run_update()?,
@@ -1036,24 +1046,15 @@ struct ProviderOAuthMeta {
 const LOGIN_PROVIDERS: &[ProviderOption] = &[
     ProviderOption {
         name: "OpenAnalyst",
-        description: "Free model or API key with credits",
+        description: "gpt-oss-120b free model or API key with credits",
         env_var: "OPENANALYST_AUTH_TOKEN",
         test_url: "https://api.openanalyst.com/api/health",
         test_header: "bearer",
         dashboard_url: "https://10x.in/dashboard",
         models_url: "",
-        // OAuth = free model (auto key, no browser)
-        // API key = credits (sk-oa- key)
-        oauth: Some(ProviderOAuthMeta {
-            client_id_env: "",
-            default_client_id: "",
-            default_client_secret: "",
-            authorize_url: "",
-            token_url: "",
-            scopes: &[],
-            token_env_var: "OPENANALYST_AUTH_TOKEN",
-            extra_authorize_params: &[],
-        }),
+        // No OAuth — OpenAnalyst uses free model (auto key) or API key only
+        // OAuth reserved for future browser-based login
+        oauth: None,
     },
     ProviderOption {
         name: "Anthropic / Claude",
@@ -1184,7 +1185,7 @@ fn open_browser(url: &str) -> bool {
     { std::process::Command::new("xdg-open").arg(url).spawn().is_ok() }
 }
 
-fn run_login() -> Result<(), Box<dyn std::error::Error>> {
+fn run_login() -> Result<Option<String>, Box<dyn std::error::Error>> {
     use crossterm::{
         cursor,
         event::{self, Event, KeyCode, KeyEvent, KeyModifiers},
@@ -1251,13 +1252,13 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
                         terminal::disable_raw_mode()?;
                         execute!(stdout, cursor::Show)?;
                         println!();
-                        return Ok(());
+                        return Ok(None);
                     }
                     KeyCode::Esc => {
                         terminal::disable_raw_mode()?;
                         execute!(stdout, cursor::Show)?;
                         println!();
-                        return Ok(());
+                        return Ok(None);
                     }
                     _ => {}
                 }
@@ -1276,9 +1277,11 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
     );
     println!();
 
-    // ── For Claude/Codex/Gemini: ask OAuth vs API key ──
-    if provider.oauth.is_some() {
-        let auth_methods = if provider.name == "OpenAnalyst" {
+    // ── OpenAnalyst: free model vs API key (no OAuth) ──
+    // ── Other providers with OAuth: browser login vs API key ──
+    let is_openanalyst = provider.name == "OpenAnalyst";
+    if is_openanalyst || provider.oauth.is_some() {
+        let auth_methods = if is_openanalyst {
             [
                 ("Use free model", "gpt-oss-120b — no credits needed"),
                 ("Use API key", "OpenAnalyst API with credits"),
@@ -1336,13 +1339,13 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
                                 terminal::disable_raw_mode()?;
                                 execute!(stdout, cursor::Show)?;
                                 println!();
-                                return Ok(());
+                                return Ok(None);
                             }
                             KeyCode::Esc => {
                                 terminal::disable_raw_mode()?;
                                 execute!(stdout, cursor::Show)?;
                                 println!();
-                                return Ok(());
+                                return Ok(None);
                             }
                             _ => {}
                         }
@@ -1355,10 +1358,11 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
         }
         println!();
 
-        if method_sel == 0 && provider.name == "OpenAnalyst" {
-            // OpenAnalyst free model — auto key, goes through api.openanalyst.com
+        if method_sel == 0 && is_openanalyst {
+            // OpenAnalyst free model — auto key, gpt-oss-120b
+            save_openanalyst_mode("free");
             run_openanalyst_free_login(provider)?;
-        } else if method_sel == 0 {
+        } else if method_sel == 0 && provider.oauth.is_some() {
             // Other providers: OAuth browser login
             let oauth_meta = provider.oauth.as_ref().unwrap();
             let client_id = env::var(oauth_meta.client_id_env)
@@ -1367,9 +1371,8 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
                 .unwrap_or_else(|| oauth_meta.default_client_id.to_string());
             run_oauth_login(provider, oauth_meta, &client_id)?;
         } else {
-            // API key (for OpenAnalyst: credits mode via api.openanalyst.com)
-            if provider.name == "OpenAnalyst" {
-                // Save mode=api so client routes to api.openanalyst.com
+            // API key path
+            if is_openanalyst {
                 save_openanalyst_mode("api");
             }
             run_apikey_login(provider)?;
@@ -1380,10 +1383,50 @@ fn run_login() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!();
-    println!("  Run \x1b[1mopenanalyst\x1b[0m to start, or \x1b[1mopenanalyst login\x1b[0m to add another provider.");
-    println!("  Use \x1b[1mopenanalyst whoami\x1b[0m to see all logged-in providers.");
-    println!();
-    Ok(())
+
+    // Ask user whether to launch the TUI immediately
+    print!("  Launch OpenAnalyst now? [\x1b[1mY\x1b[0m/n] ");
+    io::stdout().flush()?;
+
+    {
+        use crossterm::{cursor, event::{self, Event, KeyCode, KeyEvent}, execute, terminal};
+        terminal::enable_raw_mode()?;
+        let mut stdout = io::stdout();
+
+        loop {
+            if event::poll(std::time::Duration::from_secs(30))? {
+                if let Event::Key(KeyEvent { code, .. }) = event::read()? {
+                    match code {
+                        KeyCode::Enter | KeyCode::Char('y') | KeyCode::Char('Y') => {
+                            terminal::disable_raw_mode()?;
+                            execute!(stdout, cursor::Show)?;
+                            println!();
+                            let model = resolve_default_model();
+                            return Ok(Some(model));
+                        }
+                        KeyCode::Char('n') | KeyCode::Char('N') | KeyCode::Esc => {
+                            terminal::disable_raw_mode()?;
+                            execute!(stdout, cursor::Show)?;
+                            println!();
+                            println!();
+                            println!("  Run \x1b[1mopenanalyst\x1b[0m to start, or \x1b[1mopenanalyst login\x1b[0m to add another provider.");
+                            println!("  Use \x1b[1mopenanalyst whoami\x1b[0m to see all logged-in providers.");
+                            println!();
+                            return Ok(None);
+                        }
+                        _ => {}
+                    }
+                }
+            } else {
+                // Timeout — default to launching TUI
+                terminal::disable_raw_mode()?;
+                execute!(stdout, cursor::Show)?;
+                println!();
+                let model = resolve_default_model();
+                return Ok(Some(model));
+            }
+        }
+    }
 }
 
 /// OAuth browser login: start callback server → open browser → wait for redirect → exchange code → save token.
@@ -1707,7 +1750,8 @@ fn run_openanalyst_free_login(provider: &ProviderOption) -> Result<(), Box<dyn s
     println!();
     println!("  \x1b[38;5;46m\u{2713}\x1b[0m \x1b[1mFree model access configured\x1b[0m");
     println!();
-    println!("  \x1b[2mCredits:  free tier\x1b[0m");
+    println!("  \x1b[2mModel:    openai/gpt-oss-120b\x1b[0m");
+    println!("  \x1b[2mCredits:  unlimited (free tier)\x1b[0m");
     println!("  \x1b[2mKey:      {}...{}\x1b[0m", &api_key[..12], &api_key[api_key.len()-4..]);
 
     Ok(())
@@ -1976,12 +2020,12 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
     println!("  \x1b[38;5;45m\u{2713}\x1b[0m \x1b[1mLogged out successfully.\x1b[0m");
     println!();
 
-    // Redirect to login
-    run_login()
+    // Redirect to login (ignore TUI launch option from logout context)
+    run_login().map(|_| ())
 }
 
 fn run_update() -> Result<(), Box<dyn std::error::Error>> {
-    const CURRENT_VERSION: &str = "1.0.89";
+    const CURRENT_VERSION: &str = VERSION;
     const REPO: &str = "AnitChaudhry/openanalyst-cli";
 
     println!();
@@ -4874,7 +4918,7 @@ impl LiveCli {
         };
 
         let kb_endpoint = env::var("OPENANALYST_KB_URL")
-            .unwrap_or_else(|_| "https://kb.openanalyst.ai/v1/knowledge/query".to_string());
+            .unwrap_or_else(|_| "http://209.20.157.253:8000/v1/knowledge/query".to_string());
 
         println!("  \x1b[38;5;45m[>]\x1b[0m Searching knowledge base...");
         println!("  \x1b[2mQuery: {}\x1b[0m\n", truncate_for_prompt(query, 80));

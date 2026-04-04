@@ -53,8 +53,10 @@ impl Banner {
     /// - Left: welcome + OA logo + account info
     /// - Right: tips + recent activity
     /// - Blue brand color (OpenAnalyst) instead of Claude's orange
+    ///
+    /// `available_width` is the chat panel width (0 = use default).
     #[must_use]
-    pub fn to_lines(&self) -> Vec<Line<'static>> {
+    pub fn to_lines_with_width(&self, available_width: usize) -> Vec<Line<'static>> {
         // Brand colors
         let brand = Style::default().fg(Color::Rgb(50, 130, 255)).add_modifier(Modifier::BOLD);
         let brand_bold = brand;
@@ -65,11 +67,16 @@ impl Banner {
         let green = Style::default().fg(Color::Indexed(40));
         let logo_color = Style::default().fg(Color::Rgb(255, 140, 0)); // orange OA logo
 
-        // Column widths — adapt to title length to prevent truncation
+        // Column widths — adapt to available terminal width
         let title_text = self.info.app_title();
         let title_len = title_text.chars().count() + 3; // " title " + leading "─"
-        let left_w: usize = title_len.max(40);
         let right_w: usize = 38;
+        // Use available width minus borders (3 for ╭│╮) and right column
+        let left_w: usize = if available_width > right_w + 10 {
+            (available_width - right_w - 3).max(title_len).max(40)
+        } else {
+            title_len.max(40)
+        };
         let _total_inner = left_w + 1 + right_w; // +1 for middle │
 
         let mut lines = Vec::new();
@@ -225,5 +232,11 @@ impl Banner {
         lines.push(Line::from(""));
 
         lines
+    }
+
+    /// Generate banner lines with default width.
+    #[must_use]
+    pub fn to_lines(&self) -> Vec<Line<'static>> {
+        self.to_lines_with_width(0)
     }
 }
