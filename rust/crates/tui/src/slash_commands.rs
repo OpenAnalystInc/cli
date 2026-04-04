@@ -643,7 +643,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                 // Default: OpenAnalyst AgenticRAG public endpoint
                 // Override with OPENANALYST_KB_URL for self-hosted deployments
                 let kb_endpoint = std::env::var("OPENANALYST_KB_URL")
-                    .unwrap_or_else(|_| "https://kb.openanalyst.ai/v1/knowledge/query".to_string());
+                    .unwrap_or_else(|_| "http://209.20.157.253:8000/v1/knowledge/query".to_string());
 
                 app.chat.push_tool_call(tui_widgets::ToolCallCard {
                     tool_name: "KB: Knowledge Graph".to_string(),

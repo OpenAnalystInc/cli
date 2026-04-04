@@ -1,10 +1,12 @@
 //! Chat panel — scrollable message list with tool cards and focus tracking.
 
+use std::cell::Cell;
+
 use ratatui::buffer::Buffer;
 use ratatui::layout::Rect;
 use ratatui::style::{Color, Modifier, Style};
 use ratatui::text::{Line, Span, Text};
-use ratatui::widgets::{Paragraph, Scrollbar, ScrollbarOrientation, ScrollbarState, StatefulWidget, Widget, Wrap};
+use ratatui::widgets::{Paragraph, Widget, Wrap};
 
 use events::DiffLine;
 use tui_widgets::{KnowledgeCard, MarkdownStream, ToolCallCard};
@@ -77,6 +79,12 @@ pub struct ChatPanel {
     pub auto_scroll: bool,
     /// Index of the currently focused message (for scroll mode navigation).
     pub focused_message: Option<usize>,
+    /// Cached total line count from last render (for full-window scrollbar).
+    pub last_total_lines: Cell<u32>,
+    /// Cached visible height from last render.
+    pub last_visible_height: Cell<u32>,
+    /// Cached scroll position from last render.
+    pub last_scroll_pos: Cell<u32>,
 }
 
 impl Default for ChatPanel {
@@ -86,6 +94,9 @@ impl Default for ChatPanel {
             scroll_offset: 0,
             auto_scroll: true,
             focused_message: None,
+            last_total_lines: Cell::new(0),
+            last_visible_height: Cell::new(0),
+            last_scroll_pos: Cell::new(0),
         }
     }
 }
@@ -411,6 +422,11 @@ impl ChatPanel {
         let max_scroll = total_lines.saturating_sub(visible_height);
         let scroll = self.scroll_offset.min(max_scroll);
 
+        // Cache scroll state for full-window scrollbar rendering
+        self.last_total_lines.set(total_lines);
+        self.last_visible_height.set(visible_height);
+        self.last_scroll_pos.set(scroll);
+
         // Slice lines manually to support unlimited scroll (beyond u16::MAX).
         let start = scroll as usize;
         let end = (start + visible_height as usize).min(all_lines.len());
@@ -420,16 +436,6 @@ impl ChatPanel {
             .wrap(Wrap { trim: false });
         paragraph.render(area, buf);
 
-        // Scrollbar (right edge)
-        if total_lines > visible_height {
-            let mut scrollbar_state = ScrollbarState::new(total_lines as usize)
-                .position(scroll as usize)
-                .viewport_content_length(visible_height as usize);
-            let scrollbar = Scrollbar::new(ScrollbarOrientation::VerticalRight)
-                .thumb_style(Style::default().fg(Color::Indexed(240)))
-                .track_style(Style::default().fg(Color::Indexed(236)));
-            scrollbar.render(area, buf, &mut scrollbar_state);
-        }
     }
 }
 
