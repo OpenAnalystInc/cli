@@ -14,8 +14,7 @@ use crate::types::{
 
 use super::{Provider, ProviderFuture};
 
-// TODO: restore to production URL once auth is ready
-pub const DEFAULT_OPENANALYST_BASE_URL: &str = "http://192.222.52.59:8000/v1";
+pub const DEFAULT_OPENANALYST_BASE_URL: &str = "https://aquatic-temperatures-regularly-favourite.trycloudflare.com/v1";
 pub const DEFAULT_XAI_BASE_URL: &str = "https://api.x.ai/v1";
 pub const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 pub const DEFAULT_OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";
@@ -49,11 +48,10 @@ impl OpenAiCompatConfig {
     pub const fn openanalyst() -> Self {
         Self {
             provider_name: "OpenAnalyst",
-            api_key_env: "OPENANALYST_API_KEY",
+            api_key_env: "OPENANALYST_AUTH_TOKEN",
             base_url_env: "OPENANALYST_BASE_URL",
             default_base_url: DEFAULT_OPENANALYST_BASE_URL,
-            // TODO: remove model_override once production API supports openanalyst-beta natively
-            model_override: Some("gemma-4-chat"),
+            model_override: Some("openai/gpt-oss-120b"),
         }
     }
 
@@ -152,9 +150,18 @@ impl OpenAiCompatClient {
 
     pub fn from_env(config: OpenAiCompatConfig) -> Result<Self, ApiError> {
         let api_key = read_env_non_empty(config.api_key_env)?;
-        // TODO: restore auth requirement for OpenAnalyst once production auth is ready
+        // OpenAnalyst: check multiple env vars for the key
         if config.provider_name == "OpenAnalyst" {
-            return Ok(Self::new(api_key.unwrap_or_default(), config));
+            let key = api_key
+                .or_else(|| read_env_non_empty("OPENANALYST_API_KEY").ok().flatten())
+                .or_else(|| read_env_non_empty("OA_API_KEY").ok().flatten());
+            return match key {
+                Some(k) => Ok(Self::new(k, config)),
+                None => Err(ApiError::missing_credentials(
+                    "OpenAnalyst",
+                    &["OPENANALYST_AUTH_TOKEN", "OPENANALYST_API_KEY"],
+                )),
+            };
         }
         let Some(api_key) = api_key else {
             return Err(ApiError::missing_credentials(
