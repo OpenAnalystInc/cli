@@ -152,7 +152,7 @@ impl SlashSuggestions {
                 let name_pad = max_name_w + 2 - spec.name.len();
 
                 let name_style = if is_selected {
-                    Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+                    Style::default().fg(Color::Rgb(255, 165, 0)).add_modifier(Modifier::BOLD)
                 } else {
                     Style::default().fg(Color::White)
                 };
@@ -164,7 +164,7 @@ impl SlashSuggestions {
                 let indicator = if is_selected { "▸ " } else { "  " };
 
                 Line::from(vec![
-                    Span::styled(indicator, Style::default().fg(Color::Cyan)),
+                    Span::styled(indicator, Style::default().fg(Color::Rgb(255, 165, 0))),
                     Span::styled(format!("/{}", spec.name), name_style),
                     Span::raw(" ".repeat(name_pad)),
                     Span::styled(spec.summary, desc_style),
