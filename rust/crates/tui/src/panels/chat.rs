@@ -227,53 +227,57 @@ impl ChatPanel {
     /// Render the chat panel.
     pub fn render(&self, area: Rect, buf: &mut Buffer) {
         let mut all_lines: Vec<Line<'_>> = Vec::new();
+        let mut prev_was_user = false;
 
         for (msg_idx, msg) in self.messages.iter().enumerate() {
             let is_focused = self.focused_message == Some(msg_idx);
 
             match msg {
                 ChatMessage::User { text } => {
-                    all_lines.push(Line::from(""));
+                    // Single blank line before user input (tight spacing)
+                    if !all_lines.is_empty() {
+                        all_lines.push(Line::from(""));
+                    }
                     let bg = if is_focused { Color::Indexed(236) } else { Color::Reset };
                     all_lines.push(Line::from(vec![
                         Span::styled("❯ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD).bg(bg)),
                         Span::styled(text.as_str(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD).bg(bg)),
                     ]));
+                    prev_was_user = true;
                 }
-                ChatMessage::Assistant { markdown, streaming } => {
-                    all_lines.push(Line::from(""));
-                    // Status dot: blinking white while streaming, solid green when done
-                    let dot_color = if *streaming {
-                        let blink = (std::time::SystemTime::now()
-                            .duration_since(std::time::UNIX_EPOCH)
-                            .unwrap_or_default()
-                            .as_millis() / 500) % 2 == 0;
-                        if blink { Color::White } else { Color::Indexed(240) }
-                    } else {
-                        Color::Green
-                    };
-                    // First line gets status dot, all lines get 2-space indent
+                ChatMessage::Assistant { markdown, .. } => {
+                    // No blank line right after user prompt — tight coupling
+                    if !prev_was_user && !all_lines.is_empty() {
+                        all_lines.push(Line::from(""));
+                    }
                     let text = markdown.to_text();
                     let mut first = true;
                     for line in text.lines {
                         if first {
-                            let mut spans = vec![Span::styled("● ", Style::default().fg(dot_color))];
+                            let mut spans = vec![Span::raw("  ")];
                             spans.extend(line.spans);
                             all_lines.push(Line::from(spans));
                             first = false;
                         } else {
-                            // Continuation lines get matching 2-space indent
                             let mut spans = vec![Span::raw("  ")];
                             spans.extend(line.spans);
                             all_lines.push(Line::from(spans));
                         }
                     }
-                    all_lines.push(Line::from(""));
+                    prev_was_user = false;
                 }
                 ChatMessage::ToolCall { card } => {
                     render_tool_card_lines(card, is_focused, &mut all_lines);
+                    prev_was_user = false;
                 }
                 ChatMessage::System { text } => {
+                    // Filter out noisy system messages
+                    if text.starts_with("[Agent]") || text.starts_with("Agent:")
+                        || text.contains("Status: Running") || text.contains("Status: Completed")
+                        || text.starts_with("OpenAnalyst is asking")
+                    {
+                        continue; // Skip agent lifecycle noise
+                    }
                     let fg = if is_focused { Color::Indexed(252) } else { Color::DarkGray };
                     let is_error = text.starts_with("Error") || text.starts_with("error")
                         || text.contains("failed") || text.contains("Failed");
@@ -293,6 +297,7 @@ impl ChatPanel {
                             )));
                         }
                     }
+                    prev_was_user = false;
                 }
                 ChatMessage::Banner { lines } => {
                     all_lines.extend(lines.iter().cloned());
@@ -441,16 +446,22 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
 
     let has_diff = card.diff.is_some();
 
-    // For edit/write tools with diff, show "Update(file_path)" style title
+    // Build title: ● ToolName(input_preview...) or ● Update(file_path)
     let display_name = if has_diff {
         let diff = card.diff.as_ref().unwrap();
         let short_path = shorten_path(&diff.file_path);
         format!("Update({})", short_path)
     } else {
-        card.tool_name.clone()
+        // Show tool name with input preview like Claude Code: Bash(curl -s ...)
+        let preview: String = card.input_preview.chars().take(60).collect();
+        if preview.is_empty() {
+            card.tool_name.clone()
+        } else {
+            format!("{}({})", card.tool_name, preview)
+        }
     };
 
-    // Title line: ● Update(crates/orchestrator/src/worker.rs)
+    // Title line: ● Bash(curl -s --max-time 30...)
     lines.push(Line::from(vec![
         Span::styled(
             format!("{status_icon} "),
@@ -464,20 +475,17 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
         ),
     ]));
 
-    // For diff cards, show summary and diff lines only when expanded
+    // For diff cards, always show summary line
     if let Some(ref diff) = card.diff {
-        if card.expanded {
-            // Summary: └  Added 38 lines, removed 3 lines
-            let summary = match (diff.added, diff.removed) {
-                (a, 0) => format!("└  Added {a} lines"),
-                (0, r) => format!("└  Removed {r} lines"),
-                (a, r) => format!("└  Added {a} lines, removed {r} lines"),
-            };
-            lines.push(Line::from(Span::styled(
-                summary,
-                Style::default().fg(Color::DarkGray),
-            )));
-        }
+        let summary = match (diff.added, diff.removed) {
+            (a, 0) => format!("  └  Added {a} lines"),
+            (0, r) => format!("  └  Removed {r} lines"),
+            (a, r) => format!("  └  Added {a} lines, removed {r} lines"),
+        };
+        lines.push(Line::from(Span::styled(
+            summary,
+            Style::default().fg(Color::DarkGray),
+        )));
 
         // Render diff hunks with line numbers and colors
         if card.expanded {
@@ -541,18 +549,27 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
 
         lines.push(Line::from(""));
     } else {
-        // Non-diff tool card — input preview + optional raw output (only when expanded)
-        if card.expanded {
+        // Non-diff tool card — always show a compact summary line
+        if let Some(ref output) = card.output {
+            // Show first line of output as └ summary (always visible)
+            let first_line = output.lines().next().unwrap_or("(No output)");
+            let summary: String = first_line.chars().take(80).collect();
             lines.push(Line::from(Span::styled(
-                format!("  {}", card.input_preview),
-                Style::default().fg(Color::Indexed(252)),
+                format!("  └  {summary}"),
+                Style::default().fg(Color::DarkGray),
+            )));
+        } else if matches!(card.status, tui_widgets::ToolCallStatus::Completed { .. }) {
+            lines.push(Line::from(Span::styled(
+                "  └  (No output)",
+                Style::default().fg(Color::DarkGray),
             )));
         }
 
+        // Expanded: show full output
         if card.expanded {
             if let Some(ref output) = card.output {
                 let max_lines = 20;
-                let output_lines: Vec<&str> = output.lines().collect();
+                let output_lines: Vec<&str> = output.lines().skip(1).collect(); // skip first (already shown)
                 for (i, line) in output_lines.iter().enumerate() {
                     if i >= max_lines {
                         lines.push(Line::from(Span::styled(
@@ -568,8 +585,6 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
                 }
             }
         }
-
-        lines.push(Line::from(""));
     }
 }
 
