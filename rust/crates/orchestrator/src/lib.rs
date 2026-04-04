@@ -109,6 +109,9 @@ impl AgentOrchestrator {
                         Some(Action::KnowledgeFeedback { .. }) => {
                             // Handled in the TUI slash command layer, not here
                         }
+                        Some(Action::AskUserResponse { request_id, response }) => {
+                            self.resolve_ask_user(&request_id, response).await;
+                        }
                         Some(Action::Quit) | None => break,
                         Some(Action::SlashCommand(_)) => {}
                     }
@@ -320,6 +323,11 @@ impl AgentOrchestrator {
     async fn resolve_permission(&self, request_id: &str, allow: bool) {
         let mut registry = self.registry.lock().await;
         registry.resolve_permission(request_id, allow);
+    }
+
+    async fn resolve_ask_user(&self, request_id: &str, response: String) {
+        let mut registry = self.registry.lock().await;
+        registry.resolve_ask_user(request_id, response);
     }
 
     /// Cancel an agent — abort the running task.

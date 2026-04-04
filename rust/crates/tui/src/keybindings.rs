@@ -15,6 +15,12 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
         return;
     }
 
+    // AskUser dialog takes priority (modal)
+    if app.ask_user_dialog.is_some() {
+        handle_ask_user_dialog_key(key, app);
+        return;
+    }
+
     // Autocomplete popup takes priority when active
     if app.suggestions.active {
         match key.code {
@@ -534,6 +540,62 @@ fn handle_permission_dialog_key(key: KeyEvent, app: &mut App) {
                 app.permission_dialog = None;
             }
             _ => {}
+        }
+    }
+}
+
+/// Handle key events when the AskUser dialog is active.
+fn handle_ask_user_dialog_key(key: KeyEvent, app: &mut App) {
+    if let Some(ref mut dialog) = app.ask_user_dialog {
+        if dialog.is_choice() {
+            // Multiple-choice mode: navigate and select
+            match key.code {
+                KeyCode::Up | KeyCode::Char('k') => {
+                    if dialog.selected_index > 0 {
+                        dialog.selected_index -= 1;
+                    }
+                }
+                KeyCode::Down | KeyCode::Char('j') => {
+                    if dialog.selected_index < dialog.options.len().saturating_sub(1) {
+                        dialog.selected_index += 1;
+                    }
+                }
+                KeyCode::Enter => {
+                    app.resolve_ask_user();
+                }
+                KeyCode::Char(c) => {
+                    // Number key shortcut: 1-9 selects option directly
+                    if let Some(idx) = c.to_digit(10) {
+                        let idx = idx as usize;
+                        if idx >= 1 && idx <= dialog.options.len() {
+                            dialog.selected_index = idx - 1;
+                            app.resolve_ask_user();
+                        }
+                    }
+                }
+                KeyCode::Esc => {
+                    // Cancel — send default or empty
+                    app.resolve_ask_user();
+                }
+                _ => {}
+            }
+        } else {
+            // Free-text mode: type response
+            match key.code {
+                KeyCode::Char(c) => {
+                    dialog.text_input.push(c);
+                }
+                KeyCode::Backspace => {
+                    dialog.text_input.pop();
+                }
+                KeyCode::Enter => {
+                    app.resolve_ask_user();
+                }
+                KeyCode::Esc => {
+                    app.resolve_ask_user();
+                }
+                _ => {}
+            }
         }
     }
 }

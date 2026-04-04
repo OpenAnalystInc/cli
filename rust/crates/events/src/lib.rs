@@ -182,6 +182,16 @@ pub enum UiEvent {
         from_cache: bool,
     },
 
+    // ── AskUser ──
+    /// The agent wants to ask the user a question via modal dialog.
+    AskUserRequest {
+        request_id: String,
+        agent_id: AgentId,
+        question: String,
+        options: Option<Vec<String>>,
+        default: Option<String>,
+    },
+
     // ── Animation ──
     /// Periodic tick for spinner animations and elapsed time updates.
     Tick,
@@ -251,6 +261,11 @@ pub enum Action {
         comment: String,
         correction: String,
     },
+    /// User responded to an AskUser question.
+    AskUserResponse {
+        request_id: String,
+        response: String,
+    },
     /// User requested to quit.
     Quit,
 }
@@ -291,3 +306,8 @@ pub type AgentSpawnRx = tokio::sync::mpsc::Receiver<AgentSpawnRequest>;
 pub type PermissionResponseTx = tokio::sync::oneshot::Sender<bool>;
 /// Receiver for permission decision responses (TUI → blocked worker thread).
 pub type PermissionResponseRx = tokio::sync::oneshot::Receiver<bool>;
+
+/// Sender for AskUser responses (TUI → blocked worker thread).
+pub type AskUserResponseTx = tokio::sync::oneshot::Sender<String>;
+/// Receiver for AskUser responses (TUI → blocked worker thread).
+pub type AskUserResponseRx = tokio::sync::oneshot::Receiver<String>;

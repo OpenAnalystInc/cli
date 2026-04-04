@@ -124,6 +124,7 @@ fn run_turn_blocking(
         ui_tx: ui_tx.clone(),
         mcp_connections,
         loop_detector,
+        registry: registry.clone(),
     };
 
     let permission_policy = runtime::PermissionPolicy::new(config.permission_mode);
@@ -341,6 +342,7 @@ struct ChannelToolExecutor {
     ui_tx: UiEventTx,
     mcp_connections: Vec<runtime::mcp_bridge::McpConnection>,
     loop_detector: std::sync::Arc<std::sync::Mutex<LoopDetectionService>>,
+    registry: std::sync::Arc<Mutex<AgentRegistry>>,
 }
 
 impl ToolExecutor for ChannelToolExecutor {
@@ -376,6 +378,67 @@ impl ToolExecutor for ChannelToolExecutor {
         let mtime_before = file_path.as_deref().and_then(|p| {
             std::fs::metadata(p).ok().and_then(|m| m.modified().ok())
         });
+
+        // AskUser tool: send modal to TUI, block on oneshot for user's response
+        if tool_name == "AskUser" {
+            let question = input_value.get("question").and_then(|v| v.as_str()).unwrap_or("").to_string();
+            let options = input_value.get("options").and_then(|v| v.as_array()).map(|arr| {
+                arr.iter().filter_map(|v| v.as_str().map(String::from)).collect::<Vec<_>>()
+            });
+            let default = input_value.get("default").and_then(|v| v.as_str()).map(String::from);
+
+            let request_id = format!("askuser-{}-{}", self.agent_id, start.elapsed().as_nanos());
+            let (tx, rx) = tokio::sync::oneshot::channel::<String>();
+
+            // Register the oneshot in the registry
+            {
+                let mut reg = self.registry.blocking_lock();
+                reg.register_ask_user(request_id.clone(), tx);
+            }
+
+            // Send AskUser request to TUI — shows the dialog
+            let _ = self.ui_tx.blocking_send(UiEvent::AskUserRequest {
+                request_id: request_id.clone(),
+                agent_id: self.agent_id.clone(),
+                question: question.clone(),
+                options: options.clone(),
+                default: default.clone(),
+            });
+
+            // Block until user responds (120s timeout)
+            let response = {
+                let rt = tokio::runtime::Builder::new_current_thread()
+                    .enable_time()
+                    .build();
+                match rt {
+                    Ok(rt) => rt.block_on(async {
+                        match tokio::time::timeout(std::time::Duration::from_secs(120), rx).await {
+                            Ok(Ok(resp)) => resp,
+                            Ok(Err(_)) => "(dialog closed)".to_string(),
+                            Err(_) => "(timed out after 120s)".to_string(),
+                        }
+                    }),
+                    Err(_) => "(runtime error)".to_string(),
+                }
+            };
+
+            let output = serde_json::json!({
+                "question": question,
+                "response": response,
+            }).to_string();
+
+            // Send tool completion to TUI
+            let _ = self.ui_tx.blocking_send(UiEvent::ToolCallEnd {
+                agent_id: self.agent_id.clone(),
+                call_id: String::new(),
+                output: format!("User answered: {response}"),
+                is_error: false,
+                duration: start.elapsed(),
+                diff: None,
+            });
+
+            return Ok(output);
+        }
 
         // Route MCP tools to their server connection
         let result = if tool_name.starts_with("mcp__") {

@@ -26,6 +26,51 @@ pub enum ExitState {
     ConfirmExit,
 }
 
+/// AskUser dialog state — modal that blocks the agent until user responds.
+#[derive(Debug, Clone)]
+pub struct AskUserDialog {
+    pub request_id: String,
+    pub question: String,
+    pub options: Vec<String>,
+    pub default: Option<String>,
+    pub selected_index: usize,
+    pub text_input: String,
+}
+
+impl AskUserDialog {
+    pub fn new(
+        request_id: String,
+        question: String,
+        options: Option<Vec<String>>,
+        default: Option<String>,
+    ) -> Self {
+        Self {
+            request_id,
+            question,
+            options: options.unwrap_or_default(),
+            default,
+            selected_index: 0,
+            text_input: String::new(),
+        }
+    }
+
+    /// Is this a multiple-choice dialog?
+    pub fn is_choice(&self) -> bool {
+        !self.options.is_empty()
+    }
+
+    /// Get the current response text.
+    pub fn response(&self) -> String {
+        if self.is_choice() {
+            self.options.get(self.selected_index).cloned().unwrap_or_default()
+        } else if self.text_input.is_empty() {
+            self.default.clone().unwrap_or_default()
+        } else {
+            self.text_input.clone()
+        }
+    }
+}
+
 /// Reversible TUI action for the undo stack.
 #[derive(Debug, Clone)]
 pub enum UndoAction {
@@ -45,6 +90,7 @@ pub struct App {
 
     // Modal overlays
     pub permission_dialog: Option<PermissionDialog>,
+    pub ask_user_dialog: Option<AskUserDialog>,
 
     // Layout state
     pub sidebar_visible: bool,
@@ -121,6 +167,7 @@ impl App {
             input_state: InputBoxState::default(),
             sidebar_state: SidebarState::default(),
             permission_dialog: None,
+            ask_user_dialog: None,
             sidebar_visible: true,
             focus: PanelId::Input,
             scroll_mode: false,
@@ -637,6 +684,25 @@ impl App {
         }
     }
 
+    /// Resolve an AskUser dialog — send user's response back to the blocked worker.
+    pub fn resolve_ask_user(&mut self) {
+        if let Some(dialog) = self.ask_user_dialog.take() {
+            let response = dialog.response();
+            self.chat.push_system(format!("You answered: {response}"));
+            let tx = self.action_tx.clone();
+            let request_id = dialog.request_id;
+            tokio::spawn(async move {
+                if tx
+                    .send(Action::AskUserResponse { request_id, response })
+                    .await
+                    .is_err()
+                {
+                    eprintln!("[tui] orchestrator channel closed");
+                }
+            });
+        }
+    }
+
     /// Resolve a permission dialog.
     pub fn resolve_permission(&self, request_id: String, allow: bool) {
         let tx = self.action_tx.clone();
@@ -763,6 +829,18 @@ impl App {
                     required_mode,
                     selected: 0,
                 });
+            }
+            UiEvent::AskUserRequest {
+                request_id,
+                question,
+                options,
+                default,
+                ..
+            } => {
+                self.ask_user_dialog = Some(AskUserDialog::new(
+                    request_id, question, options, default,
+                ));
+                self.chat.push_system("OpenAnalyst is asking you a question...".to_string());
             }
             UiEvent::UsageUpdate {
                 input_tokens,
@@ -1041,7 +1119,100 @@ impl App {
         if let Some(dialog) = self.permission_dialog.clone() {
             dialog.render(area, buf);
         }
+
+        // AskUser dialog overlay (if active)
+        if let Some(ref dialog) = self.ask_user_dialog {
+            render_ask_user_dialog(dialog, area, buf);
+        }
     }
+}
+
+/// Render the AskUser dialog as a centered modal overlay.
+fn render_ask_user_dialog(dialog: &AskUserDialog, area: Rect, buf: &mut Buffer) {
+    use ratatui::style::{Color, Modifier, Style};
+    use ratatui::text::{Line, Span};
+    use ratatui::widgets::{Block, BorderType, Borders, Clear, Paragraph, Wrap};
+
+    let dialog_width = area.width.min(60);
+    let dialog_height = if dialog.is_choice() {
+        (dialog.options.len() as u16 + 6).min(area.height.saturating_sub(4))
+    } else {
+        8u16.min(area.height.saturating_sub(4))
+    };
+
+    // Center the dialog
+    let x = area.x + (area.width.saturating_sub(dialog_width)) / 2;
+    let y = area.y + (area.height.saturating_sub(dialog_height)) / 2;
+    let dialog_area = Rect::new(x, y, dialog_width, dialog_height);
+
+    // Clear the background
+    Clear.render(dialog_area, buf);
+
+    let block = Block::default()
+        .borders(Borders::ALL)
+        .border_type(BorderType::Rounded)
+        .border_style(Style::default().fg(Color::Rgb(50, 130, 255)))
+        .title(Line::from(vec![
+            Span::styled(" ? ", Style::default().fg(Color::Rgb(50, 130, 255)).add_modifier(Modifier::BOLD)),
+            Span::styled("OpenAnalyst asks ", Style::default().fg(Color::White).add_modifier(Modifier::BOLD)),
+        ]));
+
+    let inner = block.inner(dialog_area);
+    block.render(dialog_area, buf);
+
+    let mut lines: Vec<Line<'_>> = Vec::new();
+
+    // Question text (wrapped)
+    lines.push(Line::from(Span::styled(
+        &dialog.question,
+        Style::default().fg(Color::White).add_modifier(Modifier::BOLD),
+    )));
+    lines.push(Line::from(""));
+
+    if dialog.is_choice() {
+        // Multiple choice options
+        for (i, option) in dialog.options.iter().enumerate() {
+            let is_selected = i == dialog.selected_index;
+            let prefix = if is_selected { " > " } else { "   " };
+            let style = if is_selected {
+                Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)
+            } else {
+                Style::default().fg(Color::Indexed(252))
+            };
+            lines.push(Line::from(vec![
+                Span::styled(prefix, style),
+                Span::styled(format!("{}) {option}", i + 1), style),
+            ]));
+        }
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            " ↑↓ navigate · Enter select · 1-9 shortcut",
+            Style::default().fg(Color::Indexed(240)),
+        )));
+    } else {
+        // Text input
+        let display_text = if dialog.text_input.is_empty() {
+            if let Some(ref default) = dialog.default {
+                format!("{default}▍")
+            } else {
+                "▍".to_string()
+            }
+        } else {
+            format!("{}▍", dialog.text_input)
+        };
+        lines.push(Line::from(vec![
+            Span::styled(" > ", Style::default().fg(Color::Cyan)),
+            Span::styled(display_text, Style::default().fg(Color::White)),
+        ]));
+        lines.push(Line::from(""));
+        lines.push(Line::from(Span::styled(
+            " Type your answer · Enter submit",
+            Style::default().fg(Color::Indexed(240)),
+        )));
+    }
+
+    let paragraph = Paragraph::new(lines).wrap(Wrap { trim: false });
+    paragraph.render(inner, buf);
 }
 
 /// Build the right-aligned keybinding hints for the status bar.
