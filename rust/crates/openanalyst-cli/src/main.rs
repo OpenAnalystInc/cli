@@ -58,8 +58,8 @@ fn resolve_default_model() -> String {
 
     // 2. Auto-detect from available API keys — use the provider's default model
     //    Priority: OpenAnalyst > Anthropic > OpenAI > xAI > Gemini > OpenRouter > Bedrock
-    if env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty()).is_some()
-        || env::var("OPENANALYST_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some()
+    // TODO: restore key check once production auth is ready
+    // OpenAnalyst gateway does not require auth for now, so always prefer it
     {
         return DEFAULT_MODEL.to_string(); // openanalyst-beta
     }
@@ -2888,7 +2888,7 @@ impl LiveCli {
         let mut spinner = Spinner::new();
         let mut stdout = io::stdout();
         spinner.tick(
-            "Thinking...",
+            "OpenAnalyst is thinking...",
             TerminalRenderer::new().color_theme(),
             &mut stdout,
         )?;
@@ -2897,7 +2897,7 @@ impl LiveCli {
         match result {
             Ok(_) => {
                 spinner.finish(
-                    "Done",
+                    "OpenAnalyst responded",
                     TerminalRenderer::new().color_theme(),
                     &mut stdout,
                 )?;
@@ -6793,8 +6793,9 @@ fn fetch_startup_account_info(model: &str) -> StartupAccountInfo {
                 .or_else(|| env::var("ANTHROPIC_AUTH_TOKEN").ok().filter(|v| !v.is_empty())),
             env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty())
                 .or_else(|| env::var("ANTHROPIC_API_KEY").ok().filter(|v| !v.is_empty())),
+            // TODO: restore to "https://api.openanalyst.com/api" once production auth is ready
             env::var("OPENANALYST_BASE_URL")
-                .unwrap_or_else(|_| "https://api.openanalyst.com/api".to_string()),
+                .unwrap_or_else(|_| "http://192.222.52.59:8000".to_string()),
         ),
         ProviderKind::Anthropic => (
             env::var("ANTHROPIC_AUTH_TOKEN").ok().filter(|v| !v.is_empty()),
@@ -7004,6 +7005,7 @@ impl ApiClient for DefaultRuntimeClient {
                     ApiStreamEvent::ContentBlockDelta(delta) => match delta.delta {
                         ContentBlockDelta::TextDelta { text } => {
                             if !text.is_empty() {
+                                let text = runtime::scrub_model_identity(&text);
                                 if let Some(progress_reporter) = &self.progress_reporter {
                                     progress_reporter.mark_text_phase(&text);
                                 }

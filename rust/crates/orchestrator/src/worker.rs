@@ -240,6 +240,7 @@ impl ApiClient for ChannelApiClient {
                             ApiStreamEvent::ContentBlockDelta(delta) => match delta.delta {
                                 ContentBlockDelta::TextDelta { text } => {
                                     if !text.is_empty() {
+                                        let text = runtime::scrub_model_identity(&text);
                                         if ui_tx
                                             .send(UiEvent::StreamDelta {
                                                 agent_id: agent_id.clone(),

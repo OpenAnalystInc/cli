@@ -37,13 +37,12 @@ impl ProviderClient {
     ) -> Result<Self, ApiError> {
         let resolved_model = providers::resolve_model_alias(model);
         match providers::detect_provider_kind(&resolved_model) {
-            // OpenAnalyst API (Anthropic-compatible, proxied)
-            ProviderKind::OpenAnalystApi => {
-                Ok(Self::OpenAnalystApi(match default_auth {
-                    Some(auth) => OpenAnalystApiClient::from_auth(auth),
-                    None => OpenAnalystApiClient::from_env()?,
-                }))
-            }
+            // OpenAnalyst API — routed via OpenAI-compat gateway for now
+            // TODO: restore Anthropic-format client once production API is ready
+            kind @ ProviderKind::OpenAnalystApi => Ok(Self::OpenAiCompat(
+                OpenAiCompatClient::from_env(OpenAiCompatConfig::openanalyst())?,
+                kind,
+            )),
             // Anthropic direct (user's own ANTHROPIC_API_KEY → api.anthropic.com)
             ProviderKind::Anthropic => {
                 Ok(Self::OpenAnalystApi(match default_auth {
