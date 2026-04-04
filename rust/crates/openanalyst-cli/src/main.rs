@@ -4333,11 +4333,11 @@ impl LiveCli {
                         .and_then(|v| v.as_str()).unwrap_or("(no response)").to_string())
                 }
                 _ => {
-                    // OpenAnalyst gateway (OpenAI-compat format, no auth)
+                    // OpenAnalyst model server (OpenAI-compat format)
                     let oa_base = env::var("OPENANALYST_BASE_URL")
-                        .unwrap_or_else(|_| "http://192.222.52.59:8000".to_string());
+                        .unwrap_or_else(|_| "https://aquatic-temperatures-regularly-favourite.trycloudflare.com".to_string());
                     let body = json!({
-                        "model": "gemma-4-chat",
+                        "model": "openai/gpt-oss-120b",
                         "messages": [{"role": "user", "content": [
                             {"type": "image_url", "image_url": {"url": format!("data:{mime};base64,{b64}")}},
                             {"type": "text", "text": prompt}
@@ -4920,13 +4920,16 @@ impl LiveCli {
                     );
                     self.run_turn(&fallback)?;
                 } else {
-                    println!("  \x1b[31m[x]\x1b[0m KB request failed (HTTP {status})");
-                    println!("  \x1b[2m{}\x1b[0m", truncate_for_prompt(&body, 200));
+                    println!("  \x1b[33m[!]\x1b[0m Knowledge base returned an error. Falling back to AI...\n");
+                    let fallback = format!(
+                        "Answer this query as an expert consultant. Be specific and actionable:\n\n{query}"
+                    );
+                    self.run_turn(&fallback)?;
                 }
             }
-            Err(e) => {
-                // Network error — fall back gracefully
-                println!("  \x1b[33m[!]\x1b[0m Could not reach knowledge base: {e}");
+            Err(_) => {
+                // Network error — fall back gracefully (no internal details exposed)
+                println!("  \x1b[33m[!]\x1b[0m Knowledge base is temporarily unavailable.");
                 println!("  \x1b[2mFalling back to AI-only answer...\x1b[0m\n");
                 let fallback = format!(
                     "Answer this query as an expert consultant. Be specific and actionable:\n\n{query}"
@@ -5299,22 +5302,14 @@ impl LiveCli {
             ("OpenRouter", &["OPENROUTER_API_KEY"]),
             ("Stability AI", &["STABILITY_API_KEY"]),
         ];
-        // OpenAnalyst gateway — test actual connectivity (no key required)
+        // OpenAnalyst — check if API key is set
         {
-            let oa_base = env::var("OPENANALYST_BASE_URL")
-                .unwrap_or_else(|_| "http://192.222.52.59:8000".to_string());
-            let oa_url = format!("{}/v1/models", oa_base.trim_end_matches('/'));
-            let oa_ok = std::thread::scope(|_| {
-                reqwest::blocking::Client::builder()
-                    .timeout(Duration::from_secs(5))
-                    .build()
-                    .ok()
-                    .and_then(|c| c.get(&oa_url).send().ok())
-                    .map_or(false, |r| r.status().is_success())
-            });
-            let icon = if oa_ok { "\x1b[38;5;46m✓\x1b[0m" } else { "\x1b[38;5;196m✗\x1b[0m" };
-            let status = if oa_ok { "\x1b[38;5;46mconnected\x1b[0m" } else { "\x1b[38;5;196munreachable\x1b[0m" };
-            println!("  {icon} OpenAnalyst  {status}  ({oa_base})");
+            let has_oa = env::var("OPENANALYST_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some()
+                || env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty()).is_some();
+            let mode = env::var("OPENANALYST_MODE").unwrap_or_else(|_| "api".to_string());
+            let mode_label = if mode == "free" { "free model" } else { "API credits" };
+            let icon = if has_oa { "\x1b[38;5;46m+\x1b[0m" } else { "\x1b[38;5;240m-\x1b[0m" };
+            println!("  {icon} OpenAnalyst ({mode_label})");
         }
         for (name, keys) in providers {
             let has_key = keys.iter().any(|k| env::var(k).ok().filter(|v| !v.is_empty()).is_some());

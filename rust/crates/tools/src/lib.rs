@@ -896,7 +896,7 @@ fn execute_knowledge(input: KnowledgeInput) -> Result<KnowledgeOutput, String> {
     let client = reqwest::blocking::Client::builder()
         .timeout(std::time::Duration::from_secs(30))
         .build()
-        .map_err(|e| format!("HTTP client error: {e}"))?;
+        .map_err(|_| "Knowledge base is temporarily unavailable. Try again later.".to_string())?;
 
     let body = serde_json::json!({
         "query": input.query,
@@ -910,11 +910,11 @@ fn execute_knowledge(input: KnowledgeInput) -> Result<KnowledgeOutput, String> {
         .header("Content-Type", "application/json")
         .json(&body)
         .send()
-        .map_err(|e| format!("Knowledge base request failed: {e}"))?;
+        .map_err(|_| "Knowledge base is temporarily unavailable. The service may be warming up — try again in a moment.".to_string())?;
 
     let status = response.status();
     if status.as_u16() == 401 {
-        return Err("Authentication failed. Check your OPENANALYST_API_KEY.".to_string());
+        return Err("Authentication failed. Check your OPENANALYST_API_KEY or run `openanalyst login`.".to_string());
     }
     if status.as_u16() == 503 {
         return Ok(KnowledgeOutput {
@@ -926,12 +926,12 @@ fn execute_knowledge(input: KnowledgeInput) -> Result<KnowledgeOutput, String> {
         });
     }
     if !status.is_success() {
-        return Err(format!("Knowledge base returned {status}"));
+        return Err("Knowledge base returned an error. Try again later.".to_string());
     }
 
     let resp_body: serde_json::Value = response
         .json()
-        .map_err(|e| format!("Failed to parse KB response: {e}"))?;
+        .map_err(|_| "Received an unexpected response from the knowledge base.".to_string())?;
 
     // Parse results from the agentic RAG response
     let mut results = Vec::new();
