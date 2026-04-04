@@ -26,6 +26,15 @@ pub enum ExitState {
     ConfirmExit,
 }
 
+/// Reversible TUI action for the undo stack.
+#[derive(Debug, Clone)]
+pub enum UndoAction {
+    AddContextFile(String),
+    RemoveContextFile(String),
+    SelectAgent(Option<String>),
+    SelectPlan(Option<usize>),
+}
+
 /// The main TUI application state.
 pub struct App {
     // Panels
@@ -81,6 +90,15 @@ pub struct App {
     // Active agent name selected from sidebar (changes input box title + system prompt)
     pub active_agent_name: Option<String>,
 
+    // Context files added from sidebar (injected into prompts)
+    pub context_files: Vec<String>,
+
+    // Undo stack for reversible TUI actions (max 20)
+    pub undo_stack: Vec<UndoAction>,
+
+    // Timestamp of last Esc press for double-Esc undo detection
+    pub last_esc_time: Option<Instant>,
+
     // Slash command autocomplete
     pub suggestions: SlashSuggestions,
 
@@ -123,6 +141,9 @@ impl App {
             permission_mode: "danger-full-access".to_string(),
             permission_level: PermissionLevel::Default,
             active_agent_name: None,
+            context_files: Vec::new(),
+            undo_stack: Vec::new(),
+            last_esc_time: None,
             suggestions: SlashSuggestions::default(),
             history: InputHistory::default(),
             voice: crate::voice::VoiceState::default(),
@@ -551,6 +572,29 @@ impl App {
         self.is_streaming = true;
         self.status_bar.phase = AgentPhase::Thinking;
         self.chat.auto_scroll = true;
+
+        // Inject context files (read file contents, truncate large files)
+        let text = if !self.context_files.is_empty() {
+            let mut ctx = String::from("[Context files:\n");
+            for file_path in &self.context_files {
+                match std::fs::read_to_string(file_path) {
+                    Ok(content) => {
+                        let truncated: String = content.chars().take(8000).collect();
+                        ctx.push_str(&format!("--- {} ---\n{}\n", file_path, truncated));
+                        if content.len() > 8000 {
+                            ctx.push_str("... (truncated)\n");
+                        }
+                    }
+                    Err(_) => {
+                        ctx.push_str(&format!("--- {} --- (could not read)\n", file_path));
+                    }
+                }
+            }
+            ctx.push_str("]\n\n");
+            format!("{ctx}{text}")
+        } else {
+            text
+        };
 
         // If an agent is selected, prepend its system prompt as context
         let text = if let Some(ref agent_name) = self.active_agent_name {
@@ -983,7 +1027,8 @@ impl App {
                 .permission_level(self.permission_level)
                 .model_label(Some(model_badge))
                 .context_tag(context_tag)
-                .active_agent(self.active_agent_name.clone());
+                .active_agent(self.active_agent_name.clone())
+                .context_files(self.context_files.clone());
             input.render_with_state(layout.input, buf, &mut self.input_state);
         }
 

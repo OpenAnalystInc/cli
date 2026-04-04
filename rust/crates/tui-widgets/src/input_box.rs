@@ -187,6 +187,8 @@ pub struct InputBox {
     model_label: Option<String>,
     /// Active agent name (from sidebar selection).
     active_agent: Option<String>,
+    /// Context files attached from sidebar (shown as @file badges).
+    context_files: Vec<String>,
 }
 
 impl Default for InputBox {
@@ -197,6 +199,7 @@ impl Default for InputBox {
             context_tag: None,
             model_label: None,
             active_agent: None,
+            context_files: Vec::new(),
         }
     }
 }
@@ -234,6 +237,13 @@ impl InputBox {
     #[must_use]
     pub fn active_agent(mut self, name: Option<String>) -> Self {
         self.active_agent = name;
+        self
+    }
+
+    /// Set context files (shown as @file badges in the bottom border).
+    #[must_use]
+    pub fn context_files(mut self, files: Vec<String>) -> Self {
+        self.context_files = files;
         self
     }
 
@@ -305,6 +315,38 @@ impl InputBox {
                         .alignment(ratatui::layout::Alignment::Right),
                 );
             }
+        }
+
+        // Context file badges (bottom border)
+        if !self.context_files.is_empty() {
+            let max_width = area.width.saturating_sub(4) as usize;
+            let mut file_spans: Vec<Span<'static>> = Vec::new();
+            let mut used_width = 0usize;
+            let total = self.context_files.len();
+            let mut shown = 0usize;
+
+            for path in &self.context_files {
+                let short = path.rsplit(['/', '\\']).next().unwrap_or(path);
+                let badge = format!(" @{short} ");
+                let badge_len = badge.len() + 1; // +1 for separator space
+                if used_width + badge_len > max_width && shown > 0 {
+                    let remaining = total - shown;
+                    file_spans.push(Span::styled(
+                        format!(" +{remaining} more "),
+                        Style::default().fg(Color::Indexed(245)),
+                    ));
+                    break;
+                }
+                file_spans.push(Span::styled(
+                    badge,
+                    Style::default().fg(Color::Cyan).bg(Color::Indexed(236)),
+                ));
+                file_spans.push(Span::styled(" ", Style::default()));
+                used_width += badge_len;
+                shown += 1;
+            }
+
+            block = block.title_bottom(Line::from(file_spans));
         }
 
         let inner = block.inner(area);
