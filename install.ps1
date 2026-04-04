@@ -5,17 +5,16 @@
 #   irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex
 # ─────────────────────────────────────────────────
 
-$ErrorActionPreference = "Stop"
-[Console]::OutputEncoding = [System.Text.Encoding]::UTF8
-$OutputEncoding = [System.Text.Encoding]::UTF8
+# Prevent the script from closing the terminal on errors
+$ErrorActionPreference = "Continue"
+try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
+try { $OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
 $Repo = "AnitChaudhry/openanalyst-cli"
 $BinaryName = "openanalyst.exe"
 $InstallDir = "$env:USERPROFILE\.openanalyst\bin"
 $ConfigDir = "$env:USERPROFILE\.openanalyst"
 $Target = "x86_64-pc-windows-msvc"
-
-Clear-Host
 
 Write-Host ""
 Write-Host ""
@@ -27,7 +26,7 @@ Write-Host "    ██    ██  ██    ██ " -ForegroundColor Blue
 Write-Host "    ████████  ██    ██ " -ForegroundColor Blue
 Write-Host ""
 Write-Host "   OpenAnalyst CLI  " -ForegroundColor White -NoNewline
-Write-Host "v1.0.89" -ForegroundColor DarkGray
+Write-Host "v1.0.91" -ForegroundColor DarkGray
 Write-Host "   The Universal AI Agent for Your Terminal" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "   ────────────────────────────────────────────" -ForegroundColor DarkGray
@@ -45,24 +44,58 @@ New-Item -ItemType Directory -Force -Path $ConfigDir | Out-Null
 
 $Downloaded = $false
 
-# Step 1 — Download
+# Step 1 — Download from GitHub Release
 Write-Host "   › Fetching latest release..." -ForegroundColor Cyan -NoNewline
+
+# Build headers — use GITHUB_TOKEN for private repos if available
+$GhHeaders = @{ "User-Agent" = "openanalyst-cli" }
+if ($env:GITHUB_TOKEN) {
+    $GhHeaders["Authorization"] = "Bearer $env:GITHUB_TOKEN"
+} elseif ($env:GH_TOKEN) {
+    $GhHeaders["Authorization"] = "Bearer $env:GH_TOKEN"
+} else {
+    # Try gh CLI auth token
+    try {
+        $GhAuthToken = (gh auth token 2>$null)
+        if ($GhAuthToken) { $GhHeaders["Authorization"] = "Bearer $GhAuthToken" }
+    } catch {}
+}
+
 try {
-    $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers @{"User-Agent"="openanalyst-cli"} -ErrorAction Stop
+    $Release = Invoke-RestMethod -Uri "https://api.github.com/repos/$Repo/releases/latest" -Headers $GhHeaders -ErrorAction Stop
     $Version = $Release.tag_name -replace "^v", ""
     Write-Host " v$Version" -ForegroundColor Green
-    $AssetUrl = "https://github.com/$Repo/releases/download/v$Version/openanalyst-$Target.exe"
+
+    # Find the correct asset — try exact match first, then fallback patterns
+    $Asset = $Release.assets | Where-Object { $_.name -like "*$Target*" -or $_.name -like "*windows*x64*" -or $_.name -eq $BinaryName } | Select-Object -First 1
+
+    if ($Asset) {
+        $AssetUrl = $Asset.browser_download_url
+        # For private repos, use the API URL with auth
+        if ($GhHeaders.ContainsKey("Authorization")) {
+            $AssetUrl = $Asset.url
+            $GhHeaders["Accept"] = "application/octet-stream"
+        }
+    } else {
+        # Fallback: construct the URL directly
+        $AssetUrl = "https://github.com/$Repo/releases/download/$($Release.tag_name)/openanalyst.exe"
+    }
 
     Write-Host "   › Downloading binary..." -ForegroundColor Cyan -NoNewline
     try {
-        Invoke-WebRequest -Uri $AssetUrl -OutFile "$InstallDir\$BinaryName" -ErrorAction Stop
+        Invoke-WebRequest -Uri $AssetUrl -OutFile "$InstallDir\$BinaryName" -Headers $GhHeaders -ErrorAction Stop
         $Downloaded = $true
         Write-Host " ✓ done" -ForegroundColor Green
     } catch {
-        Write-Host " unavailable" -ForegroundColor Yellow
+        Write-Host " download failed" -ForegroundColor Yellow
     }
 } catch {
-    Write-Host " not found" -ForegroundColor Yellow
+    Write-Host " release not found" -ForegroundColor Yellow
+    Write-Host ""
+    Write-Host "   Note: If this is a private repo, set GITHUB_TOKEN:" -ForegroundColor DarkGray
+    Write-Host "     `$env:GITHUB_TOKEN = 'ghp_your_token'" -ForegroundColor DarkGray
+    Write-Host "   Or login with: gh auth login" -ForegroundColor DarkGray
+    Write-Host ""
 }
 
 # Fallback — build from source
