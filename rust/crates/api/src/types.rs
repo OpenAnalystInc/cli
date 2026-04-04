@@ -161,12 +161,21 @@ pub enum OutputContentBlock {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Usage {
+    #[serde(default, deserialize_with = "deserialize_null_as_zero")]
     pub input_tokens: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_zero")]
     pub cache_creation_input_tokens: u32,
-    #[serde(default)]
+    #[serde(default, deserialize_with = "deserialize_null_as_zero")]
     pub cache_read_input_tokens: u32,
+    #[serde(default, deserialize_with = "deserialize_null_as_zero")]
     pub output_tokens: u32,
+}
+
+fn deserialize_null_as_zero<'de, D>(deserializer: D) -> Result<u32, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    Option::<u32>::deserialize(deserializer).map(|opt| opt.unwrap_or(0))
 }
 
 impl Usage {

@@ -58,8 +58,8 @@ fn resolve_default_model() -> String {
 
     // 2. Auto-detect from available API keys — use the provider's default model
     //    Priority: OpenAnalyst > Anthropic > OpenAI > xAI > Gemini > OpenRouter > Bedrock
-    // TODO: restore key check once production auth is ready
-    // OpenAnalyst gateway does not require auth for now, so always prefer it
+    if env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty()).is_some()
+        || env::var("OPENANALYST_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some()
     {
         return DEFAULT_MODEL.to_string(); // openanalyst-beta
     }
@@ -6884,9 +6884,8 @@ fn fetch_startup_account_info(model: &str) -> StartupAccountInfo {
                 .or_else(|| env::var("ANTHROPIC_AUTH_TOKEN").ok().filter(|v| !v.is_empty())),
             env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty())
                 .or_else(|| env::var("ANTHROPIC_API_KEY").ok().filter(|v| !v.is_empty())),
-            // TODO: restore to "https://api.openanalyst.com/api" once production auth is ready
             env::var("OPENANALYST_BASE_URL")
-                .unwrap_or_else(|_| "http://192.222.52.59:8000".to_string()),
+                .unwrap_or_else(|_| "https://api.openanalyst.com/api".to_string()),
         ),
         ProviderKind::Anthropic => (
             env::var("ANTHROPIC_AUTH_TOKEN").ok().filter(|v| !v.is_empty()),
@@ -6926,15 +6925,8 @@ fn fetch_startup_account_info(model: &str) -> StartupAccountInfo {
         ),
     };
 
-    // Try to fetch account info from API (skip for OpenAnalyst gateway — no auth)
-    let fetched = if provider == ProviderKind::OpenAnalystApi
-        && api_key.is_none()
-        && auth_token.is_none()
-    {
-        None // No auth credentials → skip API call, use OS username
-    } else {
-        try_fetch_account(&base_url, auth_token.as_deref(), api_key.as_deref())
-    };
+    // Try to fetch account info from API
+    let fetched = try_fetch_account(&base_url, auth_token.as_deref(), api_key.as_deref());
 
     // Fallback display name from OS
     let os_user = env::var("USER").or_else(|_| env::var("USERNAME")).ok()
