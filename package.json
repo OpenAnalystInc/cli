@@ -11,9 +11,8 @@
   },
   "files": [
     "bin/",
-    "scripts/",
-    "rust/",
-    "src/",
+    "scripts/postinstall.js",
+    "native/",
     "README.md",
     "LICENSE"
   ],

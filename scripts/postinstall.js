@@ -87,51 +87,6 @@ function downloadStream(stream, assetName, ext, resolve) {
   stream.on("error", () => resolve(false));
 }
 
-// Build from source using cargo
-function buildFromSource() {
-  const rustDir = path.join(__dirname, "..", "rust");
-  const cargoToml = path.join(rustDir, "Cargo.toml");
-
-  if (!fs.existsSync(cargoToml)) {
-    log("Rust source not found — skipping build");
-    log("Download a prebuilt release from GitHub or install Rust to build");
-    return false;
-  }
-
-  // Check cargo
-  try {
-    execSync("cargo --version", { stdio: "pipe" });
-  } catch {
-    log("Rust/Cargo not installed — cannot build from source");
-    log("Install Rust: https://rustup.rs");
-    return false;
-  }
-
-  log("Building from source (this may take a few minutes)...");
-  try {
-    execSync("cargo build --release -p openanalyst-cli", {
-      cwd: rustDir,
-      stdio: "inherit",
-      timeout: 600000, // 10 minute timeout
-    });
-
-    // Copy binary to native/
-    const ext = os.platform() === "win32" ? ".exe" : "";
-    const srcBin = path.join(rustDir, "target", "release", `openanalyst${ext}`);
-    if (fs.existsSync(srcBin)) {
-      fs.mkdirSync(NATIVE_DIR, { recursive: true });
-      fs.copyFileSync(srcBin, path.join(NATIVE_DIR, `openanalyst${ext}`));
-      if (os.platform() !== "win32") {
-        fs.chmodSync(path.join(NATIVE_DIR, `openanalyst${ext}`), 0o755);
-      }
-      log("Build complete");
-      return true;
-    }
-  } catch (err) {
-    log(`Build failed: ${err.message}`);
-  }
-  return false;
-}
 
 async function main() {
   console.log("");
@@ -146,21 +101,11 @@ async function main() {
     return;
   }
 
-  // Strategy 2: Build from source
-  log("No prebuilt binary available, building from source...");
-  const built = buildFromSource();
-  if (built) {
-    log("Installation complete (built from source)");
-    console.log("");
-    return;
-  }
-
-  // Neither worked
+  // No prebuilt available
   console.log("");
   log("Could not install the OpenAnalyst CLI binary.");
-  log("Options:");
-  log("  1. Install Rust (https://rustup.rs) and run: npm run build");
-  log("  2. Download a release binary from GitHub");
+  log("Download from: https://openanalyst.com");
+  log("Support: support@openanalyst.com");
   console.log("");
 }
 

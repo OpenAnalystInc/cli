@@ -13,11 +13,8 @@ function getBinaryPath() {
 
   // Check multiple locations in priority order
   const candidates = [
-    // Installed via postinstall (prebuilt or cargo-built)
+    // Installed via postinstall (prebuilt binary)
     path.join(__dirname, "..", "native", binaryName),
-    // Local development build
-    path.join(__dirname, "..", "rust", "target", "release", binaryName),
-    path.join(__dirname, "..", "rust", "target", "debug", binaryName),
   ];
 
   for (const candidate of candidates) {
@@ -48,12 +45,10 @@ if (!binary) {
   OpenAnalyst CLI binary not found.
 
   Try reinstalling:
-    npm install -g @openanalyst/cli
+    npm install -g @openanalyst/openanalyst-cli
 
-  Or build from source:
-    cd rust && cargo build --release
-
-  Requires Rust toolchain: https://rustup.rs
+  Or download from: https://openanalyst.com
+  Support: support@openanalyst.com
   `);
   process.exit(1);
 }
