@@ -43,15 +43,19 @@ pub async fn run_event_loop(
     });
 
     loop {
-        // Draw
-        terminal.draw(|frame| {
-            app.render(frame.area(), frame.buffer_mut());
-        })?;
+        // Draw only when something changed (dirty flag) — smoother rendering
+        if app.needs_redraw {
+            terminal.draw(|frame| {
+                app.render(frame.area(), frame.buffer_mut());
+            })?;
+            app.needs_redraw = false;
+        }
 
         // Handle events
         tokio::select! {
             // Crossterm keyboard/mouse/paste events
             Some(event) = cx_rx.recv() => {
+                app.needs_redraw = true;
                 match event {
                     ct_event::Event::Key(key) if key.kind == ct_event::KeyEventKind::Press => {
                         handle_key(key, &mut app);
@@ -98,9 +102,12 @@ pub async fn run_event_loop(
             Some(event) = app.ui_rx.recv() => {
                 app.handle_ui_event(event);
             }
-            // Animation tick
+            // Animation tick — only redraw during streaming (spinner animation)
             _ = tick_interval.tick() => {
                 app.tick();
+                if app.is_streaming {
+                    app.needs_redraw = true;
+                }
             }
             // Auto-save session periodically
             _ = auto_save_interval.tick() => {
