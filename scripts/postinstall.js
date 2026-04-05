@@ -37,13 +37,26 @@ async function tryDownloadPrebuilt() {
   }
 
   const ext = os.platform() === "win32" ? ".exe" : "";
-  const assetName = `openanalyst-${target}${ext}`;
+  // Try platform-specific name first, then generic name
+  const platformAsset = `openanalyst-${target}${ext}`;
+  const genericAsset = `openanalyst${ext}`;
+  const assetName = platformAsset;
   const releaseUrl = `https://github.com/${REPO}/releases/download/v${PACKAGE_VERSION}/${assetName}`;
+  const fallbackUrl = `https://github.com/${REPO}/releases/download/v${PACKAGE_VERSION}/${genericAsset}`;
 
   log(`Checking for prebuilt binary: ${assetName}`);
 
+  // Try platform-specific asset first, then generic fallback
+  const downloaded = await tryUrl(releaseUrl, ext);
+  if (downloaded) return true;
+
+  log(`Platform-specific binary not found, trying generic: ${genericAsset}`);
+  return tryUrl(fallbackUrl, ext);
+}
+
+function tryUrl(url, ext) {
   return new Promise((resolve) => {
-    const request = https.get(releaseUrl, { headers: { "User-Agent": "openanalyst-cli" } }, (res) => {
+    const request = https.get(url, { headers: { "User-Agent": "openanalyst-cli" } }, (res) => {
       if (res.statusCode === 302 || res.statusCode === 301) {
         // Follow redirect (GitHub releases redirect to S3)
         https.get(res.headers.location, { headers: { "User-Agent": "openanalyst-cli" } }, (redirectRes) => {
@@ -51,7 +64,7 @@ async function tryDownloadPrebuilt() {
             resolve(false);
             return;
           }
-          downloadStream(redirectRes, assetName, ext, resolve);
+          downloadStream(redirectRes, path.basename(url), ext, resolve);
         }).on("error", () => resolve(false));
         return;
       }
@@ -59,10 +72,10 @@ async function tryDownloadPrebuilt() {
         resolve(false);
         return;
       }
-      downloadStream(res, assetName, ext, resolve);
+      downloadStream(res, path.basename(url), ext, resolve);
     });
     request.on("error", () => resolve(false));
-    request.setTimeout(15000, () => { request.destroy(); resolve(false); });
+    request.setTimeout(30000, () => { request.destroy(); resolve(false); });
   });
 }
 
