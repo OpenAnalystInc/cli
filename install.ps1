@@ -11,7 +11,7 @@ $InstallDir = "$env:USERPROFILE\.openanalyst\bin"
 $ConfigDir = "$env:USERPROFILE\.openanalyst"
 
 # ── Helpers ──
-function Rp([string]$c, [int]$n) { if ($n -le 0) { return "" }; return ($c * $n) }
+function Repeat([string]$c, [int]$n) { if ($n -le 0) { return "" }; return ($c * $n) }
 function Pad([int]$n) { if ($n -le 0) { return "" }; return (" " * $n) }
 function W([string]$t) { Write-Host $t -NoNewline -ForegroundColor White }
 function Dim([string]$t) { Write-Host $t -NoNewline -ForegroundColor DarkGray }
@@ -55,18 +55,18 @@ Dim "  v$Version"
 Nl
 Dim "   The Universal AI Agent for Your Terminal"
 Nl; Nl
-Dim "   $(Rp $H 44)"; Nl; Nl
+Dim "   $(Repeat $H 44)"; Nl; Nl
 
 # ── System info ──
 $OsLabel = "Windows"
 $ArchLabel = if ([Environment]::Is64BitOperatingSystem) { "x64" } else { "x86" }
 $BoxW = 42
 
-Dim "   $TL$(Rp $H $BoxW)$TR"; Nl
+Dim "   $TL$(Repeat $H $BoxW)$TR"; Nl
 Dim "   $VL"; W "  System       "; Dim "$OsLabel $ArchLabel"; Dim (Pad ($BoxW - 15 - "$OsLabel $ArchLabel".Length)); Dim $VL; Nl
 Dim "   $VL"; W "  Install to   "; Dim "~\.openanalyst\bin"; Dim (Pad ($BoxW - 15 - 18)); Dim $VL; Nl
 Dim "   $VL"; W "  Config at    "; Dim "~\.openanalyst"; Dim (Pad ($BoxW - 15 - 14)); Dim $VL; Nl
-Dim "   $BL$(Rp $H $BoxW)$BR"; Nl
+Dim "   $BL$(Repeat $H $BoxW)$BR"; Nl
 Nl
 
 # ── Setup ──
@@ -133,7 +133,7 @@ if (-not (Test-Path $EnvFile)) {
 
 # ── Summary ──
 Nl; Nl
-Dim "   $(Rp $H 44)"; Nl; Nl
+Dim "   $(Repeat $H 44)"; Nl; Nl
 Write-Host "   $([char]0x2713) Installation complete" -ForegroundColor Green
 Nl; Nl
 
@@ -141,13 +141,13 @@ $BinPath = "~\.openanalyst\bin\openanalyst"
 $CfgPath = "~\.openanalyst\.env"
 $VerStr = "v$Version"
 
-Dim "   $TL$(Rp $H $BoxW)$TR"; Nl
+Dim "   $TL$(Repeat $H $BoxW)$TR"; Nl
 Dim "   $VL$(Pad $BoxW)$VL"; Nl
 Dim "   $VL"; W "  Binary     "; Dim $BinPath; Dim (Pad ($BoxW - 13 - $BinPath.Length)); Dim $VL; Nl
 Dim "   $VL"; W "  Config     "; Dim $CfgPath; Dim (Pad ($BoxW - 13 - $CfgPath.Length)); Dim $VL; Nl
 Dim "   $VL"; W "  Version    "; Dim $VerStr; Dim (Pad ($BoxW - 13 - $VerStr.Length)); Dim $VL; Nl
 Dim "   $VL$(Pad $BoxW)$VL"; Nl
-Dim "   $BL$(Rp $H $BoxW)$BR"; Nl
+Dim "   $BL$(Repeat $H $BoxW)$BR"; Nl
 Nl
 
 # ── Next steps ──
@@ -167,7 +167,7 @@ Acc "      `$ openanalyst"; Nl
 Nl; Nl
 
 # ── Provider list ──
-Dim "   $TL$(Rp $H $BoxW)$TR"; Nl
+Dim "   $TL$(Repeat $H $BoxW)$TR"; Nl
 Dim "   $VL$(Pad $BoxW)$VL"; Nl
 Dim "   $VL"; W "  7 LLM Providers. One Interface."; Dim (Pad ($BoxW - 34)); Dim $VL; Nl
 Dim "   $VL$(Pad $BoxW)$VL"; Nl
@@ -197,12 +197,12 @@ foreach ($p in $providers) {
     Dim $VL; Nl
 }
 Dim "   $VL$(Pad $BoxW)$VL"; Nl
-Dim "   $BL$(Rp $H $BoxW)$BR"; Nl
+Dim "   $BL$(Repeat $H $BoxW)$BR"; Nl
 Nl
 
 Dim "   Documentation:  "
 Acc "github.com/OpenAnalystInc/openanalyst-cli"
 Nl
 Dim "   Support:        "
-Acc "anit@openanalyst.com"
+Acc "support@openanalyst.com"
 Nl; Nl
