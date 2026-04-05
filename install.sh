@@ -5,13 +5,13 @@ set -e
 # OpenAnalyst CLI Installer — macOS / Linux
 #
 # Usage:
-#   curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash
 #
 # Or with a specific version:
 #   curl -fsSL ... | bash -s -- --version 1.0.89
 # ─────────────────────────────────────────────────
 
-REPO="OpenAnalystInc/openanalyst-cli"
+REPO="AnitChaudhry/openanalyst-cli"
 BINARY_NAME="openanalyst"
 INSTALL_DIR="${OPENANALYST_INSTALL_DIR:-$HOME/.local/bin}"
 CONFIG_DIR="$HOME/.openanalyst"
@@ -175,7 +175,7 @@ if [ ! -f "$CONFIG_DIR/.env" ]; then
 #  Uncomment and fill in the providers you want to use.
 #  Or run `openanalyst login` for interactive browser-based setup.
 #
-#  Docs: https://github.com/OpenAnalystInc/openanalyst-cli
+#  Docs: https://github.com/AnitChaudhry/openanalyst-cli
 # ═══════════════════════════════════════════════════════════════════
 
 # ── Provider API Keys ─────────────────────────────────────────────
@@ -276,7 +276,7 @@ echo ""
 if [ -n "$SHELL_RC" ]; then
   echo -e "   ${DIM}Reload your shell:  source ${SHELL_RC}${R}"
 fi
-echo -e "   ${DIM}Documentation:      github.com/OpenAnalystInc/openanalyst-cli${R}"
+echo -e "   ${DIM}Documentation:      github.com/AnitChaudhry/openanalyst-cli${R}"
 echo -e "   ${DIM}Support:            anit@openanalyst.com${R}"
 echo ""
 echo ""
