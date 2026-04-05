@@ -169,23 +169,24 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   Select your LLM provider to authenticate:
 
-  <span class="c-g">&gt;</span> <span class="c-c">Anthropic / Claude</span>  opus, sonnet, haiku &mdash; browser login
-    OpenAI / Codex      gpt-4o, o3, codex-mini &mdash; browser login
-    Google Gemini       gemini-2.5-pro, flash &mdash; browser login
-    OpenAnalyst         OpenAnalyst API (default)
+  <span class="c-g">&gt;</span> <span class="c-c">OpenAnalyst</span>         gpt-oss-120b free model or API key with credits
+    Anthropic / Claude  opus, sonnet, haiku &mdash; OAuth or API key
+    OpenAI / Codex      gpt-4o, o3, codex-mini &mdash; OAuth or API key
+    Google Gemini       gemini-2.5-pro, flash &mdash; OAuth or API key
     xAI / Grok
-    OpenRouter
+    OpenRouter          350+ models
     Amazon Bedrock
 
   How would you like to authenticate?
 
-  <span class="c-g">&gt;</span> <span class="c-c">Login with browser</span>  sign in with your account (recommended)
-    Use API key         paste an API key manually
+  <span class="c-g">&gt;</span> <span class="c-c">Use free model</span>  gpt-oss-120b &mdash; no credits needed
+    Use API key       OpenAnalyst API with credits
 
-  <span class="c-d">Step 1</span>  Opening Anthropic / Claude login in your browser...
-  <span class="c-d">Step 2</span>  Waiting for authentication... <span class="c-g">&#10003; Received</span>
-  <span class="c-d">Step 3</span>  Exchanging authorization code... <span class="c-g">&#10003; Authenticated</span>
-  <span class="c-d">Step 4</span>  Fetching available models... <span class="c-c">12 models</span>
+  <span class="c-d">Step 1</span>  Connecting to OpenAnalyst... <span class="c-g">&#10003; Connected</span>
+
+  <span class="c-g">&#10003;</span> Free model access configured
+
+  Launch OpenAnalyst now? [<span class="c-c">Y</span>/n]
 
   <span class="c-g">&#10003; Login complete</span></pre></div>
   </div>
@@ -207,7 +208,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   <div class="section-sub">Switch models mid-conversation. Session persists across providers. Login via browser OAuth or API key. No other CLI does this.</div>
 
   <div class="pgrid">
-    <div class="pcard df"><div class="pcard-name">OpenAnalyst <span class="pcard-badge">DEFAULT</span></div><div class="pcard-env">OPENANALYST_AUTH_TOKEN</div><div class="pcard-desc">Models fetched live from API</div></div>
+    <div class="pcard df"><div class="pcard-name">OpenAnalyst <span class="pcard-badge">DEFAULT</span></div><div class="pcard-env">OPENANALYST_AUTH_TOKEN</div><div class="pcard-desc">gpt-oss-120b free model or API credits</div></div>
     <div class="pcard"><div class="pcard-name">Anthropic / Claude <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,0.15);color:var(--green);margin-left:4px">OAuth</span></div><div class="pcard-desc" style="margin:6px 0 8px">opus, sonnet, haiku</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">ANTHROPIC_API_KEY</span></div></div>
     <div class="pcard"><div class="pcard-name">OpenAI / Codex <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,0.15);color:var(--green);margin-left:4px">OAuth</span></div><div class="pcard-desc" style="margin:6px 0 8px">gpt-4o, o3, codex-mini</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">OPENAI_API_KEY</span></div></div>
     <div class="pcard"><div class="pcard-name">Google Gemini <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,0.15);color:var(--green);margin-left:4px">OAuth</span></div><div class="pcard-desc" style="margin:6px 0 8px">gemini-2.5-pro, flash</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">GEMINI_API_KEY</span></div></div>
@@ -238,7 +239,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <div class="wrap">
   <div class="section-label">Capabilities</div>
   <div class="section-title">What you can do</div>
-  <div class="section-sub">The most feature-rich AI agent CLI ever built. Native Rust binary, 7 LLM providers, 58 commands, voice input, multi-agent orchestration, and more.</div>
+  <div class="section-sub">The most feature-rich AI agent CLI ever built. Native Rust binary, 7 LLM providers, 65+ commands, 24 tools, voice input, multi-agent orchestration, clipboard paste, /undo revert, and more.</div>
 
   <div class="acc open" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(255,107,0,0.15);color:var(--accent)">&#9889;</div><div class="acc-title">Smart Per-Action Model Routing <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
@@ -556,7 +557,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 <!-- ═══ 11. FOOTER ═══ -->
 <div class="footer" style="padding:40px 24px">
-  <p><strong>OpenAnalyst CLI <span class="oa-version-full">v1.0.91</span></strong></p>
+  <p><strong>OpenAnalyst CLI <span class="oa-version-full">v1.0.106</span></strong></p>
   <p style="margin-top:6px">An independent, open-source AI agent for the terminal</p>
   <p style="margin-top:12px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a> &middot; <a href="https://github.com/AnitChaudhry/openanalyst-cli" target="_blank">GitHub</a></p>
 </div>
