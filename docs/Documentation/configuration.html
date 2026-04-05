@@ -3,7 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Configuration - OpenAnalyst CLI Docs</title>
+  <link rel="icon" type="image/png" href="https://openanalyst.com/images/new-logo.png">
+<title>Configuration - OpenAnalyst CLI Docs</title>
   <link rel="stylesheet" href="styles.css">
   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
 </head>
@@ -12,11 +13,11 @@
 
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <a href="../Index.html">
+        <a href="../index.html">
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
-        <span data-version-prefix="Documentation v">Documentation v2.0.3</span>
+        <span data-version-prefix="Documentation v">Documentation v2.0.7</span>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Documentation</div>
@@ -97,22 +98,32 @@ This is a React + Node.js monorepo with:
 
       <div class="code-title">.openanalyst/settings.json</div>
       <pre><code>{
-  "model": "sonnet",
+  "model": "openanalyst-beta",
   "permission_mode": "workspace-write",
+  "autoMode": "auto-edit",
+  "extendedThinking": { "enabled": true, "budgetTokens": 10000 },
   "env": {
-    "ANTHROPIC_API_KEY": "sk-ant-..."
+    "OPENANALYST_API_KEY": "sk-oa-..."
+  },
+  "permissions": {
+    "allow": ["bash(npm test)", "write_file(src/**)"],
+    "deny": ["bash(rm -rf *)"]
   },
   "hooks": {
-    "PreToolUse": [...],
-    "PostToolUse": [...],
-    "SessionStart": [...],
-    "SessionEnd": [...],
-    "CwdChanged": [...],
-    "FileChanged": [...]
+    "PreToolUse": [{ "command": "echo $TOOL_NAME" }],
+    "PostToolUse": [{ "command": "echo done" }],
+    "SessionStart": [],
+    "SessionEnd": [],
+    "SubagentSpawned": [],
+    "ModelSwitch": []
   },
-  "plugins": {
-    "enabled": ["my-plugin"],
-    "directories": ["./plugins"]
+  "subagents": {
+    "explore": { "model": null, "maxTurns": 10 },
+    "plan": { "model": null, "maxTurns": 5 }
+  },
+  "modelAliases": {
+    "fast": "openanalyst-beta",
+    "smart": "claude-sonnet-4-6"
   },
   "mcp": {
     "servers": {
@@ -172,6 +183,15 @@ openanalyst --permission-mode workspace-write
           <tr><td><code>CwdChanged</code></td><td>When the working directory changes</td></tr>
           <tr><td><code>FileChanged</code></td><td>When a file is modified</td></tr>
           <tr><td><code>TaskCreated</code></td><td>When a new task is created</td></tr>
+          <tr><td><code>Notification</code></td><td>System notification event</td></tr>
+          <tr><td><code>Stop</code></td><td>Agent execution stopped</td></tr>
+          <tr><td><code>SubagentSpawned</code></td><td>When a sub-agent is created</td></tr>
+          <tr><td><code>SubagentCompleted</code></td><td>When a sub-agent finishes</td></tr>
+          <tr><td><code>ModelSwitch</code></td><td>When the active model changes</td></tr>
+          <tr><td><code>PermissionRequest</code></td><td>When a tool requests permission</td></tr>
+          <tr><td><code>PermissionResult</code></td><td>After permission is granted/denied</td></tr>
+          <tr><td><code>ElicitationRequest</code></td><td>When AI asks user a question</td></tr>
+          <tr><td><code>ElicitationResult</code></td><td>After user responds to question</td></tr>
         </tbody>
       </table>
 
@@ -205,25 +225,46 @@ openanalyst --permission-mode workspace-write
       </table>
 
       <h2 id="file-structure">File Structure</h2>
-      <pre><code>~/.openanalyst/                  <span class="token-comment"># User config directory</span>
-  ├── credentials.json           <span class="token-comment"># Saved OAuth tokens</span>
-  ├── .env                       <span class="token-comment"># API keys</span>
-  ├── sessions/                  <span class="token-comment"># Saved conversations</span>
-  ├── plugins/                   <span class="token-comment"># Installed plugins</span>
-  ├── settings.json              <span class="token-comment"># Global user settings</span>
-  └── settings.local.json        <span class="token-comment"># Machine-local overrides</span>
 
-.openanalyst/                    <span class="token-comment"># Project config directory</span>
-  ├── settings.json              <span class="token-comment"># Project settings</span>
-  ├── settings.local.json        <span class="token-comment"># Machine overrides (gitignored)</span>
-  ├── agents/                    <span class="token-comment"># Configured agents</span>
-  ├── skills/                    <span class="token-comment"># Custom skills</span>
-  ├── hooks/                     <span class="token-comment"># Hook definitions</span>
-  └── mcp/                       <span class="token-comment"># MCP server configs</span>
+      <h3>Project-Level (created via <code>/init</code>)</h3>
+      <pre><code>project/
+├── OPENANALYST.md                    <span class="token-comment"># Project-specific AI instructions</span>
+├── OPENANALYST.local.md              <span class="token-comment"># Personal project instructions (gitignored)</span>
+├── .openanalyst.json                 <span class="token-comment"># Shared project defaults</span>
+├── .openanalyst/
+│   ├── settings.json                 <span class="token-comment"># Project-level settings</span>
+│   ├── settings.local.json           <span class="token-comment"># Machine-local overrides (gitignored)</span>
+│   ├── .env                          <span class="token-comment"># Provider API keys (gitignored)</span>
+│   ├── .mcp.json                     <span class="token-comment"># MCP server configuration</span>
+│   ├── sessions/                     <span class="token-comment"># Saved conversation sessions</span>
+│   ├── skills/                       <span class="token-comment"># Multi-file SKILL.md definitions</span>
+│   ├── commands/                     <span class="token-comment"># Simple slash commands</span>
+│   ├── rules/                        <span class="token-comment"># Path-specific instruction files</span>
+│   ├── agents/                       <span class="token-comment"># Custom subagent definitions</span>
+│   ├── hooks/                        <span class="token-comment"># Reusable hook scripts</span>
+│   └── output-styles/                <span class="token-comment"># Custom output formatting</span></code></pre>
 
-OPENANALYST.md                   <span class="token-comment"># Project guidance (auto-detected)</span>
-.openanalyst.json                <span class="token-comment"># Shared project defaults</span>
-.openanalyst-todos.json          <span class="token-comment"># Task tracking</span></code></pre>
+      <h3>User-Level (all projects)</h3>
+      <pre><code>~/.openanalyst/
+├── settings.json                     <span class="token-comment"># User-wide settings</span>
+├── .env                              <span class="token-comment"># Global API keys</span>
+├── credentials.json                  <span class="token-comment"># Saved provider credentials</span>
+├── skills/                           <span class="token-comment"># User skills (available everywhere)</span>
+├── commands/                         <span class="token-comment"># User slash commands</span>
+├── rules/                            <span class="token-comment"># User rules</span>
+├── agents/                           <span class="token-comment"># User agents</span>
+└── output-styles/                    <span class="token-comment"># User output styles</span></code></pre>
+
+      <h3>3-Level Config Hierarchy</h3>
+      <p>All configuration (rules, skills, agents, output-styles) loads from three levels, with later levels overriding earlier ones:</p>
+      <table>
+        <thead><tr><th>Priority</th><th>Level</th><th>Location</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td>1 (lowest)</td><td>Managed</td><td><code>/etc/openanalyst-cli/</code> or <code>C:\Program Files\OpenAnalystCLI\</code></td><td>Enforced organization defaults</td></tr>
+          <tr><td>2</td><td>User</td><td><code>~/.openanalyst/</code></td><td>Personal defaults for all projects</td></tr>
+          <tr><td>3 (highest)</td><td>Project</td><td><code>.openanalyst/</code></td><td>Repo-specific, overrides user</td></tr>
+        </tbody>
+      </table>
 
       <div class="page-footer">
         <a href="agents.html">&larr; Multi-Agent System</a>
