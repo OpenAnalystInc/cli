@@ -14,7 +14,7 @@ use crate::types::{
 
 use super::{Provider, ProviderFuture};
 
-pub const DEFAULT_OPENANALYST_BASE_URL: &str = "https://aquatic-temperatures-regularly-favourite.trycloudflare.com/v1";
+pub const DEFAULT_OPENANALYST_BASE_URL: &str = "https://api.openanalyst.com/v1";
 pub const DEFAULT_XAI_BASE_URL: &str = "https://api.x.ai/v1";
 pub const DEFAULT_OPENAI_BASE_URL: &str = "https://api.openai.com/v1";
 pub const DEFAULT_OPENROUTER_BASE_URL: &str = "https://openrouter.ai/api/v1";

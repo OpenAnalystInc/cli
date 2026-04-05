@@ -1066,46 +1066,21 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
         test_header: "x-api-key",
         dashboard_url: "https://console.anthropic.com/settings/keys",
         models_url: "https://api.anthropic.com/v1/models",
-        oauth: Some(ProviderOAuthMeta {
-            client_id_env: "OPENANALYST_ANTHROPIC_CLIENT_ID",
-            default_client_id: "9d1c250a-e61b-44d9-88ed-5944d1962f5e",
-            default_client_secret: "",
-            authorize_url: "https://claude.ai/oauth/authorize",
-            token_url: "https://claude.ai/oauth/token",
-            scopes: &[
-                "user:profile",
-                "user:inference",
-            ],
-            token_env_var: "ANTHROPIC_API_KEY",
-            extra_authorize_params: &[],
-        }),
+        // OAuth disabled — Anthropic restricts OAuth tokens to Claude Code only.
+        // Users must use API keys from console.anthropic.com
+        oauth: None,
     },
     ProviderOption {
         name: "OpenAI / Codex",
-        description: "gpt-4o, o3, codex-mini — OAuth or API key",
+        description: "gpt-4o, o3, codex-mini — API key",
         env_var: "OPENAI_API_KEY",
         test_url: "https://api.openai.com/v1/models",
         test_header: "bearer",
         dashboard_url: "https://platform.openai.com/api-keys",
         models_url: "https://api.openai.com/v1/models",
-        oauth: Some(ProviderOAuthMeta {
-            client_id_env: "OPENANALYST_OPENAI_CLIENT_ID",
-            default_client_id: "app_EMoamEEZ73f0CkXaXp7hrann",
-            default_client_secret: "",
-            authorize_url: "https://auth.openai.com/oauth/authorize",
-            token_url: "https://auth.openai.com/oauth/token",
-            scopes: &[
-                "openid",
-                "profile",
-                "email",
-                "offline_access",
-            ],
-            token_env_var: "OPENAI_API_KEY",
-            extra_authorize_params: &[
-                ("response_type", "code"),
-                ("code_challenge_method", "S256"),
-            ],
-        }),
+        // OAuth disabled — OpenAI restricts OAuth tokens to Codex CLI only.
+        // Users must use API keys from platform.openai.com
+        oauth: None,
     },
     ProviderOption {
         name: "Google Gemini",
@@ -4401,7 +4376,7 @@ impl LiveCli {
                 _ => {
                     // OpenAnalyst model server (OpenAI-compat format)
                     let oa_base = env::var("OPENANALYST_BASE_URL")
-                        .unwrap_or_else(|_| "https://aquatic-temperatures-regularly-favourite.trycloudflare.com".to_string());
+                        .unwrap_or_else(|_| "https://api.openanalyst.com".to_string());
                     let body = json!({
                         "model": "openai/gpt-oss-120b",
                         "messages": [{"role": "user", "content": [
