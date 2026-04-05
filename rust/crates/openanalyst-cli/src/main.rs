@@ -399,9 +399,11 @@ fn load_saved_provider_credentials() {
 fn main() {
     // 1. Create ~/.openanalyst/.env template on first run (if missing)
     let _ = runtime::create_dotenv_template();
-    // 2. Load ~/.openanalyst/.env into process env (won't override existing vars)
+    // 2. Load project-level .openanalyst/.env first (takes priority)
+    let _ = runtime::load_dotenv_from(&std::path::Path::new(".openanalyst").join(".env"));
+    // 3. Load global ~/.openanalyst/.env (won't override project-level vars)
     let _ = runtime::load_dotenv();
-    // 3. Load saved credentials from ~/.openanalyst/credentials.json into env vars
+    // 4. Load saved credentials from ~/.openanalyst/credentials.json into env vars
     load_saved_provider_credentials();
     // 4. Detect auth from installed CLIs (Claude, Codex, Gemini)
     load_external_cli_credentials();
@@ -2790,6 +2792,12 @@ fn run_tui(
         cwd: cwd.display().to_string(),
         version: VERSION.to_string(),
     });
+
+    // Count configured MCP servers for status display
+    if let Ok(loader) = runtime::ConfigLoader::default_for(&cwd).load() {
+        let mcp_count = loader.mcp().servers().len();
+        app.sidebar_state.mcp_servers_connected = mcp_count;
+    }
 
     // Install panic hook to restore terminal on crash
     let original_hook = std::panic::take_hook();

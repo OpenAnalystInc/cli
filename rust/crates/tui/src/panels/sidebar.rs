@@ -160,6 +160,8 @@ pub struct SidebarState {
     pub routing_model_index: [usize; 4],
     /// Index of the active plan (selected by user from sidebar).
     pub active_plan_index: Option<usize>,
+    /// Number of connected MCP servers (for status display).
+    pub mcp_servers_connected: usize,
 }
 
 impl Default for SidebarState {
@@ -186,6 +188,7 @@ impl Default for SidebarState {
             available_models,
             routing_model_index: [0; 4],
             active_plan_index: None,
+            mcp_servers_connected: 0,
         }
     }
 }

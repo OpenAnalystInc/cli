@@ -1131,13 +1131,43 @@ impl App {
                     .unwrap_or(m)
                     .to_string()
             };
+            // Credit status based on provider mode
+            let credit_status = match std::env::var("OPENANALYST_MODE").as_deref() {
+                Ok("free") => Some("free tier".to_string()),
+                Ok("api") => Some("API credits".to_string()),
+                _ => {
+                    // Check which provider is active
+                    let model = &self.status_bar.model_name;
+                    if model.contains("claude") || model.contains("opus") || model.contains("sonnet") || model.contains("haiku") {
+                        Some("Anthropic".to_string())
+                    } else if model.contains("gpt") || model.contains("codex") {
+                        Some("OpenAI".to_string())
+                    } else if model.contains("gemini") {
+                        Some("Gemini".to_string())
+                    } else if model.contains("grok") {
+                        Some("xAI".to_string())
+                    } else if model.contains("openrouter") {
+                        Some("OpenRouter".to_string())
+                    } else if !model.is_empty() {
+                        Some("API".to_string())
+                    } else {
+                        None
+                    }
+                }
+            };
+
+            // MCP server count
+            let mcp_count = self.sidebar_state.mcp_servers_connected;
+
             let input = InputBox::default()
                 .mode(input_mode)
                 .permission_level(self.permission_level)
                 .model_label(Some(model_badge))
                 .context_tag(context_tag)
                 .active_agent(self.active_agent_name.clone())
-                .context_files(self.context_files.clone());
+                .context_files(self.context_files.clone())
+                .credit_status(credit_status)
+                .mcp_count(mcp_count);
             input.render_with_state(layout.input, buf, &mut self.input_state);
         }
 

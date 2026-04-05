@@ -189,6 +189,10 @@ pub struct InputBox {
     active_agent: Option<String>,
     /// Context files attached from sidebar (shown as @file badges).
     context_files: Vec<String>,
+    /// Credit/balance status (shown bottom-right, e.g., "free tier" or "42 credits").
+    credit_status: Option<String>,
+    /// Connected MCP servers count (shown bottom-right if > 0).
+    mcp_count: usize,
 }
 
 impl Default for InputBox {
@@ -200,6 +204,8 @@ impl Default for InputBox {
             model_label: None,
             active_agent: None,
             context_files: Vec::new(),
+            credit_status: None,
+            mcp_count: 0,
         }
     }
 }
@@ -244,6 +250,20 @@ impl InputBox {
     #[must_use]
     pub fn context_files(mut self, files: Vec<String>) -> Self {
         self.context_files = files;
+        self
+    }
+
+    /// Set credit/balance status (shown bottom-right).
+    #[must_use]
+    pub fn credit_status(mut self, status: Option<String>) -> Self {
+        self.credit_status = status;
+        self
+    }
+
+    /// Set connected MCP server count (shown bottom-right if > 0).
+    #[must_use]
+    pub fn mcp_count(mut self, count: usize) -> Self {
+        self.mcp_count = count;
         self
     }
 
@@ -347,6 +367,30 @@ impl InputBox {
             }
 
             block = block.title_bottom(Line::from(file_spans));
+        }
+
+        // Bottom-right: credit status + MCP count
+        {
+            let mut bottom_right: Vec<Span<'static>> = Vec::new();
+            if let Some(ref status) = self.credit_status {
+                bottom_right.push(Span::styled(
+                    format!(" {status} "),
+                    Style::default().fg(Color::Indexed(245)).bg(Color::Indexed(236)),
+                ));
+                bottom_right.push(Span::styled(" ", Style::default()));
+            }
+            if self.mcp_count > 0 {
+                bottom_right.push(Span::styled(
+                    format!(" MCP:{} ", self.mcp_count),
+                    Style::default().fg(Color::Green).bg(Color::Indexed(236)),
+                ));
+            }
+            if !bottom_right.is_empty() {
+                block = block.title_bottom(
+                    Line::from(bottom_right)
+                        .alignment(ratatui::layout::Alignment::Right),
+                );
+            }
         }
 
         let inner = block.inner(area);
