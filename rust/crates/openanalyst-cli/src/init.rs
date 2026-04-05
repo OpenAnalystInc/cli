@@ -8,8 +8,76 @@ const STARTER_OPENANALYST_JSON: &str = concat!(
     "  }\n",
     "}\n",
 );
+const PROJECT_DOTENV_TEMPLATE: &str = r#"# ═══════════════════════════════════════════════════════════════════
+#  OpenAnalyst CLI — Project Environment Configuration
+# ═══════════════════════════════════════════════════════════════════
+#
+#  Project-level API keys. These take priority over ~/.openanalyst/.env.
+#  This file is gitignored — safe to store keys here.
+#  You can also use `openanalyst login` for interactive setup.
+#
+#  Docs: https://openanalyst.com/docs
+# ═══════════════════════════════════════════════════════════════════
+
+# ── Provider API Keys ─────────────────────────────────────────────
+# Uncomment and add your key for each provider you want to use.
+
+# OpenAnalyst (default provider — free tier available)
+# OPENANALYST_API_KEY=
+# OPENANALYST_AUTH_TOKEN=
+
+# Anthropic / Claude (opus, sonnet, haiku)
+# ANTHROPIC_API_KEY=sk-ant-...
+
+# OpenAI (gpt-4o, o3, codex-mini)
+# OPENAI_API_KEY=sk-...
+
+# Google Gemini (gemini-2.5-pro, flash)
+# GEMINI_API_KEY=AIza...
+
+# xAI / Grok (grok-3, grok-mini)
+# XAI_API_KEY=xai-...
+
+# OpenRouter (350+ models via one key)
+# OPENROUTER_API_KEY=sk-or-...
+
+# Amazon Bedrock
+# BEDROCK_API_KEY=
+
+# Stability AI (image generation via /image)
+# STABILITY_API_KEY=sk-...
+
+# ── Self-Hosted / Local Models ────────────────────────────────────
+# Connect to locally hosted models (Ollama, vLLM, LM Studio, text-generation-webui, etc.)
+# Any OpenAI-compatible endpoint works here.
+
+# Ollama (default: http://localhost:11434/v1)
+# OLLAMA_BASE_URL=http://localhost:11434/v1
+# OLLAMA_API_KEY=ollama
+
+# Local OpenAI-compatible server (vLLM, LM Studio, LocalAI, etc.)
+# LOCAL_LLM_BASE_URL=http://localhost:8000/v1
+# LOCAL_LLM_API_KEY=
+
+# Custom model name for local inference
+# LOCAL_LLM_MODEL=
+
+# ── Base URL Overrides (optional) ─────────────────────────────────
+# Use these to point to custom/proxy endpoints.
+
+# OPENANALYST_BASE_URL=
+# ANTHROPIC_BASE_URL=
+# OPENAI_BASE_URL=
+# GEMINI_BASE_URL=
+"#;
+
 const GITIGNORE_COMMENT: &str = "# OpenAnalyst CLI local artifacts";
-const GITIGNORE_ENTRIES: [&str; 2] = [".openanalyst/settings.local.json", ".openanalyst/sessions/"];
+const GITIGNORE_ENTRIES: [&str; 4] = [
+    ".openanalyst/settings.local.json",
+    ".openanalyst/sessions/",
+    ".openanalyst/.env",
+    "OPENANALYST.local.md",
+];
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum InitStatus {
@@ -84,6 +152,29 @@ pub(crate) fn initialize_repo(cwd: &Path) -> Result<InitReport, Box<dyn std::err
     artifacts.push(InitArtifact {
         name: ".openanalyst/",
         status: ensure_dir(&oa_dir)?,
+    });
+
+    // Create subdirectories matching the full project configuration structure
+    for (name, subdir) in [
+        ("sessions/", "sessions"),
+        ("skills/", "skills"),
+        ("commands/", "commands"),
+        ("rules/", "rules"),
+        ("agents/", "agents"),
+        ("hooks/", "hooks"),
+        ("output-styles/", "output-styles"),
+    ] {
+        artifacts.push(InitArtifact {
+            name,
+            status: ensure_dir(&oa_dir.join(subdir))?,
+        });
+    }
+
+    // Create .openanalyst/.env with API key placeholders
+    let oa_env = oa_dir.join(".env");
+    artifacts.push(InitArtifact {
+        name: ".env",
+        status: write_file_if_missing(&oa_env, PROJECT_DOTENV_TEMPLATE)?,
     });
 
     let oa_json = cwd.join(".openanalyst.json");
@@ -355,6 +446,11 @@ mod tests {
         let report = initialize_repo(&root).expect("init should succeed");
         let rendered = report.render();
         assert!(rendered.contains(".openanalyst/      created"));
+        for subdir in ["sessions/", "skills/", "commands/", "rules/", "agents/", "hooks/", "output-styles/"] {
+            assert!(rendered.contains(&format!("{:<18} created", subdir)), "missing: {subdir}");
+            let dir_name = subdir.trim_end_matches('/');
+            assert!(root.join(".openanalyst").join(dir_name).is_dir(), "dir missing: {dir_name}");
+        }
         assert!(rendered.contains(".openanalyst.json  created"));
         assert!(rendered.contains(".gitignore         created"));
         assert!(rendered.contains("OPENANALYST.md     created"));
@@ -374,6 +470,8 @@ mod tests {
         let gitignore = fs::read_to_string(root.join(".gitignore")).expect("read gitignore");
         assert!(gitignore.contains(".openanalyst/settings.local.json"));
         assert!(gitignore.contains(".openanalyst/sessions/"));
+        assert!(gitignore.contains(".openanalyst/.env"));
+        assert!(gitignore.contains("OPENANALYST.local.md"));
         let oa_md = fs::read_to_string(root.join("OPENANALYST.md")).expect("read openanalyst md");
         assert!(oa_md.contains("Languages: Rust."));
         assert!(oa_md.contains("cargo clippy --workspace --all-targets -- -D warnings"));
@@ -386,7 +484,7 @@ mod tests {
         let root = temp_dir();
         fs::create_dir_all(&root).expect("create root");
         fs::write(root.join("OPENANALYST.md"), "custom guidance\n").expect("write existing openanalyst md");
-        fs::write(root.join(".gitignore"), ".openanalyst/settings.local.json\n").expect("write gitignore");
+        fs::write(root.join(".gitignore"), ".openanalyst/settings.local.json\n.openanalyst/sessions/\n.openanalyst/.env\nOPENANALYST.local.md\n").expect("write gitignore");
 
         let first = initialize_repo(&root).expect("first init should succeed");
         assert!(first
@@ -405,6 +503,7 @@ mod tests {
         let gitignore = fs::read_to_string(root.join(".gitignore")).expect("read gitignore");
         assert_eq!(gitignore.matches(".openanalyst/settings.local.json").count(), 1);
         assert_eq!(gitignore.matches(".openanalyst/sessions/").count(), 1);
+        assert_eq!(gitignore.matches(".openanalyst/.env").count(), 1);
 
         fs::remove_dir_all(root).expect("cleanup temp dir");
     }
