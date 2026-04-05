@@ -7,7 +7,7 @@ const os = require("os");
 const https = require("https");
 
 const PACKAGE_VERSION = require("../package.json").version;
-const REPO = "OpenAnalystInc/openanalyst-cli";
+const REPO = "OpenAnalystInc/cli";
 const NATIVE_DIR = path.join(__dirname, "..", "native");
 
 const PLATFORM_MAP = {
