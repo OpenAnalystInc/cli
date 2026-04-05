@@ -1,4 +1,4 @@
-# OpenAnalyst CLI
+# [OpenAnalyst CLI](https://openanalystinc.github.io/cli/)
 
 **The Universal AI Agent for Your Terminal.**
 
