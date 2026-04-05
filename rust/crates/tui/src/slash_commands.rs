@@ -83,6 +83,16 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                 .unwrap_or_else(|e| format!("Error: {e}"));
             app.chat.push_system(output);
         }
+        SlashCommand::Rules { args } => {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let output = commands::handle_rules_slash_command(args.as_deref(), &cwd);
+            app.chat.push_system(output);
+        }
+        SlashCommand::OutputStyle { name } => {
+            let cwd = std::env::current_dir().unwrap_or_default();
+            let output = commands::handle_output_style_slash_command(name.as_deref(), &cwd);
+            app.chat.push_system(output);
+        }
         SlashCommand::Export { path } => {
             let dest = path.unwrap_or_else(|| "session-export.md".to_string());
             let output = export_session(&app.chat.messages, &dest);

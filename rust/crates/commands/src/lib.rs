@@ -481,6 +481,20 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: None,
         resume_supported: false,
     },
+    SlashCommandSpec {
+        name: "rules",
+        aliases: &[],
+        summary: "List active rules from .openanalyst/rules/",
+        argument_hint: Some("[list|<path>]"),
+        resume_supported: false,
+    },
+    SlashCommandSpec {
+        name: "output-style",
+        aliases: &["style"],
+        summary: "List or set output style from .openanalyst/output-styles/",
+        argument_hint: Some("[name|list]"),
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -666,6 +680,14 @@ pub enum SlashCommand {
         action: Option<String>,
     },
     Undo,
+    /// List active rules from .openanalyst/rules/.
+    Rules {
+        args: Option<String>,
+    },
+    /// List or set output style from .openanalyst/output-styles/.
+    OutputStyle {
+        name: Option<String>,
+    },
     Unknown(String),
 }
 
@@ -881,6 +903,12 @@ impl SlashCommand {
                 action: parts.next().map(ToOwned::to_owned),
             },
             "undo" | "revert" => Self::Undo,
+            "rules" => Self::Rules {
+                args: remainder_after_command(trimmed, command),
+            },
+            "output-style" | "style" => Self::OutputStyle {
+                name: parts.next().map(ToOwned::to_owned),
+            },
             other => Self::Unknown(other.to_string()),
         })
     }
@@ -1198,6 +1226,53 @@ pub fn handle_skills_slash_command(args: Option<&str>, cwd: &Path) -> std::io::R
         }
         Some("-h" | "--help" | "help") => Ok(render_skills_usage(None)),
         Some(args) => Ok(render_skills_usage(Some(args))),
+    }
+}
+
+pub fn handle_rules_slash_command(args: Option<&str>, cwd: &Path) -> String {
+    let rules = runtime::load_rules(cwd);
+    match normalize_optional_args(args) {
+        None | Some("list") => runtime::format_rules_list(&rules),
+        Some("-h" | "--help" | "help") => {
+            "Usage: /rules [list]\n\n\
+             List all active rules from .openanalyst/rules/ (project) and ~/.openanalyst/rules/ (user).\n\
+             Rules without a `paths:` frontmatter field are always active (global).\n\
+             Rules with `paths:` are only loaded when matching files are accessed.".to_string()
+        }
+        Some(filter) => {
+            // Filter rules matching a path
+            let matching = runtime::rules_for_path(&rules, filter);
+            if matching.is_empty() {
+                format!("No rules match path: {filter}")
+            } else {
+                let mut out = format!("Rules matching '{filter}':\n\n");
+                for rule in matching {
+                    out.push_str(&format!("  {} — {}\n", rule.name,
+                        if rule.is_global() { "global".to_string() } else { rule.paths.join(", ") }));
+                }
+                out
+            }
+        }
+    }
+}
+
+pub fn handle_output_style_slash_command(name: Option<&str>, cwd: &Path) -> String {
+    let styles = runtime::load_output_styles(cwd);
+    match normalize_optional_args(name) {
+        None | Some("list") => runtime::format_output_styles_list(&styles),
+        Some("-h" | "--help" | "help") => {
+            "Usage: /output-style [name|list]\n\n\
+             List available output styles or set the active style.\n\
+             Create styles by adding .md files to .openanalyst/output-styles/.".to_string()
+        }
+        Some(style_name) => {
+            if let Some(style) = runtime::find_output_style(&styles, style_name) {
+                format!("Output style set to: {}\n\n{}", style.name, style.instructions)
+            } else {
+                let available: Vec<_> = styles.iter().map(|s| s.name.as_str()).collect();
+                format!("Unknown style: {style_name}\nAvailable: {}", if available.is_empty() { "none".to_string() } else { available.join(", ") })
+            }
+        }
     }
 }
 
@@ -2196,6 +2271,8 @@ pub fn handle_slash_command(
         | SlashCommand::Hooks { .. }
         | SlashCommand::Trust { .. }
         | SlashCommand::Undo
+        | SlashCommand::Rules { .. }
+        | SlashCommand::OutputStyle { .. }
         | SlashCommand::Unknown(_) => None,
     }
 }
@@ -2552,7 +2629,7 @@ mod tests {
         assert!(help.contains("aliases: /plugins, /marketplace"));
         assert!(help.contains("/agents"));
         assert!(help.contains("/skills"));
-        assert_eq!(slash_command_specs().len(), 60);
+        assert_eq!(slash_command_specs().len(), 63);
         assert_eq!(resume_supported_slash_commands().len(), 14);
     }
 

@@ -286,6 +286,12 @@ where
     pub fn into_session(self) -> Session {
         self.session
     }
+
+    /// Access the hook runner to fire lifecycle events.
+    #[must_use]
+    pub fn hook_runner(&self) -> &HookRunner {
+        &self.hook_runner
+    }
 }
 
 fn build_assistant_message(

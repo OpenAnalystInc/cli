@@ -91,6 +91,7 @@ pub struct SystemPromptBuilder {
     append_sections: Vec<String>,
     project_context: Option<ProjectContext>,
     config: Option<RuntimeConfig>,
+    rules_sections: Vec<String>,
 }
 
 impl SystemPromptBuilder {
@@ -131,6 +132,20 @@ impl SystemPromptBuilder {
         self
     }
 
+    /// Inject global rules from .openanalyst/rules/ into the system prompt.
+    #[must_use]
+    pub fn with_rules(mut self, rules: &[crate::rules::RuleDefinition]) -> Self {
+        let global: Vec<_> = rules.iter().filter(|r| r.is_global()).collect();
+        if !global.is_empty() {
+            let mut section = "# Project Rules\n".to_string();
+            for rule in global {
+                section.push_str(&format!("\n## {}\n{}\n", rule.name, rule.content));
+            }
+            self.rules_sections.push(section);
+        }
+        self
+    }
+
     #[must_use]
     pub fn with_lsp_context(mut self, enrichment: &LspContextEnrichment) -> Self {
         if !enrichment.is_empty() {
@@ -161,6 +176,8 @@ impl SystemPromptBuilder {
         if let Some(config) = &self.config {
             sections.push(render_config_section(config));
         }
+        // Inject global rules from .openanalyst/rules/
+        sections.extend(self.rules_sections.iter().cloned());
         sections.extend(self.append_sections.iter().cloned());
         sections
     }
@@ -420,10 +437,12 @@ pub fn load_system_prompt(
     let cwd = cwd.into();
     let project_context = ProjectContext::discover_with_git(&cwd, current_date.into())?;
     let config = ConfigLoader::default_for(&cwd).load()?;
+    let rules = crate::rules::load_rules(&cwd);
     Ok(SystemPromptBuilder::new()
         .with_os(os_name, os_version)
         .with_project_context(project_context)
         .with_runtime_config(config)
+        .with_rules(&rules)
         .build())
 }
 

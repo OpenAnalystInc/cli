@@ -111,7 +111,7 @@ type AllowedToolSet = BTreeSet<String>;
 /// Does NOT auto-download; just creates a marker file that the TUI/REPL can read.
 fn background_update_check() {
     const CURRENT_VERSION: &str = VERSION;
-    const REPO: &str = "AnitChaudhry/openanalyst-cli";
+    const REPO: &str = "OpenAnalystInc/cli";
 
     // Only check once per day
     let config_dir = env::var("OPENANALYST_CONFIG_HOME")
@@ -396,6 +396,18 @@ fn load_saved_provider_credentials() {
     }
 }
 
+/// Inject environment variables from settings.json "env" field.
+/// Won't override existing env vars.
+fn inject_settings_env_vars() {
+    let cwd = env::current_dir().unwrap_or_default();
+    let settings = runtime::settings::load_settings(&cwd);
+    for (key, value) in &settings.env {
+        if env::var(key).ok().filter(|v| !v.is_empty()).is_none() {
+            env::set_var(key, value);
+        }
+    }
+}
+
 fn main() {
     // 1. Create ~/.openanalyst/.env template on first run (if missing)
     let _ = runtime::create_dotenv_template();
@@ -407,7 +419,9 @@ fn main() {
     load_saved_provider_credentials();
     // 4. Detect auth from installed CLIs (Claude, Codex, Gemini)
     load_external_cli_credentials();
-    // 5. Ensure the CLI binary directory is in PATH
+    // 5. Inject env vars from settings.json "env" field (won't override existing)
+    inject_settings_env_vars();
+    // 6. Ensure the CLI binary directory is in PATH
     ensure_path_registered();
     // Prune old/empty sessions in the background (non-blocking)
     std::thread::spawn(cleanup_old_sessions);
@@ -2003,7 +2017,7 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
 
 fn run_update() -> Result<(), Box<dyn std::error::Error>> {
     const CURRENT_VERSION: &str = VERSION;
-    const REPO: &str = "AnitChaudhry/openanalyst-cli";
+    const REPO: &str = "OpenAnalystInc/cli";
 
     println!();
     println!("  \x1b[38;5;45m\x1b[1mOpenAnalyst CLI \x1b[0m\x1b[2m— Update\x1b[0m");
@@ -2106,9 +2120,9 @@ fn run_update() -> Result<(), Box<dyn std::error::Error>> {
             println!();
             println!("  \x1b[2mManual update:\x1b[0m");
             if cfg!(target_os = "windows") {
-                println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex\x1b[0m");
+                println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex\x1b[0m");
             } else {
-                println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash\x1b[0m");
+                println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh | bash\x1b[0m");
             }
         }
     }
@@ -2221,9 +2235,9 @@ fn run_uninstall() -> Result<(), Box<dyn std::error::Error>> {
     println!("  \x1b[38;5;45mOpenAnalyst CLI has been uninstalled.\x1b[0m");
     println!("  \x1b[2mTo reinstall:\x1b[0m");
     if cfg!(target_os = "windows") {
-        println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex\x1b[0m");
+        println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex\x1b[0m");
     } else {
-        println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash\x1b[0m");
+        println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh | bash\x1b[0m");
     }
     println!();
     Ok(())
@@ -2706,6 +2720,8 @@ fn run_resume_command(
         | SlashCommand::Trust { .. }
         | SlashCommand::Undo
         | SlashCommand::Feedback { .. }
+        | SlashCommand::Rules { .. }
+        | SlashCommand::OutputStyle { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
 }
@@ -2781,6 +2797,15 @@ fn run_tui(
         original_hook(info);
     }));
 
+    // Fire SessionStart hooks
+    let hook_runner = if let Ok(cfg) = runtime::ConfigLoader::default_for(&cwd).load() {
+        let hr = runtime::HookRunner::from_feature_config(cfg.feature_config());
+        let _ = hr.run_session_start("tui");
+        Some(hr)
+    } else {
+        None
+    };
+
     let rt = tokio::runtime::Runtime::new()?;
     rt.block_on(async {
         // Spawn orchestrator in background
@@ -2790,6 +2815,11 @@ fn run_tui(
         let terminal = tui::setup_terminal()?;
         let result = tui::event_loop::run_event_loop(app, terminal).await;
         tui::restore_terminal()?;
+
+        // Fire SessionEnd hooks
+        if let Some(hr) = &hook_runner {
+            let _ = hr.run_session_end("tui_exit");
+        }
 
         // Send Quit to orchestrator and wait for clean shutdown
         orchestrator_handle.abort();
@@ -2823,6 +2853,9 @@ fn run_repl(
     let mut editor = input::LineEditor::new("> ", slash_command_completion_candidates());
     cli.animate_startup_banner();
 
+    // Fire SessionStart hook
+    let _ = cli.runtime.hook_runner().run_session_start(&cli.session.id);
+
     loop {
         match editor.read_line()? {
             input::ReadOutcome::Submit(input) => {
@@ -2831,6 +2864,7 @@ fn run_repl(
                     continue;
                 }
                 if matches!(trimmed.as_str(), "/exit" | "/quit") {
+                    let _ = cli.runtime.hook_runner().run_session_end("user_exit");
                     cli.persist_session()?;
                     break;
                 }
@@ -2845,6 +2879,7 @@ fn run_repl(
             }
             input::ReadOutcome::Cancel => {}
             input::ReadOutcome::Exit => {
+                let _ = cli.runtime.hook_runner().run_session_end("eof");
                 cli.persist_session()?;
                 break;
             }
@@ -3440,6 +3475,18 @@ impl LiveCli {
                 } else {
                     eprintln!("Usage: /feedback <your correction or comment>");
                 }
+                false
+            }
+            SlashCommand::Rules { args } => {
+                let cwd = env::current_dir().unwrap_or_default();
+                let output = commands::handle_rules_slash_command(args.as_deref(), &cwd);
+                eprintln!("{output}");
+                false
+            }
+            SlashCommand::OutputStyle { name } => {
+                let cwd = env::current_dir().unwrap_or_default();
+                let output = commands::handle_output_style_slash_command(name.as_deref(), &cwd);
+                eprintln!("{output}");
                 false
             }
             SlashCommand::Unknown(name) => {
