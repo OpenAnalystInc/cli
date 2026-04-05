@@ -60,7 +60,7 @@
           <tr><td><code>read_file</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Read file contents with line numbers</td></tr>
           <tr><td><code>write_file</code></td><td><span class="badge-sm badge-yellow">Workspace</span></td><td>Create or overwrite files</td></tr>
           <tr><td><code>edit_file</code></td><td><span class="badge-sm badge-yellow">Workspace</span></td><td>Modify files with exact string replacement patches</td></tr>
-          <tr><td><code>glob_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Find files by glob patterns (e.g., <code>**/*.rs</code>)</td></tr>
+          <tr><td><code>glob_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Find files by glob patterns (e.g., <code>**/*.py</code>)</td></tr>
           <tr><td><code>grep_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Search file contents with regex patterns</td></tr>
           <tr><td><code>web_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Search the internet for information</td></tr>
           <tr><td><code>web_fetch</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Fetch and parse URL content</td></tr>
@@ -147,13 +147,13 @@
 
       <h3>glob_search</h3>
       <p>Find files by glob pattern. Returns matching paths sorted by modification time.</p>
-      <pre><code><span class="token-comment">// Example: find all Rust source files</span>
-glob_search { pattern: "**/*.rs" }</code></pre>
+      <pre><code><span class="token-comment">// Example: find all Python source files</span>
+glob_search { pattern: "**/*.py" }</code></pre>
 
       <h3>grep_search</h3>
       <p>Search file contents with regex. Supports context lines, file type filters, and multiple output modes.</p>
       <pre><code><span class="token-comment">// Example: find all function definitions</span>
-grep_search { pattern: "fn\\s+\\w+", type: "rust" }</code></pre>
+grep_search { pattern: "fn\\s+\\w+", type: "python" }</code></pre>
 
       <h2 id="web-tools">Web Tools</h2>
 

@@ -238,7 +238,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <div class="wrap">
   <div class="section-label">Capabilities</div>
   <div class="section-title">What you can do</div>
-  <div class="section-sub">The most feature-rich AI agent CLI ever built. Native Rust binary, 7 LLM providers, 65+ commands, 24 tools, voice input, multi-agent orchestration, clipboard paste, /undo revert, and more.</div>
+  <div class="section-sub">The most feature-rich AI agent CLI ever built. Native binary, 7 LLM providers, 65+ commands, 24 tools, voice input, multi-agent orchestration, clipboard paste, /undo revert, and more.</div>
 
   <div class="acc open" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(255,107,0,0.15);color:var(--accent)">&#9889;</div><div class="acc-title">Smart Per-Action Model Routing <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
@@ -246,7 +246,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(34,211,238,0.15);color:var(--cyan)">&#9733;</div><div class="acc-title">Knowledge Base &mdash; Agentic RAG <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content"><code style="color:var(--cyan)">/knowledge best Meta Ads strategy for D2C brands</code><br><br>Powered by <strong>BGE-M3 1024-dim embeddings</strong> on A100 GPU, <strong>PostgreSQL pgvector</strong>, and <strong>Neo4j knowledge graph</strong>. The pipeline:<br><br>1. <strong>Local MOE intent classification</strong> &mdash; Rust-side, zero latency (strategic, procedural, factual, comparative, diagnostic, etc.)<br>2. <strong>API call</strong> to hosted AgenticRAG with intent hint<br>3. <strong>Hybrid search</strong> &mdash; pgvector cosine + PostgreSQL FTS + Neo4j graph expansion<br>4. <strong>RRF fusion</strong> &mdash; merges results from all sources<br>5. <strong>KnowledgeCard</strong> &mdash; tabbed, collapsible results with abstracted category labels<br>6. <strong>Feedback</strong> &mdash; inline thumbs-up/down + <code>/feedback</code> corrections<br>7. <strong>Local cache</strong> &mdash; instant replay from <code>.openanalyst/knowledge/</code><br><br><strong>No raw course names exposed</strong> &mdash; results show "Ads Strategy", "AI &amp; Machine Learning", etc.<br>Set <code>OPENANALYST_API_KEY=oa_your_key</code> to access.</div></div>
+    <div class="acc-body"><div class="acc-content"><code style="color:var(--cyan)">/knowledge best Meta Ads strategy for D2C brands</code><br><br>Powered by <strong>BGE-M3 1024-dim embeddings</strong> on A100 GPU, <strong>PostgreSQL pgvector</strong>, and <strong>Neo4j knowledge graph</strong>. The pipeline:<br><br>1. <strong>Local MOE intent classification</strong> &mdash; local, zero latency (strategic, procedural, factual, comparative, diagnostic, etc.)<br>2. <strong>API call</strong> to hosted AgenticRAG with intent hint<br>3. <strong>Hybrid search</strong> &mdash; pgvector cosine + PostgreSQL FTS + Neo4j graph expansion<br>4. <strong>RRF fusion</strong> &mdash; merges results from all sources<br>5. <strong>KnowledgeCard</strong> &mdash; tabbed, collapsible results with abstracted category labels<br>6. <strong>Feedback</strong> &mdash; inline thumbs-up/down + <code>/feedback</code> corrections<br>7. <strong>Local cache</strong> &mdash; instant replay from <code>.openanalyst/knowledge/</code><br><br><strong>No raw course names exposed</strong> &mdash; results show "Ads Strategy", "AI &amp; Machine Learning", etc.<br>Set <code>OPENANALYST_API_KEY=oa_your_key</code> to access.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(255,107,0,0.12);color:var(--accent)">&#9889;</div><div class="acc-title">Switch Models Mid-Conversation</div><div class="acc-arrow">&#9654;</div></div>
@@ -294,7 +294,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(14,165,233,0.15);color:var(--accent)">&#9881;</div><div class="acc-title">Cross-Platform Native Binary</div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Single Rust binary. No Node.js, no Python, no Docker. Native on macOS (Intel + Apple Silicon), Linux (x64 + ARM), and Windows. Fast startup, low memory. ~13MB release binary.</div></div>
+    <div class="acc-body"><div class="acc-content">Single native binary. No Node.js, no Python, no Docker. Native on macOS (Intel + Apple Silicon), Linux (x64 + ARM), and Windows. Fast startup, low memory. ~18MB binary.</div></div>
   </div>
 </div>
 </section>
@@ -466,7 +466,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <section id="architecture" style="background:var(--bg2)">
 <div class="wrap">
   <div class="section-label">Architecture</div>
-  <div class="section-title">14-crate Rust workspace</div>
+  <div class="section-title">Architecture</div>
   <div class="section-sub">Modular, testable, zero-dependency binary. Built with ecosystem crates, not reinvented.</div>
 
   <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">src/modules/</span></div></div>
