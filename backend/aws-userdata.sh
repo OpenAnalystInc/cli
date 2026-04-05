@@ -33,7 +33,7 @@ mkdir -p /opt/openanalyst-kb
 cd /opt/openanalyst-kb
 
 # Clone the repo
-git clone https://github.com/AnitChaudhry/openanalyst-cli.git repo
+git clone https://github.com/OpenAnalystInc/openanalyst-cli.git repo
 cp -r repo/backend/* .
 
 # Create Python venv

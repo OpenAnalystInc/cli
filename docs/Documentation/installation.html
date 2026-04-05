@@ -72,7 +72,7 @@
 
         <div id="tab-mac" class="tab-content active">
           <p>Run the install script:</p>
-          <pre><code>curl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash</code></pre>
+          <pre><code>curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.sh | bash</code></pre>
           <p>This downloads the latest release binary and places it in <code>/usr/local/bin/openanalyst</code>.</p>
 
           <div class="callout callout-tip">
@@ -83,13 +83,13 @@
 
         <div id="tab-win" class="tab-content">
           <p>Open PowerShell as Administrator:</p>
-          <pre><code>irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex</code></pre>
+          <pre><code>irm https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.ps1 | iex</code></pre>
           <p>The binary is placed in your user PATH automatically.</p>
         </div>
 
         <div id="tab-source" class="tab-content">
           <p>Build from source (requires Rust 1.75+):</p>
-          <pre><code>git clone https://github.com/AnitChaudhry/openanalyst-cli.git
+          <pre><code>git clone https://github.com/OpenAnalystInc/openanalyst-cli.git
 cd openanalyst-cli/rust
 cargo build --release</code></pre>
           <p>The compiled binary is at <code>target/release/openanalyst</code> (or <code>.exe</code> on Windows).</p>
@@ -113,10 +113,10 @@ openanalyst whoami</code></pre>
       <p>Re-run the same install script to update to the latest version. Your configuration and sessions are preserved.</p>
 
       <pre><code><span class="token-comment"># macOS / Linux</span>
-curl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.sh | bash
 
 <span class="token-comment"># Windows</span>
-irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex</code></pre>
+irm https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.ps1 | iex</code></pre>
 
       <h2 id="uninstall">Uninstalling</h2>
       <p>Remove the binary and optionally clean up config:</p>

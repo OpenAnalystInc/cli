@@ -7,7 +7,7 @@
   "icon": "assets/icon.png",
   "repository": {
     "type": "git",
-    "url": "https://github.com/AnitChaudhry/openanalyst-cli.git",
+    "url": "https://github.com/OpenAnalystInc/openanalyst-cli.git",
     "directory": "vscode-extension"
   },
   "engines": {

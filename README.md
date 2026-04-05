@@ -38,12 +38,12 @@ OpenAnalyst CLI is an **independent, open-source AI coding agent** that connects
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.sh | bash
 ```
 
 **Windows PowerShell:**
 ```powershell
-irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.ps1 | iex
 ```
 
 **Build from source:**
@@ -393,7 +393,7 @@ THIS SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND. OpenAnalyst Inc
 
 ## Contact
 
-- **Issues:** [github.com/AnitChaudhry/openanalyst-cli/issues](https://github.com/AnitChaudhry/openanalyst-cli/issues)
+- **Issues:** [github.com/OpenAnalystInc/openanalyst-cli/issues](https://github.com/OpenAnalystInc/openanalyst-cli/issues)
 - **Email:** anit@openanalyst.com
 
 ---
