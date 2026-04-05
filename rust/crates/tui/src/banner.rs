@@ -159,16 +159,16 @@ impl Banner {
         // ── Blank separator ──
         lines.push(brow("", dim, "", dim));
 
-        // ── Model + provider ──
+        // ── Model + provider (left-aligned) ──
         let model_line = format!(
-            "   {} · {}",
+            " {} · {}",
             self.info.model_display, self.info.provider_name
         );
         lines.push(brow(&model_line, white, "", dim));
 
-        // ── Email + org ──
+        // ── Email + org (left-aligned) ──
         if let Some(ref email) = self.info.user_email {
-            let mut info = format!("      {email}");
+            let mut info = format!(" {email}");
             if let Some(ref org) = self.info.organization {
                 info = format!("{info} · {org}'s Organization");
             }
@@ -180,14 +180,14 @@ impl Banner {
             lines.push(brow(&info, dim, "", dim));
         }
 
-        // ── CWD ──
-        let cwd_display = if self.info.cwd.chars().count() > left_w - 8 {
-            let keep = left_w - 10;
+        // ── CWD (left-aligned) ──
+        let cwd_display = if self.info.cwd.chars().count() > left_w - 4 {
+            let keep = left_w - 5;
             let start = self.info.cwd.chars().count() - keep;
             let truncated: String = self.info.cwd.chars().skip(start).collect();
-            format!("      …{truncated}")
+            format!(" …{truncated}")
         } else {
-            format!("      {}", self.info.cwd)
+            format!(" {}", self.info.cwd)
         };
         lines.push(brow(&cwd_display, dim, "", dim));
 
