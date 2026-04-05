@@ -130,17 +130,20 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
             app.chat.scroll_offset = 0;
             app.chat.focused_message = None;
         }
-        // Up → previous history entry (when input is empty or single-line, like Claude Code)
+        // Up → load queued message for editing (if streaming + queue exists),
+        // or previous history entry (like Claude Code)
         KeyCode::Up if !app.scroll_mode => {
             let current = app.input_state.text();
-            // Only navigate history if input is empty or single-line (no newlines)
             if !current.contains('\n') {
-                if let Some(prev) = app.history.prev(&current) {
+                // If streaming and queue has messages, load last queued for editing
+                if app.is_streaming && !app.pending_queue.is_empty() && current.is_empty() {
+                    let queued = app.pending_queue.pop().unwrap_or_default();
+                    app.input_state.set_text(&queued);
+                } else if let Some(prev) = app.history.prev(&current) {
                     let prev_owned = prev.to_string();
                     app.input_state.set_text(&prev_owned);
                 }
             } else {
-                // Multi-line: let edtui handle cursor movement
                 app.input_state.event_handler.on_key_event(key, &mut app.input_state.editor);
             }
         }
