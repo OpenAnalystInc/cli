@@ -1262,6 +1262,48 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system(msg);
         }
 
+        SlashCommand::Undo => {
+            // Revert all uncommitted file changes using git
+            let output = std::process::Command::new("git")
+                .args(["diff", "--stat", "HEAD"])
+                .output();
+            match output {
+                Ok(o) if o.status.success() => {
+                    let stats = String::from_utf8_lossy(&o.stdout);
+                    if stats.trim().is_empty() {
+                        app.chat.push_system("No uncommitted changes to revert.".to_string());
+                    } else {
+                        // Show what will be reverted
+                        app.chat.push_system(format!("Reverting:\n{stats}"));
+                        // Revert all tracked file changes
+                        let checkout = std::process::Command::new("git")
+                            .args(["checkout", "--", "."])
+                            .output();
+                        // Also clean untracked files created by the agent
+                        let clean = std::process::Command::new("git")
+                            .args(["clean", "-fd"])
+                            .output();
+                        match (checkout, clean) {
+                            (Ok(c), Ok(cl)) if c.status.success() => {
+                                let clean_msg = if cl.status.success() {
+                                    let cleaned = String::from_utf8_lossy(&cl.stdout);
+                                    if cleaned.trim().is_empty() { String::new() }
+                                    else { format!("\n{cleaned}") }
+                                } else { String::new() };
+                                app.chat.push_system(format!("✓ All changes reverted.{clean_msg}"));
+                            }
+                            _ => {
+                                app.chat.push_system("Failed to revert changes. Check git status.".to_string());
+                            }
+                        }
+                    }
+                }
+                _ => {
+                    app.chat.push_system("Not a git repository — /undo requires git.".to_string());
+                }
+            }
+        }
+
         SlashCommand::Unknown(name) => {
             app.chat.push_system(format!("Unknown command: /{name}. Type /help for available commands."));
         }

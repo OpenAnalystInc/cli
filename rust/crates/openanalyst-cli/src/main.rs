@@ -2727,6 +2727,7 @@ fn run_resume_command(
         | SlashCommand::UserPrompt { .. }
         | SlashCommand::Hooks { .. }
         | SlashCommand::Trust { .. }
+        | SlashCommand::Undo
         | SlashCommand::Feedback { .. }
         | SlashCommand::Unknown(_) => Err("unsupported resumed slash command".into()),
     }
@@ -3444,6 +3445,10 @@ impl LiveCli {
             }
             SlashCommand::Trust { .. } => {
                 eprintln!("Use /trust in the TUI mode.");
+                false
+            }
+            SlashCommand::Undo => {
+                eprintln!("Use /undo in the TUI mode.");
                 false
             }
             SlashCommand::Feedback { text } => {
