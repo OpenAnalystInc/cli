@@ -1060,7 +1060,7 @@ const LOGIN_PROVIDERS: &[ProviderOption] = &[
     },
     ProviderOption {
         name: "Anthropic / Claude",
-        description: "opus, sonnet, haiku — OAuth or API key",
+        description: "opus, sonnet, haiku — API key",
         env_var: "ANTHROPIC_API_KEY",
         test_url: "https://api.anthropic.com/v1/messages",
         test_header: "x-api-key",
