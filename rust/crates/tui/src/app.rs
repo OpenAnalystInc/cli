@@ -95,6 +95,9 @@ pub enum UndoAction {
 
 /// The main TUI application state.
 pub struct App {
+    // Dirty flag — skip redraw when nothing changed (smoother rendering)
+    pub needs_redraw: bool,
+
     // Panels
     pub chat: ChatPanel,
     pub status_bar: StatusBar,
@@ -175,6 +178,7 @@ impl App {
     /// Create a new App with smart per-action routing based on the user's model.
     pub fn new(ui_rx: UiEventRx, action_tx: ActionTx, default_model: &str) -> Self {
         let mut app = Self {
+            needs_redraw: true,
             chat: ChatPanel::default(),
             status_bar: StatusBar::default(),
             input_state: InputBoxState::default(),
@@ -744,6 +748,7 @@ impl App {
 
     /// Handle a backend UI event.
     pub fn handle_ui_event(&mut self, event: UiEvent) {
+        self.needs_redraw = true;
         match event {
             UiEvent::StreamDelta { text, .. } => {
                 self.chat.push_delta(&text);
