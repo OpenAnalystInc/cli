@@ -536,22 +536,7 @@ impl App {
             }
         }
 
-        // Mid-task skill injection: slash command while agents are running
-        if self.is_streaming && text.starts_with('/') {
-            // Inject as a new skill agent
-            self.chat.push_user(text.clone());
-            self.chat.push_system(format!("[skill injection] {}", &text));
-            let tx = self.action_tx.clone();
-            let cmd = text.clone();
-            tokio::spawn(async move {
-                if tx.send(Action::InjectSkill(cmd)).await.is_err() {
-                    eprintln!("[tui] orchestrator channel closed");
-                }
-            });
-            return;
-        }
-
-        // Regular prompts: queue if streaming, send immediately otherwise
+        // Queue everything (prompts + slash commands) during streaming
         if self.is_streaming {
             const MAX_PENDING_QUEUE: usize = 50;
             if self.pending_queue.len() >= MAX_PENDING_QUEUE {
@@ -677,9 +662,27 @@ impl App {
         if self.pending_queue.is_empty() {
             return;
         }
-        // Combine all queued messages with double newlines
-        let combined = std::mem::take(&mut self.pending_queue).join("\n\n");
-        self.submit_prompt_internal(combined);
+        let queue = std::mem::take(&mut self.pending_queue);
+        // Separate slash commands from regular prompts
+        let mut prompts = Vec::new();
+        for item in queue {
+            if item.starts_with('/') {
+                // Execute slash commands first (individually)
+                if !prompts.is_empty() {
+                    let combined = prompts.join("\n\n");
+                    prompts.clear();
+                    self.submit_prompt_internal(combined);
+                }
+                self.submit_prompt(item);
+            } else {
+                prompts.push(item);
+            }
+        }
+        // Send remaining regular prompts
+        if !prompts.is_empty() {
+            let combined = prompts.join("\n\n");
+            self.submit_prompt_internal(combined);
+        }
     }
 
     /// Resolve an AskUser dialog — send user's response back to the blocked worker.

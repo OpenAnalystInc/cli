@@ -255,9 +255,14 @@ impl ChatPanel {
                         all_lines.push(Line::from(""));
                     }
                     let bg = if is_focused { Color::Indexed(236) } else { Color::Reset };
+                    let text_color = if text.starts_with('/') {
+                        Color::Rgb(255, 140, 0) // Orange for slash commands
+                    } else {
+                        Color::White
+                    };
                     all_lines.push(Line::from(vec![
                         Span::styled("❯ ", Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD).bg(bg)),
-                        Span::styled(text.as_str(), Style::default().fg(Color::White).add_modifier(Modifier::BOLD).bg(bg)),
+                        Span::styled(text.as_str(), Style::default().fg(text_color).add_modifier(Modifier::BOLD).bg(bg)),
                     ]));
                     prev_was_user = true;
                 }

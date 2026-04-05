@@ -141,8 +141,38 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
                 } else {
                     &app.status_bar.model_name
                 };
-                let table = app.router.render_table();
-                app.chat.push_system(format!("Current model: {current}\n{table}"));
+                // Show available providers based on env API keys
+                let mut available = Vec::new();
+                if std::env::var("OPENANALYST_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some()
+                    || std::env::var("OPENANALYST_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+                    available.push("OpenAnalyst: openanalyst-beta, gpt-oss-120b");
+                }
+                if std::env::var("ANTHROPIC_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+                    available.push("Anthropic: claude-opus-4-6, claude-sonnet-4-6, claude-haiku-4-5");
+                }
+                if std::env::var("OPENAI_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+                    available.push("OpenAI: gpt-4o, gpt-4o-mini, gpt-4.1, gpt-4.1-mini");
+                }
+                if std::env::var("XAI_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+                    available.push("xAI: grok-3, grok-3-mini");
+                }
+                if std::env::var("GEMINI_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+                    available.push("Gemini: gemini-2.5-pro, gemini-2.5-flash");
+                }
+                if std::env::var("OPENROUTER_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+                    available.push("OpenRouter: openrouter/auto (350+ models)");
+                }
+                if std::env::var("BEDROCK_API_KEY").ok().filter(|v| !v.is_empty()).is_some() {
+                    available.push("Bedrock: bedrock/claude");
+                }
+                let providers = if available.is_empty() {
+                    "  (no API keys found — run /login)".to_string()
+                } else {
+                    available.iter().map(|p| format!("  {p}")).collect::<Vec<_>>().join("\n")
+                };
+                app.chat.push_system(format!(
+                    "Current model: {current}\n\nAvailable providers:\n{providers}\n\nUse /model <name> to switch."
+                ));
             }
         }
         SlashCommand::Permissions { mode } => {
