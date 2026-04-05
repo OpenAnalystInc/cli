@@ -1,13 +1,12 @@
 {
   "name": "@openanalystinc/openanalyst-cli",
-  "version": "2.0.2",
-  "description": "OpenAnalyst CLI — AI-powered code analysis agent with multi-provider LLM support",
+  "version": "2.0.3",
+  "description": "OpenAnalyst CLI — The Universal AI Agent for Your Terminal. 7 LLM providers (OpenAnalyst, Anthropic Claude, OpenAI GPT, Google Gemini, xAI Grok, OpenRouter, Amazon Bedrock), 65+ slash commands, 24 built-in tools, smart model routing, multi-agent orchestration, knowledge base RAG, voice input, and TUI with full tool execution.",
   "bin": {
     "openanalyst": "bin/cli.js"
   },
   "scripts": {
-    "postinstall": "node scripts/postinstall.js",
-    "build": "node scripts/build.js"
+    "postinstall": "node scripts/postinstall.js"
   },
   "files": [
     "bin/",
@@ -19,16 +18,34 @@
   "keywords": [
     "cli",
     "ai",
+    "agent",
     "openanalyst",
-    "code-analysis",
     "llm",
-    "agent"
+    "terminal",
+    "tui",
+    "code-assistant",
+    "ai-agent",
+    "anthropic",
+    "claude",
+    "openai",
+    "gpt",
+    "gemini",
+    "grok",
+    "multi-provider",
+    "code-analysis",
+    "developer-tools",
+    "coding-agent",
+    "mcp"
   ],
-  "author": "OpenAnalyst Inc",
+  "author": {
+    "name": "OpenAnalyst Inc",
+    "email": "support@openanalyst.com",
+    "url": "https://openanalyst.com"
+  },
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/OpenAnalystInc/openanalyst-cli.git"
+    "url": "git+https://github.com/OpenAnalystInc/cli.git"
   },
   "publishConfig": {
     "access": "public",
@@ -42,17 +59,12 @@
     "linux",
     "win32"
   ],
-  "main": "index.js",
-  "directories": {
-    "doc": "docs",
-    "test": "tests"
-  },
+  "cpu": [
+    "x64",
+    "arm64"
+  ],
   "bugs": {
-    "url": "https://github.com/OpenAnalystInc/openanalyst-cli/issues"
+    "url": "https://github.com/OpenAnalystInc/cli/issues"
   },
-  "homepage": "https://github.com/OpenAnalystInc/openanalyst-cli#readme",
-  "dependencies": {
-    "@playwright/test": "1.52",
-    "playwright": "1.52"
-  }
+  "homepage": "https://openanalyst.com"
 }
