@@ -160,7 +160,6 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
     <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Terminal</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
 <pre class="code"><span class="c-g">git clone</span> https://github.com/OpenAnalystInc/openanalyst-cli.git
 <span class="c-g">cd</span> openanalyst-cli/rust
-<span class="c-g">cargo</span> build --release</pre></div>
   </div>
 
   <div style="margin-top:24px">
@@ -275,7 +274,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(255,107,0,0.15);color:var(--accent)">&#9889;</div><div class="acc-title">/openanalyst &mdash; Autonomous Agent <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Inspired by Andrej Karpathy&rsquo;s agent philosophy: simple loop, good model, basic tools, verifiable criteria. The autonomous agent runs a <strong>think&rarr;act&rarr;observe&rarr;verify</strong> loop without user interaction.<br><br><code style="color:var(--cyan)">/openanalyst fix all failing tests --criteria "cargo test"</code><br><code style="color:var(--cyan)">/oa refactor auth to async --goal "all async" --criteria "cargo build"</code><br><code style="color:var(--cyan)">/oa add caching --max-turns 20</code><br><br>Optional params: <code>--goal</code> (description), <code>--criteria</code> (shell command to verify), <code>--max-turns</code> (default 30). Criteria commands have 60s timeout. Turn budget enforced as hard limit.</div></div>
+    <div class="acc-body"><div class="acc-content">Inspired by Andrej Karpathy&rsquo;s agent philosophy: simple loop, good model, basic tools, verifiable criteria. The autonomous agent runs a <strong>think&rarr;act&rarr;observe&rarr;verify</strong> loop without user interaction.<br><br><code style="color:var(--cyan)">/openanalyst fix all failing tests --criteria "npm test"</code><br><code style="color:var(--cyan)">/oa refactor auth to async --goal "all async" --criteria "npm run build"</code><br><code style="color:var(--cyan)">/oa add caching --max-turns 20</code><br><br>Optional params: <code>--goal</code> (description), <code>--criteria</code> (shell command to verify), <code>--max-turns</code> (default 30). Criteria commands have 60s timeout. Turn budget enforced as hard limit.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(34,211,238,0.15);color:var(--cyan)">&#9095;</div><div class="acc-title">MCP Protocol + LSP Integration <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
@@ -470,7 +469,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   <div class="section-title">14-crate Rust workspace</div>
   <div class="section-sub">Modular, testable, zero-dependency binary. Built with ecosystem crates, not reinvented.</div>
 
-  <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">rust/crates/</span></div></div>
+  <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">src/modules/</span></div></div>
 <pre class="code"><span class="c-c">api/</span>                 <span class="c-d"># Multi-provider API client (7 providers)</span>
 <span class="c-c">commands/</span>            <span class="c-d"># 59 slash commands</span>
 <span class="c-c">events/</span>              <span class="c-d"># Shared TUI &harr; backend event types</span>
@@ -491,7 +490,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <div style="font-weight:600;font-size:14px;margin-bottom:8px;color:var(--accent)">Ecosystem Crates</div>
       <div style="font-size:13px;color:var(--muted);line-height:1.8">
         <strong style="color:var(--text)">tui-markdown</strong> &mdash; Markdown rendering<br>
-        <strong style="color:var(--text)">edtui</strong> &mdash; Vim-mode editor<br>
+        <strong style="color:var(--text)">Vim Engine &mdash; Built-in modal editor<br>
         <strong style="color:var(--text)">tui-tree-widget</strong> &mdash; File tree<br>
         <strong style="color:var(--text)">throbber-widgets-tui</strong> &mdash; Spinner<br>
         <strong style="color:var(--text)">syntect-tui</strong> &mdash; Syntax highlighting
