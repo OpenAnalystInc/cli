@@ -191,8 +191,24 @@ pub fn handle_key(key: KeyEvent, app: &mut App) {
                 .unwrap_or(false);
             app.last_esc_time = Some(now);
 
-            if is_double_esc {
-                // Double-Esc: undo last action
+            if is_double_esc && app.is_streaming {
+                // Double-Esc during streaming: cancel AI execution
+                app.cancelled = true;
+                app.is_streaming = false;
+                app.chat.finish_assistant();
+                app.status_bar.phase = tui_widgets::status_bar::AgentPhase::Idle;
+                if let Some(start) = app.turn_start.take() {
+                    app.status_bar.elapsed = start.elapsed();
+                }
+                app.chat.push_inline_status("Cancelled".to_string(), true);
+                // Send cancel to orchestrator
+                let tx = app.action_tx.clone();
+                let agent_id = "primary".to_string();
+                tokio::spawn(async move {
+                    let _ = tx.send(events::Action::CancelAgent(agent_id)).await;
+                });
+            } else if is_double_esc {
+                // Double-Esc when idle: undo last action
                 if let Some(action) = app.undo_stack.pop() {
                     match action {
                         crate::app::UndoAction::AddContextFile(path) => {

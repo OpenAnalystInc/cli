@@ -453,22 +453,20 @@ impl ChatPanel {
 /// For Edit/Write tools with diff data, renders a rich diff view with
 /// green added lines, red removed lines, line numbers, and a summary.
 fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: &mut Vec<Line<'a>>) {
-    let status_icon = match &card.status {
-        tui_widgets::ToolCallStatus::Running { .. } => "●",
-        tui_widgets::ToolCallStatus::Completed { .. } => "●",
-        tui_widgets::ToolCallStatus::Failed { .. } => "●",
-    };
-    let status_color = match &card.status {
+    // Smooth spinner animation — cycles through braille dots (no harsh blinking)
+    let spinner_chars = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
+    let tick = (std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .unwrap_or_default()
+        .as_millis() / 100) as usize;
+
+    let (status_icon, status_color) = match &card.status {
         tui_widgets::ToolCallStatus::Running { .. } => {
-            // Blinking white dot while running
-            let blink = (std::time::SystemTime::now()
-                .duration_since(std::time::UNIX_EPOCH)
-                .unwrap_or_default()
-                .as_millis() / 500) % 2 == 0;
-            if blink { Color::White } else { Color::Indexed(240) }
+            let ch = spinner_chars[tick % spinner_chars.len()];
+            (String::from(ch), Color::Cyan)
         }
-        tui_widgets::ToolCallStatus::Completed { .. } => Color::Green,
-        tui_widgets::ToolCallStatus::Failed { .. } => Color::Red,
+        tui_widgets::ToolCallStatus::Completed { .. } => ("✓".to_string(), Color::Green),
+        tui_widgets::ToolCallStatus::Failed { .. } => ("✗".to_string(), Color::Red),
     };
 
     let has_diff = card.diff.is_some();
@@ -488,7 +486,7 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
         }
     };
 
-    // Title line: ● Bash(curl -s --max-time 30...)
+    // Title line: ⠋ Bash(curl -s --max-time 30...)
     lines.push(Line::from(vec![
         Span::styled(
             format!("{status_icon} "),
@@ -578,9 +576,14 @@ fn render_tool_card_lines<'a>(card: &'a ToolCallCard, _is_focused: bool, lines: 
     } else {
         // Non-diff tool card — always show a compact summary line
         if let Some(ref output) = card.output {
-            // Show first line of output as └ summary (always visible)
-            let first_line = output.lines().next().unwrap_or("(No output)");
-            let summary: String = first_line.chars().take(80).collect();
+            // Show first meaningful line as └ summary (skip JSON braces/brackets)
+            let summary = output.lines()
+                .find(|l| {
+                    let t = l.trim();
+                    !t.is_empty() && t != "{" && t != "}" && t != "[" && t != "]" && !t.starts_with('"')
+                })
+                .unwrap_or("Done");
+            let summary: String = summary.trim().chars().take(80).collect();
             lines.push(Line::from(Span::styled(
                 format!("  └  {summary}"),
                 Style::default().fg(Color::DarkGray),
