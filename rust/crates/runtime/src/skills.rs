@@ -3,16 +3,18 @@
 //! ## Skill format (`.openanalyst/skills/<name>/SKILL.md`)
 //!
 //! Multi-file skills live in subdirectories under `skills/`:
-//! ```
+//!
+//! ```text
 //! .openanalyst/skills/deploy/
-//! ├── SKILL.md          # Required: main skill definition
-//! ├── reference.md      # Optional: supporting docs (available via ${OPENANALYST_SKILL_DIR})
-//! └── scripts/
-//!     └── validate.sh   # Optional: helper scripts
+//!   SKILL.md          # Required: main skill definition
+//!   reference.md      # Optional: supporting docs
+//!   scripts/
+//!     validate.sh     # Optional: helper scripts
 //! ```
 //!
 //! SKILL.md frontmatter:
-//! ```yaml
+//!
+//! ```text
 //! ---
 //! name: deploy
 //! description: Deploy the application to staging or production
@@ -28,16 +30,14 @@
 //!   - "src/**/*.ts"
 //! shell: "bash"
 //! ---
-//!
 //! Skill instructions here...
-//! $ARGUMENTS for user input
-//! $0, $1 for positional args
 //! ```
 //!
 //! ## Command format (`.openanalyst/commands/<name>.md`)
 //!
 //! Simple single-file slash commands:
-//! ```yaml
+//!
+//! ```text
 //! ---
 //! name: review-pr
 //! description: Review a pull request
