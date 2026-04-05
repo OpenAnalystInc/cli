@@ -3,9 +3,9 @@
  * elements with class "oa-version" or data-version-prefix attributes.
  *
  * Usage in HTML:
- *   <span class="oa-version">1.0.106</span>           → replaced with latest tag (no "v")
- *   <span class="oa-version-full">v1.0.106</span>     → replaced with "v1.0.106"
- *   <span data-version-prefix="Documentation v">Documentation v1.0.106</span>
+ *   <span class="oa-version">2.0.3</span>           → replaced with latest tag (no "v")
+ *   <span class="oa-version-full">v2.0.3</span>     → replaced with "v2.0.3"
+ *   <span data-version-prefix="Documentation v">Documentation v2.0.3</span>
  *
  * Falls back to the hardcoded text if fetch fails (offline, rate-limited).
  */

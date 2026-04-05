@@ -16,7 +16,7 @@
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
-        <span data-version-prefix="Documentation v">Documentation v1.0.106</span>
+        <span data-version-prefix="Documentation v">Documentation v2.0.3</span>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Documentation</div>
@@ -55,7 +55,7 @@
       <div class="card-grid">
         <div class="card">
           <div class="card-icon">&#128273;</div>
-          <h3>OAuth (Recommended)</h3>
+          <h3>API Key (All Providers)</h3>
           <p>Browser-based login with PKCE security. Tokens refresh automatically.</p>
         </div>
         <div class="card">
@@ -75,7 +75,7 @@
 
       <div class="callout callout-tip">
         <div class="callout-title">Direct Provider Login</div>
-        For <strong>Claude</strong> (Anthropic), <strong>Codex</strong> (OpenAI), and <strong>Gemini</strong> (Google) you can login directly through your provider account via browser OAuth. No API key needed &mdash; just sign in with your existing Anthropic, OpenAI, or Google account. Credentials are stored securely with PKCE and auto-refresh.
+        All providers authenticate via API key. Get your key from the provider dashboard and paste it during login. Gemini also supports OAuth browser login.
       </div>
 
       <pre><code><span class="token-comment"># Interactive provider picker</span>
@@ -109,13 +109,13 @@ openanalyst whoami</code></pre>
 OPENANALYST_AUTH_TOKEN=your-openanalyst-key
 OPENANALYST_BASE_URL=https://api.openanalyst.com/api
 
-<span class="token-comment"># Anthropic / Claude (or use OAuth: openanalyst login --provider anthropic)</span>
+<span class="token-comment"># Anthropic / Claude</span>
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
-<span class="token-comment"># OpenAI / GPT / Codex (or use OAuth: openanalyst login --provider openai)</span>
+<span class="token-comment"># OpenAI / GPT / Codex</span>
 OPENAI_API_KEY=sk-...
 
-<span class="token-comment"># Google Gemini (or use OAuth: openanalyst login --provider gemini)</span>
+<span class="token-comment"># Google Gemini (also supports OAuth: openanalyst login)</span>
 GEMINI_API_KEY=AIzaSy...
 
 <span class="token-comment"># xAI / Grok</span>
