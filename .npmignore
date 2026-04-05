@@ -1,0 +1,50 @@
+# Source code — NOT shipped in npm package
+rust/
+src/
+backend/
+knowledgeBase/
+AgenticRAG/
+tests/
+vscode-extension/
+docs/
+assets/
+scripts/build.js
+
+# Build artifacts
+*.map
+*.d.ts.map
+*.js.map
+target/
+native/
+
+# Dev files
+.git/
+.github/
+.claude/
+.openanalyst/
+.vscode/
+.idea/
+*.log
+*.tmp
+
+# Config
+.gitignore
+.openanalyst.json
+CLAUDE.md
+OPENANALYST.md
+IMPLEMENTATION.md
+PARITY.md
+RESEARCH.md
+CODE_OF_CONDUCT.md
+CONTRIBUTING.md
+SECURITY.md
+
+# Node dev
+node_modules/
+package-lock.json
+tsconfig.json
+*.tsbuildinfo
+
+# Archives
+archive/
+.omx/
