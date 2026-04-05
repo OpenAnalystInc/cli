@@ -2019,9 +2019,9 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
     println!();
     println!("  \x1b[38;5;45m\u{2713}\x1b[0m \x1b[1mLogged out successfully.\x1b[0m");
     println!();
-
-    // Redirect to login (ignore TUI launch option from logout context)
-    run_login().map(|_| ())
+    println!("  Run \x1b[1mopenanalyst login\x1b[0m to sign in again.");
+    println!();
+    Ok(())
 }
 
 fn run_update() -> Result<(), Box<dyn std::error::Error>> {

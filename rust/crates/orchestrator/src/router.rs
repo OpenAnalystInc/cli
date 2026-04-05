@@ -293,21 +293,12 @@ impl ModelResolver {
     /// Automatically assigns lighter models to lower tiers.
     #[must_use]
     pub fn from_default_model(user_model: &str) -> Self {
-        let (fast, balanced, capable) = match classify_model(user_model) {
-            ModelTier::Fast => {
-                (user_model.to_string(), user_model.to_string(), user_model.to_string())
-            }
-            ModelTier::Balanced => {
-                ("claude-haiku-4-5".to_string(), user_model.to_string(), user_model.to_string())
-            }
-            ModelTier::Capable => {
-                ("claude-haiku-4-5".to_string(), "claude-sonnet-4-6".to_string(), user_model.to_string())
-            }
-        };
+        // All tiers use the user's logged-in model. No hardcoded fallbacks.
+        // The user controls their model via /model — we respect that everywhere.
         Self {
-            fast_model: fast,
-            balanced_model: balanced,
-            capable_model: capable,
+            fast_model: user_model.to_string(),
+            balanced_model: user_model.to_string(),
+            capable_model: user_model.to_string(),
         }
     }
 
@@ -524,11 +515,17 @@ mod tests {
     }
 
     #[test]
-    fn router_from_opus() {
+    fn router_uses_user_model_for_all_tiers() {
         let router = ModelRouter::from_default_model("claude-opus-4-6");
-        assert_eq!(router.model_for_agent(&AgentType::Explore), "claude-haiku-4-5");
-        assert_eq!(router.model_for_agent(&AgentType::Plan), "claude-sonnet-4-6");
+        // All tiers use the user's logged-in model — no cross-provider routing
+        assert_eq!(router.model_for_agent(&AgentType::Explore), "claude-opus-4-6");
+        assert_eq!(router.model_for_agent(&AgentType::Plan), "claude-opus-4-6");
         assert_eq!(router.model_for_agent(&AgentType::Primary), "claude-opus-4-6");
+
+        let router = ModelRouter::from_default_model("openanalyst-beta");
+        assert_eq!(router.model_for_agent(&AgentType::Explore), "openanalyst-beta");
+        assert_eq!(router.model_for_agent(&AgentType::Plan), "openanalyst-beta");
+        assert_eq!(router.model_for_agent(&AgentType::Primary), "openanalyst-beta");
     }
 
     #[test]
@@ -556,7 +553,7 @@ mod tests {
 
         let route = router.route_prompt("read src/main.rs");
         assert_eq!(route.category, ActionCategory::Explore);
-        assert_eq!(route.model, "claude-haiku-4-5");
+        assert_eq!(route.model, "claude-opus-4-6"); // all tiers use user's model
         assert_eq!(route.effort_budget, 1_024);
 
         let route = router.route_prompt("implement the new auth handler");
@@ -602,10 +599,10 @@ mod tests {
 
         let route = router.route_agent_task(&AgentType::Explore, "find all rust files");
         assert_eq!(route.category, ActionCategory::Explore);
-        assert_eq!(route.model, "claude-haiku-4-5");
+        assert_eq!(route.model, "claude-opus-4-6"); // user's model
 
         let route = router.route_agent_task(&AgentType::Plan, "design the new API");
         assert_eq!(route.category, ActionCategory::Research);
-        assert_eq!(route.model, "claude-sonnet-4-6");
+        assert_eq!(route.model, "claude-opus-4-6"); // user's model
     }
 }
