@@ -488,7 +488,7 @@ const DOTENV_TEMPLATE: &str = r#"# ═══════════════
 #  Only uncomment and fill in the providers you want to use.
 #  You can also use `openanalyst login` for interactive setup.
 #
-#  Docs: https://github.com/OpenAnalystInc/openanalyst-cli
+#  Docs: https://github.com/AnitChaudhry/openanalyst-cli
 # ═══════════════════════════════════════════════════════════════════
 
 # ── Provider API Keys ─────────────────────────────────────────────

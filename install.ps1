@@ -1,11 +1,11 @@
 # OpenAnalyst CLI Installer — Windows PowerShell
-# Usage: irm https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.ps1 | iex
+# Usage: irm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex
 
 $ErrorActionPreference = "Continue"
 $ProgressPreference = "SilentlyContinue"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
 
-$Repo = "OpenAnalystInc/openanalyst-cli"
+$Repo = "AnitChaudhry/openanalyst-cli"
 $BinaryName = "openanalyst.exe"
 $InstallDir = "$env:USERPROFILE\.openanalyst\bin"
 $ConfigDir = "$env:USERPROFILE\.openanalyst"
@@ -201,7 +201,7 @@ Dim "   $BL$(Repeat $H $BoxW)$BR"; Nl
 Nl
 
 Dim "   Documentation:  "
-Acc "github.com/OpenAnalystInc/openanalyst-cli"
+Acc "github.com/AnitChaudhry/openanalyst-cli"
 Nl
 Dim "   Support:        "
 Acc "support@openanalyst.com"
