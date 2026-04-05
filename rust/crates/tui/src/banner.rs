@@ -13,6 +13,7 @@ pub struct BannerAccountInfo {
     pub model_display: String,
     pub provider_name: String,
     pub user_email: Option<String>,
+    pub credits: Option<String>,
     pub organization: Option<String>,
     pub cwd: String,
     pub version: String,
@@ -178,6 +179,13 @@ impl Banner {
                 info = format!("{t}...");
             }
             lines.push(brow(&info, dim, "", dim));
+        }
+
+        // ── Credits balance (left-aligned) ──
+        if let Some(ref credits) = self.info.credits {
+            let credits_line = format!(" Credits: {credits}");
+            let credits_style = Style::default().fg(Color::Indexed(40)); // green
+            lines.push(brow(&credits_line, credits_style, "", dim));
         }
 
         // ── CWD (left-aligned) ──

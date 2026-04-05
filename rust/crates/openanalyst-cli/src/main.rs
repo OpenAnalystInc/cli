@@ -2779,6 +2779,7 @@ fn run_tui(
         model_display: account.model_display,
         provider_name: account.provider_name,
         user_email: account.user_email,
+        credits: account.credits,
         organization: account.organization,
         cwd: cwd.display().to_string(),
         version: VERSION.to_string(),
@@ -7056,6 +7057,7 @@ struct StartupAccountInfo {
     provider_name: String,
     user_name: Option<String>,
     user_email: Option<String>,
+    credits: Option<String>,
     subscription: Option<String>,
     organization: Option<String>,
 }
@@ -7132,6 +7134,7 @@ fn fetch_startup_account_info(model: &str) -> StartupAccountInfo {
         provider_name,
         user_name: fetched.as_ref().and_then(|f| f.name.clone()).or(os_user),
         user_email: fetched.as_ref().and_then(|f| f.email.clone()),
+        credits: fetched.as_ref().and_then(|f| f.credits.clone()),
         subscription: fetched.as_ref().and_then(|f| f.subscription.clone()),
         organization: fetched.as_ref().and_then(|f| f.organization.clone()),
     }
@@ -7141,6 +7144,7 @@ fn fetch_startup_account_info(model: &str) -> StartupAccountInfo {
 struct FetchedAccount {
     name: Option<String>,
     email: Option<String>,
+    credits: Option<String>,
     subscription: Option<String>,
     organization: Option<String>,
 }
@@ -7153,62 +7157,100 @@ fn try_fetch_account(
     let rt = tokio::runtime::Runtime::new().ok()?;
     rt.block_on(async {
         let client = reqwest::Client::builder()
-            .timeout(Duration::from_secs(3))
+            .timeout(Duration::from_secs(5))
             .build()
             .ok()?;
 
         let base = base_url.trim_end_matches('/');
+        let mut account = FetchedAccount {
+            name: None,
+            email: None,
+            credits: None,
+            subscription: None,
+            organization: None,
+        };
 
-        // Try multiple known endpoints for user info:
-        // 1. /v1/me (standard)
-        // 2. /keys (OpenAnalyst JWT-based)
-        // 3. /credits/balance (OpenAnalyst - has user context)
-        let endpoints = [
-            format!("{base}/v1/me"),
-            format!("{base}/health"),
-        ];
-
-        for url in &endpoints {
-            let mut req = client.get(url)
-                .header("anthropic-version", "2023-06-01");
-            if let Some(token) = auth_token {
-                req = req.bearer_auth(token);
+        // ── OpenAnalyst API: JWT-authenticated endpoints ──
+        // /keys returns user info (name, email) with JWT auth
+        // /credits/balance returns credit balance with JWT auth
+        if let Some(token) = auth_token {
+            // Fetch user info from /keys
+            if let Ok(resp) = client.get(format!("{base}/keys"))
+                .bearer_auth(token)
+                .send().await
+            {
+                if resp.status().is_success() {
+                    if let Ok(body) = resp.json::<serde_json::Value>().await {
+                        account.name = body.get("name").and_then(|v| v.as_str()).map(ToOwned::to_owned)
+                            .or_else(|| body.get("display_name").and_then(|v| v.as_str()).map(ToOwned::to_owned))
+                            .or_else(|| body.get("user").and_then(|u| u.get("name")).and_then(|v| v.as_str()).map(ToOwned::to_owned));
+                        account.email = body.get("email").and_then(|v| v.as_str()).map(ToOwned::to_owned)
+                            .or_else(|| body.get("user").and_then(|u| u.get("email")).and_then(|v| v.as_str()).map(ToOwned::to_owned));
+                        account.organization = body.get("organization").and_then(|v| v.as_str()).map(ToOwned::to_owned)
+                            .or_else(|| body.get("org_name").and_then(|v| v.as_str()).map(ToOwned::to_owned));
+                        account.subscription = body.get("plan").and_then(|v| v.as_str()).map(ToOwned::to_owned)
+                            .or_else(|| body.get("tier").and_then(|v| v.as_str()).map(ToOwned::to_owned));
+                    }
+                }
             }
-            if let Some(key) = api_key {
-                req = req.header("x-api-key", key);
+
+            // Fetch credit balance from /credits/balance
+            if let Ok(resp) = client.get(format!("{base}/credits/balance"))
+                .bearer_auth(token)
+                .send().await
+            {
+                if resp.status().is_success() {
+                    if let Ok(body) = resp.json::<serde_json::Value>().await {
+                        // Try common balance field names
+                        let bal = body.get("balance").and_then(|v| v.as_f64())
+                            .or_else(|| body.get("credits").and_then(|v| v.as_f64()))
+                            .or_else(|| body.get("remaining").and_then(|v| v.as_f64()));
+                        if let Some(b) = bal {
+                            account.credits = Some(format!("${:.2}", b));
+                        }
+                        // Also pick up user info if /keys didn't have it
+                        if account.name.is_none() {
+                            account.name = body.get("name").and_then(|v| v.as_str()).map(ToOwned::to_owned)
+                                .or_else(|| body.get("user").and_then(|u| u.get("name")).and_then(|v| v.as_str()).map(ToOwned::to_owned));
+                        }
+                        if account.email.is_none() {
+                            account.email = body.get("email").and_then(|v| v.as_str()).map(ToOwned::to_owned)
+                                .or_else(|| body.get("user").and_then(|u| u.get("email")).and_then(|v| v.as_str()).map(ToOwned::to_owned));
+                        }
+                    }
+                }
             }
 
-            let resp = match req.send().await {
-                Ok(r) if r.status().is_success() => r,
-                _ => continue,
-            };
-
-            let body: serde_json::Value = match resp.json().await {
-                Ok(b) => b,
-                Err(_) => continue,
-            };
-
-            let account = FetchedAccount {
-                name: body.get("name").and_then(|v| v.as_str()).map(ToOwned::to_owned)
-                    .or_else(|| body.get("display_name").and_then(|v| v.as_str()).map(ToOwned::to_owned))
-                    .or_else(|| body.get("user").and_then(|u| u.get("name")).and_then(|v| v.as_str()).map(ToOwned::to_owned)),
-                email: body.get("email").and_then(|v| v.as_str()).map(ToOwned::to_owned)
-                    .or_else(|| body.get("user").and_then(|u| u.get("email")).and_then(|v| v.as_str()).map(ToOwned::to_owned)),
-                subscription: body.get("subscription").and_then(|v| v.as_str()).map(ToOwned::to_owned)
-                    .or_else(|| body.get("plan").and_then(|v| v.as_str()).map(ToOwned::to_owned))
-                    .or_else(|| body.get("tier").and_then(|v| v.as_str()).map(ToOwned::to_owned)),
-                organization: body.get("organization").and_then(|v| {
-                        v.as_str().map(ToOwned::to_owned)
-                            .or_else(|| v.get("name").and_then(|n| n.as_str()).map(ToOwned::to_owned))
-                    })
-                    .or_else(|| body.get("org_name").and_then(|v| v.as_str()).map(ToOwned::to_owned)),
-            };
-
-            // Only return if we got at least one useful field
-            if account.name.is_some() || account.email.is_some() {
+            if account.name.is_some() || account.email.is_some() || account.credits.is_some() {
                 return Some(account);
             }
         }
+
+        // ── Fallback: API key-based endpoints ──
+        // Try /v1/me or similar for non-OpenAnalyst providers
+        if let Some(key) = api_key {
+            for endpoint in ["/v1/me", "/v1/organizations"] {
+                let resp = match client.get(format!("{base}{endpoint}"))
+                    .header("x-api-key", key)
+                    .header("anthropic-version", "2023-06-01")
+                    .send().await
+                {
+                    Ok(r) if r.status().is_success() => r,
+                    _ => continue,
+                };
+                let body: serde_json::Value = match resp.json().await {
+                    Ok(b) => b,
+                    Err(_) => continue,
+                };
+                account.name = body.get("name").and_then(|v| v.as_str()).map(ToOwned::to_owned)
+                    .or_else(|| body.get("display_name").and_then(|v| v.as_str()).map(ToOwned::to_owned));
+                account.email = body.get("email").and_then(|v| v.as_str()).map(ToOwned::to_owned);
+                if account.name.is_some() || account.email.is_some() {
+                    return Some(account);
+                }
+            }
+        }
+
         None
     })
 }
