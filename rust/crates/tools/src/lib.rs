@@ -1764,16 +1764,28 @@ fn resolve_skill_path(skill: &str) -> Result<std::path::PathBuf, String> {
     }
 
     let mut candidates = Vec::new();
+
+    // Project-level: .openanalyst/skills/ (highest priority)
+    if let Ok(cwd) = std::env::current_dir() {
+        candidates.push(cwd.join(".openanalyst").join("skills"));
+        candidates.push(cwd.join(".openanalyst").join("commands"));
+    }
+
+    // User-level: ~/.openanalyst/skills/
+    if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
+        let home = std::path::PathBuf::from(home);
+        candidates.push(home.join(".openanalyst").join("skills"));
+        candidates.push(home.join(".openanalyst").join("commands"));
+    }
+
+    // Legacy codex compatibility
     if let Ok(codex_home) = std::env::var("CODEX_HOME") {
         candidates.push(std::path::PathBuf::from(codex_home).join("skills"));
     }
     if let Ok(home) = std::env::var("HOME").or_else(|_| std::env::var("USERPROFILE")) {
         let home = std::path::PathBuf::from(home);
-        candidates.push(home.join(".agents").join("skills"));
-        candidates.push(home.join(".config").join("opencode").join("skills"));
         candidates.push(home.join(".codex").join("skills"));
     }
-    candidates.push(std::path::PathBuf::from("/home/bellman/.codex/skills"));
 
     for root in candidates {
         let direct = root.join(requested).join("SKILL.md");
