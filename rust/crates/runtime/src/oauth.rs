@@ -527,6 +527,19 @@ const DOTENV_TEMPLATE: &str = r#"# ═══════════════
 # OPENANALYST_OPENAI_CLIENT_ID=
 # OPENANALYST_GOOGLE_CLIENT_ID=
 
+# ── Self-Hosted / Local Models ────────────────────────────────────
+# Connect to locally hosted models (Ollama, vLLM, LM Studio, text-generation-webui, etc.)
+# Any OpenAI-compatible endpoint works here.
+
+# Ollama (default: http://localhost:11434/v1)
+# OLLAMA_BASE_URL=http://localhost:11434/v1
+# OLLAMA_API_KEY=ollama
+
+# Local OpenAI-compatible server (vLLM, LM Studio, LocalAI, etc.)
+# LOCAL_LLM_BASE_URL=http://localhost:8000/v1
+# LOCAL_LLM_API_KEY=
+# LOCAL_LLM_MODEL=
+
 # ── Base URL Overrides (optional) ─────────────────────────────────
 # Use these to point to custom/proxy endpoints.
 

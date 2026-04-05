@@ -19,6 +19,10 @@ pub mod compression;
 pub mod policy;
 pub mod settings;
 pub mod skills;
+pub mod rules;
+pub mod agents_config;
+pub mod output_styles;
+pub mod config_paths;
 mod permissions;
 mod prompt;
 mod remote;
@@ -105,6 +109,22 @@ pub use compression::{
 };
 pub use folder_trust::{discover_trust, trust_folder, untrust_folder, TrustLevel, TrustInfo};
 pub use branding::scrub_model_identity;
+pub use rules::{
+    load_rules, global_rules, rules_for_path, format_rules_list,
+    RuleDefinition, RuleScope,
+};
+pub use agents_config::{
+    load_agent_definitions, active_agent_definitions, format_agents_list,
+    AgentDefinition, AgentScope,
+};
+pub use output_styles::{
+    load_output_styles, find_output_style, format_output_styles_list,
+    OutputStyleDefinition, OutputStyleScope,
+};
+pub use config_paths::{
+    managed_config_home, user_config_home, project_config_dir,
+    ConfigLevel,
+};
 pub use ide_detect::{detect_ide, ide_context_string, Ide};
 pub use output_masking::{mask_tool_output, likely_contains_secrets, MaskingStats};
 pub use policy::{

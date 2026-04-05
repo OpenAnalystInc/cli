@@ -1,6 +1,6 @@
 {
   "name": "@openanalystinc/openanalyst-cli",
-  "version": "2.0.5",
+  "version": "2.0.6",
   "description": "OpenAnalyst CLI — The Universal AI Agent for Your Terminal. 7 LLM providers (OpenAnalyst, Anthropic Claude, OpenAI GPT, Google Gemini, xAI Grok, OpenRouter, Amazon Bedrock), 65+ slash commands, 24 built-in tools, smart model routing, multi-agent orchestration, knowledge base RAG, voice input, and TUI with full tool execution.",
   "bin": {
     "openanalyst": "bin/cli.js"
