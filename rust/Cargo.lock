@@ -3796,6 +3796,7 @@ dependencies = [
 name = "tui-widgets"
 version = "1.0.91"
 dependencies = [
+ "arboard",
  "crossterm 0.29.0",
  "edtui",
  "events",
