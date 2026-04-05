@@ -29,7 +29,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/AnitChaudhry/openanalyst-cli.git"
+    "url": "git+https://github.com/OpenAnalystInc/openanalyst-cli.git"
   },
   "engines": {
     "node": ">=18"
@@ -45,9 +45,9 @@
     "test": "tests"
   },
   "bugs": {
-    "url": "https://github.com/AnitChaudhry/openanalyst-cli/issues"
+    "url": "https://github.com/OpenAnalystInc/openanalyst-cli/issues"
   },
-  "homepage": "https://github.com/AnitChaudhry/openanalyst-cli#readme",
+  "homepage": "https://github.com/OpenAnalystInc/openanalyst-cli#readme",
   "dependencies": {
     "@playwright/test": "1.52",
     "playwright": "1.52"

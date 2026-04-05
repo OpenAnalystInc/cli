@@ -111,7 +111,7 @@ type AllowedToolSet = BTreeSet<String>;
 /// Does NOT auto-download; just creates a marker file that the TUI/REPL can read.
 fn background_update_check() {
     const CURRENT_VERSION: &str = VERSION;
-    const REPO: &str = "AnitChaudhry/openanalyst-cli";
+    const REPO: &str = "OpenAnalystInc/openanalyst-cli";
 
     // Only check once per day
     let config_dir = env::var("OPENANALYST_CONFIG_HOME")
@@ -2026,7 +2026,7 @@ fn run_logout() -> Result<(), Box<dyn std::error::Error>> {
 
 fn run_update() -> Result<(), Box<dyn std::error::Error>> {
     const CURRENT_VERSION: &str = VERSION;
-    const REPO: &str = "AnitChaudhry/openanalyst-cli";
+    const REPO: &str = "OpenAnalystInc/openanalyst-cli";
 
     println!();
     println!("  \x1b[38;5;45m\x1b[1mOpenAnalyst CLI \x1b[0m\x1b[2m— Update\x1b[0m");
@@ -2129,9 +2129,9 @@ fn run_update() -> Result<(), Box<dyn std::error::Error>> {
             println!();
             println!("  \x1b[2mManual update:\x1b[0m");
             if cfg!(target_os = "windows") {
-                println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex\x1b[0m");
+                println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.ps1 | iex\x1b[0m");
             } else {
-                println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash\x1b[0m");
+                println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.sh | bash\x1b[0m");
             }
         }
     }
@@ -2244,9 +2244,9 @@ fn run_uninstall() -> Result<(), Box<dyn std::error::Error>> {
     println!("  \x1b[38;5;45mOpenAnalyst CLI has been uninstalled.\x1b[0m");
     println!("  \x1b[2mTo reinstall:\x1b[0m");
     if cfg!(target_os = "windows") {
-        println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.ps1 | iex\x1b[0m");
+        println!("  \x1b[38;5;45mirm https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.ps1 | iex\x1b[0m");
     } else {
-        println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/AnitChaudhry/openanalyst-cli/main/install.sh | bash\x1b[0m");
+        println!("  \x1b[38;5;45mcurl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/main/install.sh | bash\x1b[0m");
     }
     println!();
     Ok(())

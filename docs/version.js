@@ -10,7 +10,7 @@
  * Falls back to the hardcoded text if fetch fails (offline, rate-limited).
  */
 (function () {
-  var REPO = 'AnitChaudhry/openanalyst-cli';
+  var REPO = 'OpenAnalystInc/openanalyst-cli';
   var CACHE_KEY = 'oa_cli_version';
   var CACHE_TTL = 300000; // 5 minutes
 
