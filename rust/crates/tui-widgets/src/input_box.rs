@@ -445,6 +445,55 @@ impl InputBoxState {
             return None;
         }
 
+        // Ctrl+V → paste from system clipboard (text or image path)
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('v') {
+            if let Ok(mut clipboard) = arboard::Clipboard::new() {
+                // Try text first
+                if let Ok(text) = clipboard.get_text() {
+                    if !text.is_empty() {
+                        let current = self.text();
+                        self.set_text(&format!("{current}{text}"));
+                        return None;
+                    }
+                }
+                // Try image — save to temp file and insert path reference
+                if let Ok(image) = clipboard.get_image() {
+                    let temp_dir = std::env::temp_dir().join("openanalyst-clipboard");
+                    let _ = std::fs::create_dir_all(&temp_dir);
+                    let ts = std::time::SystemTime::now()
+                        .duration_since(std::time::UNIX_EPOCH)
+                        .unwrap_or_default()
+                        .as_millis();
+                    let img_path = temp_dir.join(format!("paste-{ts}.png"));
+                    // Convert RGBA bytes to PNG
+                    if let Ok(()) = save_rgba_as_png(
+                        &image.bytes,
+                        image.width as u32,
+                        image.height as u32,
+                        &img_path,
+                    ) {
+                        let current = self.text();
+                        let path_str = img_path.display().to_string();
+                        self.set_text(&format!("{current}[image] {path_str}"));
+                    }
+                }
+            }
+            return None;
+        }
+
+        // Ctrl+Z → undo (delegates to edtui's undo)
+        if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('z') {
+            // Send 'u' key to edtui in Normal mode for undo
+            let prev_mode = self.editor.mode;
+            self.editor.mode = EditorMode::Normal;
+            self.event_handler.on_key_event(
+                KeyEvent::new(KeyCode::Char('u'), KeyModifiers::NONE),
+                &mut self.editor,
+            );
+            self.editor.mode = prev_mode;
+            return None;
+        }
+
         // Enter → submit (works for single-line and multiline/pasted text)
         if key.code == KeyCode::Enter && !key.modifiers.contains(KeyModifiers::SHIFT) {
             let text = self.text();
@@ -460,4 +509,59 @@ impl InputBoxState {
         self.event_handler.on_key_event(key, &mut self.editor);
         None
     }
+}
+
+/// Save raw RGBA bytes as a PNG file (minimal implementation, no extra deps).
+fn save_rgba_as_png(rgba: &[u8], width: u32, height: u32, path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
+    use std::io::Write;
+    let mut file = std::fs::File::create(path)?;
+
+    // BMP is simpler than PNG and doesn't need a compression library
+    // Write as BMP (BITMAPFILEHEADER + BITMAPINFOHEADER + pixel data)
+    let row_size = (width * 3 + 3) & !3; // rows padded to 4-byte boundary
+    let pixel_data_size = row_size * height;
+    let file_size = 54 + pixel_data_size;
+
+    // BITMAPFILEHEADER (14 bytes)
+    file.write_all(b"BM")?;
+    file.write_all(&(file_size).to_le_bytes())?;
+    file.write_all(&0u16.to_le_bytes())?; // reserved
+    file.write_all(&0u16.to_le_bytes())?; // reserved
+    file.write_all(&54u32.to_le_bytes())?; // pixel data offset
+
+    // BITMAPINFOHEADER (40 bytes)
+    file.write_all(&40u32.to_le_bytes())?;
+    file.write_all(&(width).to_le_bytes())?;
+    file.write_all(&(height).to_le_bytes())?;
+    file.write_all(&1u16.to_le_bytes())?; // planes
+    file.write_all(&24u16.to_le_bytes())?; // bits per pixel (BGR)
+    file.write_all(&0u32.to_le_bytes())?; // compression (none)
+    file.write_all(&(pixel_data_size).to_le_bytes())?;
+    file.write_all(&2835u32.to_le_bytes())?; // h resolution
+    file.write_all(&2835u32.to_le_bytes())?; // v resolution
+    file.write_all(&0u32.to_le_bytes())?; // colors
+    file.write_all(&0u32.to_le_bytes())?; // important colors
+
+    // Pixel data (BMP is bottom-up, BGR format)
+    let mut row_buf = vec![0u8; row_size as usize];
+    for y in (0..height).rev() {
+        for x in 0..width {
+            let src = ((y * width + x) * 4) as usize;
+            let dst = (x * 3) as usize;
+            if src + 2 < rgba.len() {
+                row_buf[dst] = rgba[src + 2];     // B
+                row_buf[dst + 1] = rgba[src + 1]; // G
+                row_buf[dst + 2] = rgba[src];     // R
+            }
+        }
+        file.write_all(&row_buf)?;
+    }
+
+    // Rename to .bmp since we're writing BMP format
+    let bmp_path = path.with_extension("bmp");
+    if path != bmp_path {
+        let _ = std::fs::rename(path, &bmp_path);
+    }
+
+    Ok(())
 }
