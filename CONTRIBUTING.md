@@ -63,7 +63,7 @@ Add /doctor command for installation diagnostics
 1. Fill out the PR template completely
 2. Link any related issues
 3. Ensure CI passes (if configured)
-4. Request review from `@AnitChaudhry`
+4. Request review from `@OpenAnalystInc`
 5. Address review feedback
 6. Maintainer will merge when approved
 
