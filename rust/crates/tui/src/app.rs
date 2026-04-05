@@ -556,12 +556,12 @@ impl App {
             const MAX_PENDING_QUEUE: usize = 50;
             if self.pending_queue.len() >= MAX_PENDING_QUEUE {
                 self.chat.push_system(format!(
-                    "Queue full ({MAX_PENDING_QUEUE} items) — prompt dropped. Wait for current turn to finish."
+                    "Queue full ({MAX_PENDING_QUEUE} items) — prompt dropped."
                 ));
                 return;
             }
-            self.pending_queue.push(text.clone());
-            self.chat.push_system(format!("[queued] {}", truncate_display(&text, 60)));
+            self.pending_queue.push(text);
+            // No chat clutter — queued status shown in status bar
             return;
         }
 
@@ -671,12 +671,15 @@ impl App {
         });
     }
 
-    /// Drain the pending queue — called when streaming ends.
+    /// Drain the pending queue — combines all queued messages and submits as one turn.
+    /// Matches Claude Code / Gemini CLI behavior where queued messages auto-send when idle.
     fn drain_pending_queue(&mut self) {
-        if let Some(next) = self.pending_queue.first().cloned() {
-            self.pending_queue.remove(0);
-            self.submit_prompt_internal(next);
+        if self.pending_queue.is_empty() {
+            return;
         }
+        // Combine all queued messages with double newlines
+        let combined = std::mem::take(&mut self.pending_queue).join("\n\n");
+        self.submit_prompt_internal(combined);
     }
 
     /// Resolve an AskUser dialog — send user's response back to the blocked worker.
@@ -1092,7 +1095,10 @@ impl App {
         }
 
         // Status line (full width, with hints + animated spinner color)
-        let hints = build_status_hints(self.is_streaming, self.scroll_mode, self.sidebar_visible, self.focus);
+        let mut hints = build_status_hints(self.is_streaming, self.scroll_mode, self.sidebar_visible, self.focus);
+        if !self.pending_queue.is_empty() {
+            hints = format!("{}queued · {hints}", self.pending_queue.len());
+        }
         let mut status = self.status_bar.clone();
         status.hints = hints;
         status.spinner_color = if self.is_streaming { Some(self.spinner_state.current_color()) } else { None };

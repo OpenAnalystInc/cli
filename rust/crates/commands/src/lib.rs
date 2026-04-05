@@ -474,6 +474,13 @@ const SLASH_COMMAND_SPECS: &[SlashCommandSpec] = &[
         argument_hint: Some("[add|remove|status]"),
         resume_supported: false,
     },
+    SlashCommandSpec {
+        name: "undo",
+        aliases: &["revert"],
+        summary: "Revert all uncommitted file changes made by the agent (git checkout)",
+        argument_hint: None,
+        resume_supported: false,
+    },
 ];
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -658,6 +665,7 @@ pub enum SlashCommand {
     Trust {
         action: Option<String>,
     },
+    Undo,
     Unknown(String),
 }
 
@@ -872,6 +880,7 @@ impl SlashCommand {
             "trust" => Self::Trust {
                 action: parts.next().map(ToOwned::to_owned),
             },
+            "undo" | "revert" => Self::Undo,
             other => Self::Unknown(other.to_string()),
         })
     }
@@ -2186,6 +2195,7 @@ pub fn handle_slash_command(
         | SlashCommand::UserPrompt { .. }
         | SlashCommand::Hooks { .. }
         | SlashCommand::Trust { .. }
+        | SlashCommand::Undo
         | SlashCommand::Unknown(_) => None,
     }
 }
