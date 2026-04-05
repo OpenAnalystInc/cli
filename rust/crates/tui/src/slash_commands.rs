@@ -28,13 +28,15 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system(help);
         }
         SlashCommand::Version => {
-            app.chat.push_system("OpenAnalyst CLI v1.0.89".to_string());
+            app.chat.push_system(format!("OpenAnalyst CLI v{}", option_env!("OA_BUILD_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))));
         }
         SlashCommand::Cost => {
             let tokens = app.status_bar.total_tokens;
             let elapsed = app.status_bar.elapsed;
+            let model = if app.status_bar.model_name.is_empty() { "default" } else { &app.status_bar.model_name };
+            let messages = app.chat.messages.len();
             app.chat.push_system(format!(
-                "Session usage: {tokens} tokens, {:.1}s elapsed",
+                "Session: {tokens} tokens · {messages} messages · {:.1}s elapsed · Model: {model}",
                 elapsed.as_secs_f64()
             ));
         }
@@ -87,9 +89,19 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.chat.push_system(output);
         }
         SlashCommand::Tokens { target } => {
-            let text = target.unwrap_or_default();
-            let estimated = text.split_whitespace().count() * 4 / 3; // rough estimate
-            app.chat.push_system(format!("Estimated tokens: ~{estimated}"));
+            if let Some(text) = target {
+                // Better estimate: ~4 chars per token for English, ~2 for code
+                let chars = text.len();
+                let words = text.split_whitespace().count();
+                let estimated = (chars as f64 / 3.5).ceil() as usize;
+                app.chat.push_system(format!(
+                    "Estimated: ~{estimated} tokens ({chars} chars, {words} words)"
+                ));
+            } else {
+                // Show current session token usage
+                let tokens = app.status_bar.total_tokens;
+                app.chat.push_system(format!("Session tokens: {tokens}"));
+            }
         }
 
         // ── Model/Permission switching — update app state ──
@@ -173,11 +185,17 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
         // ── Session management ──
 
         SlashCommand::Clear { .. } => {
+            // Auto-save current session before clearing
+            app.auto_save_session();
             app.chat.messages.clear();
             app.chat.scroll_offset = 0;
             app.chat.focused_message = None;
             app.status_bar.total_tokens = 0;
-            app.chat.push_system("Session cleared.".to_string());
+            // Re-show banner after clear
+            if let Some(info) = app.banner_info.clone() {
+                app.banner_shown = false;
+                app.set_banner(info);
+            }
         }
         SlashCommand::Compact => {
             let before = app.chat.messages.len();
@@ -944,7 +962,15 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
             app.should_quit = true;
         }
         SlashCommand::Vim => {
-            app.chat.push_system("Vim mode: toggle with Ctrl+V in the input editor.".to_string());
+            use edtui::EditorMode;
+            let current = app.input_state.editor.mode;
+            if matches!(current, EditorMode::Normal) {
+                app.input_state.editor.mode = EditorMode::Insert;
+                app.chat.push_system("Vim mode: OFF (Insert mode)".to_string());
+            } else {
+                app.input_state.editor.mode = EditorMode::Normal;
+                app.chat.push_system("Vim mode: ON (Normal mode — i to insert, Esc to command)".to_string());
+            }
         }
         SlashCommand::Think { prompt } => {
             let text = prompt.unwrap_or_else(|| "the next question".to_string());
@@ -1085,7 +1111,7 @@ pub fn handle_slash_command(app: &mut App, input: &str) -> bool {
 
         // ── TUI control commands ──
         SlashCommand::Exit => {
-            app.chat.push_system("Saving session and exiting...".to_string());
+            app.auto_save_session();
             app.should_quit = true;
         }
         SlashCommand::Sidebar => {
@@ -1639,8 +1665,43 @@ fn list_sessions() -> String {
     if out.is_empty() {
         return "No saved sessions found.".to_string();
     }
-    out.push_str("\nUse /session switch <filename> or /resume <path> to load.");
+    out.push_str("\nUse /resume <number> or /session switch <number> to load.");
     out
+}
+
+/// Resolve a 1-based session number to its filename.
+fn resolve_session_by_number(num: usize) -> Result<String, String> {
+    let sessions_dir = std::path::Path::new(".openanalyst").join("sessions");
+    if !sessions_dir.exists() {
+        return Err("No sessions directory found.".to_string());
+    }
+    let current_cwd = std::env::current_dir()
+        .unwrap_or_default()
+        .display()
+        .to_string()
+        .to_lowercase();
+    let mut entries: Vec<_> = std::fs::read_dir(&sessions_dir)
+        .map_err(|e| e.to_string())?
+        .filter_map(|e| e.ok())
+        .filter(|e| e.path().extension().and_then(|x| x.to_str()) == Some("json"))
+        .filter(|e| {
+            let name = e.file_name().to_string_lossy().to_string();
+            !name.contains("latest") && !name.contains("usage")
+        })
+        .collect();
+    entries.sort_by(|a, b| {
+        b.metadata().and_then(|m| m.modified()).ok()
+            .cmp(&a.metadata().and_then(|m| m.modified()).ok())
+    });
+    // Filter to this project's sessions (same as list_sessions)
+    let this_project: Vec<_> = entries.iter().filter(|e| {
+        let (_, cwd, _) = read_session_metadata(&e.path());
+        cwd.to_lowercase() == current_cwd || cwd.is_empty()
+    }).collect();
+    if num == 0 || num > this_project.len() {
+        return Err(format!("Session #{num} not found. Use /resume to list available sessions."));
+    }
+    Ok(this_project[num - 1].file_name().to_string_lossy().to_string())
 }
 
 /// Read only top-level metadata from a session file (fast — no message parsing).
@@ -1655,7 +1716,16 @@ fn read_session_metadata(path: &std::path::Path) -> (String, String, String) {
 }
 
 /// /resume and /session switch — load a session JSON into the chat.
+/// Accepts: number (1-based index), filename, or full path.
 fn load_session_into_chat(app: &mut crate::app::App, path: &str) -> Result<usize, String> {
+    // If input is a number, resolve to session filename by index
+    let resolved_path = if let Ok(num) = path.trim().parse::<usize>() {
+        resolve_session_by_number(num)?
+    } else {
+        path.to_string()
+    };
+    let path = &resolved_path;
+
     // Try the path directly, then in .openanalyst/sessions/
     let file_path = if std::path::Path::new(path).exists() {
         std::path::PathBuf::from(path)
@@ -1832,7 +1902,7 @@ fn run_doctor() -> String {
     let mut out = String::from("── OpenAnalyst CLI Diagnostics ──\n\n");
 
     // Check binary
-    out.push_str("Binary:      openanalyst v1.0.89\n");
+    out.push_str(&format!("Binary:      openanalyst v{}\n", option_env!("OA_BUILD_VERSION").unwrap_or(env!("CARGO_PKG_VERSION"))));
     out.push_str(&format!("Working dir: {}\n", std::env::current_dir().unwrap_or_default().display()));
     out.push_str(&format!("OS:          {}\n\n", std::env::consts::OS));
 
