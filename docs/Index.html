@@ -281,20 +281,12 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
     <div class="acc-body"><div class="acc-content">Commit, branch, PR, issue creation, diff review &mdash; all from slash commands. <code style="color:var(--cyan)">/commit</code> generates a message and commits. <code style="color:var(--cyan)">/pr</code> drafts a pull request. <code style="color:var(--cyan)">/diff-review</code> gets AI-powered code review of your changes.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
-    <div class="acc-header"><div class="acc-icon" style="background:rgba(234,179,8,0.15);color:var(--yellow)">&#9733;</div><div class="acc-title">22 Built-in Tools + Plugin System + Connected Apps</div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Bash, PowerShell, file read/write/edit, glob/grep search, web search/fetch, sub-agents, notebooks, REPL, Knowledge Base, UserApp (connected apps via Composio), and more. Plus a full plugin system &mdash; install, enable, disable, uninstall custom tools with <code style="color:var(--cyan)">/plugins install &lt;path&gt;</code>. Connect Gmail, Slack, GitHub, Notion and 200+ apps with <code style="color:var(--cyan)">/app add gmail</code>. All backed by real <code>PluginManager</code>.</div></div>
+    <div class="acc-header"><div class="acc-icon" style="background:rgba(234,179,8,0.15);color:var(--yellow)">&#9733;</div><div class="acc-title">21 Built-in Tools + Plugin System</div><div class="acc-arrow">&#9654;</div></div>
+    <div class="acc-body"><div class="acc-content">Bash, file read/write/edit, glob/grep search, web search/fetch, sub-agents, notebooks, REPL, PowerShell, and more. Plus a full plugin system &mdash; install, enable, disable, uninstall custom tools with <code style="color:var(--cyan)">/plugins install &lt;path&gt;</code>. All backed by real <code>PluginManager</code>.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(239,68,68,0.15);color:var(--red)">&#9888;</div><div class="acc-title">Production-Grade Reliability <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
     <div class="acc-body"><div class="acc-content"><strong>Stream timeout</strong> &mdash; 30s per-event timeout detects hung connections and provider stalls<br><strong>Retry with backoff</strong> &mdash; Exponential backoff (1s&rarr;2s&rarr;4s&rarr;8s, max 32s) on transient errors<br><strong>340+ tests</strong> &mdash; Unit, integration, edge-case, and mock-server tests across all modules<br><strong>No panics</strong> &mdash; All unwrap() in critical paths replaced with proper error handling<br><strong>Crash recovery</strong> &mdash; Panic handler restores terminal and saves crash marker. Session auto-saves every 60s<br><strong>Format-on-save resilience</strong> &mdash; Detects external file changes between consecutive edits (formatters, linters)<br><strong>Bracketed paste</strong> &mdash; Multi-line paste handled as single event, no corruption<br><strong>Zero silent failures</strong> &mdash; All async channel sends log on failure instead of silently dropping events<br><strong>Hook system</strong> &mdash; 9 events: PreToolUse, PostToolUse, CwdChanged, FileChanged, SessionStart, SessionEnd, TaskCreated, Notification, Stop &mdash; all with allow/deny/warn. Manage via <code>/hooks</code><br><strong>Custom keybindings</strong> &mdash; All keys remappable via <code>.openanalyst/keybindings.json</code></div></div>
-  </div>
-  <div class="acc" onclick="toggleAcc(this)">
-    <div class="acc-header"><div class="acc-icon" style="background:rgba(16,185,129,0.15);color:var(--green)">&#9889;</div><div class="acc-title">Local AI API Server &mdash; Power Your Apps <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content">Type <code style="color:var(--cyan)">/localai</code> and OpenAnalyst becomes a local AI gateway on <code>localhost:3080</code>. Your React apps, Python scripts, Chrome extensions &mdash; anything can call <code>POST /v1/chat</code> and get real AI responses with tool execution. No API keys needed for your apps &mdash; OpenAnalyst uses your configured provider. <strong>Build AI-powered demos in minutes.</strong></div></div>
-  </div>
-  <div class="acc" onclick="toggleAcc(this)">
-    <div class="acc-header"><div class="acc-icon" style="background:rgba(255,107,0,0.15);color:var(--accent)">&#9889;</div><div class="acc-title">Connected Apps &mdash; Gmail, Slack, GitHub, 200+ <span class="tag tag-n">NEW</span></div><div class="acc-arrow">&#9654;</div></div>
-    <div class="acc-body"><div class="acc-content"><code style="color:var(--cyan)">/app add gmail</code> connects your Gmail. The AI can then read emails, send replies, search &mdash; all through natural language. Supports 200+ apps via Composio: Slack, GitHub, Notion, Linear, Jira, HubSpot, Salesforce, Discord, Telegram, Google Calendar, Dropbox, Trello, Asana, and more. Each app's tools are individually toggleable.</div></div>
   </div>
   <div class="acc" onclick="toggleAcc(this)">
     <div class="acc-header"><div class="acc-icon" style="background:rgba(14,165,233,0.15);color:var(--accent)">&#9881;</div><div class="acc-title">Cross-Platform Native Binary</div><div class="acc-arrow">&#9654;</div></div>
@@ -349,9 +341,6 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
       <tr><td>/trust <span class="tag tag-n">NEW</span></td><td>Trust or untrust workspace for hooks and skills</td></tr>
       <tr><td>/undo <span class="tag tag-n">NEW</span></td><td>Revert all uncommitted file changes</td></tr>
       <tr><td>/feedback &lt;text&gt; <span class="tag tag-n">NEW</span></td><td>Submit feedback or corrections to knowledge base</td></tr>
-      <tr><td>/app [add|remove|tools|list] <span class="tag tag-n">NEW</span></td><td>Connect apps (Gmail, Slack, GitHub, Notion, 200+) &mdash; AI uses them automatically</td></tr>
-      <tr><td>/localai [port] <span class="tag tag-n">NEW</span></td><td>Start local AI API server &mdash; power your apps with OpenAnalyst on localhost</td></tr>
-      <tr><td>/mcp [add|remove] <span class="tag tag-n">NEW</span></td><td>Manage MCP tool servers &mdash; add, remove, list with persistent config</td></tr>
     </table>
   </div>
 
