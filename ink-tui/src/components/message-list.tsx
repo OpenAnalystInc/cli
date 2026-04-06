@@ -87,6 +87,7 @@ const MessageItem = React.memo(function MessageItem({
           input={message.inputPreview}
           output={message.output || undefined}
           durationMs={message.durationMs}
+          diff={message.diff}
           expanded={message.expanded}
           onToggleExpand={() => {
             chatActions.toggleToolCardExpand(message.toolId);
@@ -99,13 +100,16 @@ const MessageItem = React.memo(function MessageItem({
       return (
         <KnowledgeCard
           queryId={String(message.queryId)}
-          subQuestions={[{
-            question: message.query,
-            results: [],
-          }]}
+          subQuestions={message.subQuestions.length > 0
+            ? message.subQuestions.map((sq) => ({
+                question: sq.subQuestion,
+                results: [...sq.results],
+              }))
+            : [{ question: message.query, results: [] }]
+          }
           answer={message.answer ?? ''}
           cached={message.fromCache}
-          graphExpanded={false}
+          graphExpanded={message.subQuestions.some((sq) => sq.results.some((r) => r.graphExpanded))}
           durationMs={message.latencyMs}
           expanded={message.expanded}
           activeTabIndex={message.activeTab}

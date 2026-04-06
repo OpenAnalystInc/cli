@@ -33,13 +33,30 @@ const CATEGORY_LABELS: Record<ActionCategory, string> = {
   write:    'write     ',
 };
 
-/** Category-specific colors matching Ratatui sidebar */
-const CATEGORY_COLORS: Record<ActionCategory, string> = {
-  explore:  '#00BFFF', // cyan
-  research: '#FFD700', // yellow
-  code:     '#00FF7F', // green
-  write:    '#FFA500', // orange
-};
+/**
+ * Category-specific colors matching Ratatui sidebar.
+ * Resolved at render time from semantic tokens via getCategoryColor().
+ */
+
+/** Map categories to semantic token colors. */
+function getCategoryColor(cat: ActionCategory, colors: SemanticColors): string {
+  switch (cat) {
+    case 'explore':  return colors.text.accent;         // cyan
+    case 'research': return colors.status.warning;      // yellow
+    case 'code':     return colors.status.done;         // green
+    case 'write':    return colors.text.slashCommand;   // orange
+  }
+}
+
+/** Map tier to semantic token colors. */
+function getTierDotColor(tier: string, colors: SemanticColors): string {
+  switch (tier) {
+    case 'fast':     return colors.text.accent;         // cyan
+    case 'balanced': return colors.status.warning;      // yellow
+    case 'capable':  return colors.status.done;         // green
+    default:         return colors.text.secondary;      // dim
+  }
+}
 
 /** Max model name width for 26-char sidebar. */
 const MAX_MODEL_WIDTH = 10;
@@ -53,14 +70,6 @@ function truncate(text: string, maxLen: number): string {
   return text.slice(0, maxLen - 1) + '\u2026';
 }
 
-function tierDotColor(tier: string): string {
-  switch (tier) {
-    case 'fast':     return '#00BFFF'; // cyan
-    case 'balanced': return '#FFD700'; // yellow
-    case 'capable':  return '#00FF7F'; // green
-    default:         return '#888888';
-  }
-}
 
 // ---------------------------------------------------------------------------
 // Props
@@ -92,7 +101,7 @@ export function SidebarRouting({
       {/* Show default provider hint */}
       {defaultProvider && defaultConfig && (
         <Box>
-          <Text color="#FFD700">{' \u2605 '}</Text>
+          <Text color={colors.status.warning}>{' \u2605 '}</Text>
           <Text color={colors.text.secondary} dimColor>
             {truncate(defaultConfig.name, MAX_MODEL_WIDTH)}
           </Text>
@@ -110,15 +119,15 @@ export function SidebarRouting({
         }
         const model = truncate(modelDisplay || 'beta', MAX_MODEL_WIDTH);
 
-        const catColor = CATEGORY_COLORS[cat];
-        const dotColor = tierDotColor(entry.tier || defaultConfig?.tier || 'balanced');
+        const catColor = getCategoryColor(cat, colors);
+        const dotColor = getTierDotColor(entry.tier || defaultConfig?.tier || 'balanced', colors);
 
         const selPrefix = isSelected ? '\u25B8' : ' ';
-        const bg = isSelected ? '#333333' : undefined;
+        const bg = isSelected ? colors.sidebar.border : undefined;
 
         return (
           <Box key={cat}>
-            <Text color="#FFD700" backgroundColor={bg}>{selPrefix}</Text>
+            <Text color={colors.status.warning} backgroundColor={bg}>{selPrefix}</Text>
             <Text color={catColor} backgroundColor={bg}>
               {label}
             </Text>

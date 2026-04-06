@@ -24,8 +24,8 @@ export const BaseMessageSchema = z.object({
   type: z.string(),
   /** Optional correlation ID for request/response pairing. */
   id: z.string().optional(),
-  /** Unix epoch milliseconds when the message was created. */
-  timestamp: z.number(),
+  /** Unix epoch milliseconds when the message was created. Rust does NOT send this — defaults to Date.now(). */
+  timestamp: z.number().optional().default(() => Date.now()),
 });
 
 export type BaseMessage = z.infer<typeof BaseMessageSchema>;
@@ -50,7 +50,7 @@ export const ENGINE_EVENT_TYPES = [
   'stream_end',
   'tool_call_start',
   'tool_call_update',
-  'tool_call_complete',
+  'tool_call_end',
   'permission_request',
   'ask_user_request',
   'status_update',
@@ -59,7 +59,7 @@ export const ENGINE_EVENT_TYPES = [
   'agent_completed',
   'agent_failed',
   'usage_update',
-  'kb_result',
+  'knowledge_result',
   'system_message',
   'banner',
   'sidebar_update',
@@ -72,10 +72,10 @@ export const TUI_ACTION_TYPES = [
   'submit_prompt',
   'run_in_background',
   'cancel_agent',
-  'resolve_permission',
-  'resolve_ask_user',
-  'kb_feedback',
-  'change_permission_mode',
+  'permission_response',
+  'ask_user_response',
+  'knowledge_feedback',
+  'update_permissions',
   'toggle_context_file',
   'change_routing',
   'clear_chat',
@@ -83,6 +83,7 @@ export const TUI_ACTION_TYPES = [
   'update_model',
   'moe_dispatch',
   'inject_skill',
+  'voice_transcribed',
   'quit',
 ] as const;
 

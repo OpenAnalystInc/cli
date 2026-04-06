@@ -81,7 +81,7 @@ function inputPreview(input: string): string {
 
 function useSpinner(active: boolean): { frame: string; color: string } {
   const [frameIndex, setFrameIndex] = useState(0);
-  const { getSpinnerGradient } = useTheme();
+  const { getSpinnerGradient, colors } = useTheme();
   const gradientRef = useRef<readonly string[]>(getSpinnerGradient(SPINNER_FRAMES.length));
 
   useEffect(() => {
@@ -94,7 +94,7 @@ function useSpinner(active: boolean): { frame: string; color: string } {
 
   return {
     frame: SPINNER_FRAMES[frameIndex] ?? '⠋',
-    color: gradientRef.current[frameIndex] ?? '#3282FF',
+    color: gradientRef.current[frameIndex] ?? colors.spinner.active,
   };
 }
 

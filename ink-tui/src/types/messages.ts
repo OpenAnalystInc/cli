@@ -164,10 +164,11 @@ export type SystemLevel = z.infer<typeof SystemLevelSchema>;
 // ═══════════════════════════════════════════════════════════════════════════
 
 // 1. stream_delta — LLM response chunk
+// NOTE: Rust sends { "text": "..." } not { "content": "..." }.
+// Rust does NOT send a "done" field — the stream_end event signals completion.
 export const StreamDeltaSchema = messageSchema('stream_delta', {
   agentId: z.string(),
-  content: z.string(),
-  done: z.boolean(),
+  text: z.string(),
 });
 export type StreamDelta = z.infer<typeof StreamDeltaSchema>;
 
@@ -178,53 +179,63 @@ export const StreamEndSchema = messageSchema('stream_end', {
 export type StreamEnd = z.infer<typeof StreamEndSchema>;
 
 // 3. tool_call_start — tool execution begins
+// NOTE: Rust sends "callId" not "toolId".
 export const ToolCallStartSchema = messageSchema('tool_call_start', {
   agentId: z.string(),
-  toolId: z.string(),
+  callId: z.string(),
   toolName: z.string(),
   inputPreview: z.string(),
 });
 export type ToolCallStart = z.infer<typeof ToolCallStartSchema>;
 
 // 4. tool_call_update — tool progress (partial output)
+// NOTE: This event does NOT exist in Rust yet. Kept for future use.
 export const ToolCallUpdateSchema = messageSchema('tool_call_update', {
   agentId: z.string(),
-  toolId: z.string(),
+  callId: z.string(),
   output: z.string(),
 });
 export type ToolCallUpdate = z.infer<typeof ToolCallUpdateSchema>;
 
-// 5. tool_call_complete — tool finished
-export const ToolCallCompleteSchema = messageSchema('tool_call_complete', {
+// 5. tool_call_end — tool finished
+// NOTE: Rust sends "tool_call_end" not "tool_call_complete".
+// Rust sends "callId" (not "toolId"), "isError" (bool, not "status" enum),
+// and "duration" (ms number, not "durationMs").
+export const ToolCallEndSchema = messageSchema('tool_call_end', {
   agentId: z.string(),
-  toolId: z.string(),
-  status: z.enum(['completed', 'failed']),
+  callId: z.string(),
   output: z.string(),
-  durationMs: z.number(),
-  diff: DiffInfoSchema.optional(),
+  isError: z.boolean(),
+  duration: z.number(),
+  diff: DiffInfoSchema.optional().nullable(),
 });
-export type ToolCallComplete = z.infer<typeof ToolCallCompleteSchema>;
+export type ToolCallEnd = z.infer<typeof ToolCallEndSchema>;
+
+// Keep the old name as an alias for backward compatibility with mock mode
+export const ToolCallCompleteSchema = ToolCallEndSchema;
+export type ToolCallComplete = ToolCallEnd;
 
 // 6. permission_request — needs user approval
+// NOTE: Rust sends "input" not "toolInput", and "requiredMode" as a free string.
+// Rust does NOT send "filePath" or "description".
 export const PermissionRequestSchema = messageSchema('permission_request', {
   requestId: z.string(),
   agentId: z.string(),
   toolName: z.string(),
-  toolInput: z.string(),
-  requiredMode: PermissionModeSchema,
-  filePath: z.string().optional(),
-  description: z.string().optional(),
+  input: z.string(),
+  requiredMode: z.string(),
 });
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 
 // 7. ask_user_request — needs user choice or text input
+// NOTE: Rust sends "default" not "defaultValue", and does NOT send "allowFreeText".
+// Rust "options" is Option<Vec<String>> which serializes as null or array.
 export const AskUserRequestSchema = messageSchema('ask_user_request', {
   requestId: z.string(),
   agentId: z.string(),
   question: z.string(),
-  options: z.array(z.string()).optional(),
-  defaultValue: z.string().optional(),
-  allowFreeText: z.boolean(),
+  options: z.array(z.string()).optional().nullable(),
+  default: z.string().optional().nullable(),
 });
 export type AskUserRequest = z.infer<typeof AskUserRequestSchema>;
 
@@ -275,8 +286,9 @@ export const UsageUpdateSchema = messageSchema('usage_update', {
 });
 export type UsageUpdate = z.infer<typeof UsageUpdateSchema>;
 
-// 14. kb_result — knowledge base query result
-export const KbResultSchema = messageSchema('kb_result', {
+// 14. knowledge_result — knowledge base query result
+// NOTE: Rust sends "knowledge_result" (from enum variant KnowledgeResult), not "kb_result".
+export const KbResultSchema = messageSchema('knowledge_result', {
   queryId: z.number(),
   query: z.string(),
   intent: z.string(),
@@ -345,7 +357,7 @@ export const EngineEventSchema = z.discriminatedUnion('type', [
   StreamEndSchema,
   ToolCallStartSchema,
   ToolCallUpdateSchema,
-  ToolCallCompleteSchema,
+  ToolCallEndSchema,
   PermissionRequestSchema,
   AskUserRequestSchema,
   StatusUpdateSchema,
@@ -387,31 +399,41 @@ export const CancelAgentSchema = messageSchema('cancel_agent', {
 });
 export type CancelAgent = z.infer<typeof CancelAgentSchema>;
 
-// 4. resolve_permission — answer permission dialog
-export const ResolvePermissionSchema = messageSchema('resolve_permission', {
+// 4. permission_response — answer permission dialog
+// NOTE: Rust expects "permission_response" (not "resolve_permission"),
+// with "requestId" and "allow" (boolean), not "decision" string.
+export const ResolvePermissionSchema = messageSchema('permission_response', {
   requestId: z.string(),
-  decision: z.enum(['allow', 'deny']),
+  allow: z.boolean(),
 });
 export type ResolvePermission = z.infer<typeof ResolvePermissionSchema>;
 
-// 5. resolve_ask_user — answer ask-user dialog
-export const ResolveAskUserSchema = messageSchema('resolve_ask_user', {
+// 5. ask_user_response — answer ask-user dialog
+// NOTE: Rust expects "ask_user_response" (not "resolve_ask_user"),
+// with "requestId" and "response" (not "answer").
+export const ResolveAskUserSchema = messageSchema('ask_user_response', {
   requestId: z.string(),
-  answer: z.string(),
+  response: z.string(),
 });
 export type ResolveAskUser = z.infer<typeof ResolveAskUserSchema>;
 
-// 6. kb_feedback — rate KB result
-export const KbFeedbackSchema = messageSchema('kb_feedback', {
+// 6. knowledge_feedback — rate KB result
+// NOTE: Rust expects "knowledge_feedback" (not "kb_feedback"),
+// and "comment"/"correction" are required strings in Rust.
+export const KbFeedbackSchema = messageSchema('knowledge_feedback', {
   queryId: z.number(),
   rating: z.enum(['positive', 'negative', 'corrected']),
-  comment: z.string().optional(),
-  correction: z.string().optional(),
+  comment: z.string(),
+  correction: z.string(),
 });
 export type KbFeedback = z.infer<typeof KbFeedbackSchema>;
 
-// 7. change_permission_mode — Ctrl+P mode cycle
-export const ChangePermissionModeSchema = messageSchema('change_permission_mode', {
+// 7. update_permissions — Ctrl+P mode cycle
+// NOTE: Rust expects "update_permissions" (not "change_permission_mode"),
+// and it's a newtype variant wrapping a String. Internally tagged serde
+// cannot deserialize newtype(String) -- this is a KNOWN Rust-side limitation.
+// For now we send the object form and note this needs a Rust-side fix.
+export const ChangePermissionModeSchema = messageSchema('update_permissions', {
   mode: PermissionModeSchema,
 });
 export type ChangePermissionMode = z.infer<typeof ChangePermissionModeSchema>;
@@ -435,12 +457,18 @@ export const ClearChatSchema = messageSchema('clear_chat', {});
 export type ClearChat = z.infer<typeof ClearChatSchema>;
 
 // 11. slash_command — user issued a slash command
+// NOTE: Rust Action::SlashCommand(String) is a newtype variant.
+// Internally tagged serde cannot deserialize newtype(String).
+// This is a KNOWN Rust-side limitation — needs Rust fix to use struct variant.
 export const SlashCommandSchema = messageSchema('slash_command', {
   command: z.string(),
 });
 export type SlashCommand = z.infer<typeof SlashCommandSchema>;
 
 // 12. update_model — change default model
+// NOTE: Rust Action::UpdateModel(String) is a newtype variant.
+// Internally tagged serde cannot deserialize newtype(String).
+// This is a KNOWN Rust-side limitation — needs Rust fix to use struct variant.
 export const UpdateModelSchema = messageSchema('update_model', {
   model: z.string(),
 });
@@ -458,7 +486,14 @@ export const InjectSkillSchema = messageSchema('inject_skill', {
 });
 export type InjectSkill = z.infer<typeof InjectSkillSchema>;
 
-// 15. quit — user wants to exit
+// 15. voice_transcribed — voice transcription completed
+// NOTE: Rust Action::VoiceTranscribed { text } — handled in TUI event loop.
+export const VoiceTranscribedSchema = messageSchema('voice_transcribed', {
+  text: z.string(),
+});
+export type VoiceTranscribed = z.infer<typeof VoiceTranscribedSchema>;
+
+// 16. quit — user wants to exit
 export const QuitSchema = messageSchema('quit', {});
 export type Quit = z.infer<typeof QuitSchema>;
 
@@ -481,6 +516,7 @@ export const TuiActionSchema = z.discriminatedUnion('type', [
   UpdateModelSchema,
   MoeDispatchSchema,
   InjectSkillSchema,
+  VoiceTranscribedSchema,
   QuitSchema,
 ]);
 export type TuiAction = z.infer<typeof TuiActionSchema>;

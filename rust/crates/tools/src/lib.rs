@@ -1754,7 +1754,10 @@ fn todo_store_path() -> Result<std::path::PathBuf, String> {
         return Ok(std::path::PathBuf::from(path));
     }
     let cwd = std::env::current_dir().map_err(|error| error.to_string())?;
-    Ok(cwd.join(".openanalyst-todos.json"))
+    // Store inside .openanalyst/ so todos are shared when project is shared via git
+    let project_dir = cwd.join(".openanalyst");
+    let _ = std::fs::create_dir_all(&project_dir);
+    Ok(project_dir.join("todos.json"))
 }
 
 fn resolve_skill_path(skill: &str) -> Result<std::path::PathBuf, String> {

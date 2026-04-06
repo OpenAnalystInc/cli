@@ -73,6 +73,26 @@ pub fn project_config_dir(project_dir: &std::path::Path) -> PathBuf {
     project_dir.join(".openanalyst")
 }
 
+/// Returns the Claude Code user config directory (`~/.claude/`) as a fallback
+/// for users migrating from Claude Code. Returns `None` if the directory does
+/// not exist.
+#[must_use]
+pub fn claude_user_config_home() -> Option<PathBuf> {
+    std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .ok()
+        .map(|h| PathBuf::from(h).join(".claude"))
+        .filter(|p| p.is_dir())
+}
+
+/// Returns the Claude Code project config directory (`.claude/`) as a fallback.
+/// Returns `None` if the directory does not exist.
+#[must_use]
+pub fn claude_project_config_dir(project_dir: &std::path::Path) -> Option<PathBuf> {
+    let p = project_dir.join(".claude");
+    if p.is_dir() { Some(p) } else { None }
+}
+
 /// Configuration scope — managed > user > project for enforcement;
 /// project > user > managed for user customization.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]

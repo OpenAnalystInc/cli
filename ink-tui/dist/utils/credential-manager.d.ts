@@ -36,6 +36,8 @@ export declare const PROVIDER_CONFIG: Record<string, ProviderConfig>;
 declare class CredentialManager {
     private globalEnvPath;
     private credJsonPath;
+    /** Fallback path: ~/.claude/.env — for users migrating from Claude Code. */
+    private claudeEnvPath;
     constructor();
     /**
      * Save an API key for a provider to ALL storage locations:

@@ -37,9 +37,16 @@ export interface SessionData {
     permissionMode: string;
 }
 export declare class SessionManager {
+    /** Primary sessions dir (project-level preferred). */
     private readonly sessionsDir;
+    /** Global sessions dir — always ~/.openanalyst/sessions/ as backup. */
+    private readonly globalSessionsDir;
     constructor();
-    /** Save (or overwrite) a session to disk. */
+    /**
+     * Save session to BOTH project-level AND global.
+     * - Project copy: shared when project is pushed via git (team collaboration)
+     * - Global copy: user's personal backup across all projects
+     */
     save(data: SessionData): void;
     /** Load a session by its full ID. Returns null if not found or corrupted. */
     load(sessionId: string): SessionData | null;
@@ -63,7 +70,7 @@ export declare class SessionManager {
      * Fallback to global: ~/.openanalyst/sessions/
      */
     private resolveSessionsDir;
-    /** Ensure the sessions directory exists. */
+    /** Ensure both session directories exist. */
     private ensureDir;
     /** Read and parse a single session file. Returns null on any error. */
     private readSessionFile;

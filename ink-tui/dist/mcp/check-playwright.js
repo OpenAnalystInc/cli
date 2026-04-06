@@ -6,13 +6,16 @@
  * letting the server fail with a cryptic error.
  */
 import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 /**
  * Check if Playwright chromium browser is installed.
  * This is a synchronous check for startup speed.
  */
 export function checkPlaywrightInstalled() {
     try {
-        // Try to resolve the @playwright/mcp package
+        // Use createRequire for ESM compatibility — require.resolve is not
+        // available natively in ESM modules (package.json "type": "module").
+        const require = createRequire(import.meta.url);
         require.resolve('@playwright/mcp');
     }
     catch {

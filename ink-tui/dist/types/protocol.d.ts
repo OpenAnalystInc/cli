@@ -18,16 +18,16 @@ export declare const BaseMessageSchema: z.ZodObject<{
     type: z.ZodString;
     /** Optional correlation ID for request/response pairing. */
     id: z.ZodOptional<z.ZodString>;
-    /** Unix epoch milliseconds when the message was created. */
-    timestamp: z.ZodNumber;
+    /** Unix epoch milliseconds when the message was created. Rust does NOT send this — defaults to Date.now(). */
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 }, "strip", z.ZodTypeAny, {
     type: string;
     timestamp: number;
     id?: string | undefined;
 }, {
     type: string;
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type BaseMessage = z.infer<typeof BaseMessageSchema>;
 /** Marker: message flows from Rust engine to Ink TUI. */
@@ -39,9 +39,9 @@ export type TuiAction<T extends string = string> = BaseMessage & {
     type: T;
 };
 /** All event type discriminators (Engine -> TUI). */
-export declare const ENGINE_EVENT_TYPES: readonly ["stream_delta", "stream_end", "tool_call_start", "tool_call_update", "tool_call_complete", "permission_request", "ask_user_request", "status_update", "agent_spawned", "agent_status_changed", "agent_completed", "agent_failed", "usage_update", "kb_result", "system_message", "banner", "sidebar_update", "model_info", "context_files_update"];
+export declare const ENGINE_EVENT_TYPES: readonly ["stream_delta", "stream_end", "tool_call_start", "tool_call_update", "tool_call_end", "permission_request", "ask_user_request", "status_update", "agent_spawned", "agent_status_changed", "agent_completed", "agent_failed", "usage_update", "knowledge_result", "system_message", "banner", "sidebar_update", "model_info", "context_files_update"];
 /** All action type discriminators (TUI -> Engine). */
-export declare const TUI_ACTION_TYPES: readonly ["submit_prompt", "run_in_background", "cancel_agent", "resolve_permission", "resolve_ask_user", "kb_feedback", "change_permission_mode", "toggle_context_file", "change_routing", "clear_chat", "slash_command", "update_model", "moe_dispatch", "inject_skill", "quit"];
+export declare const TUI_ACTION_TYPES: readonly ["submit_prompt", "run_in_background", "cancel_agent", "permission_response", "ask_user_response", "knowledge_feedback", "update_permissions", "toggle_context_file", "change_routing", "clear_chat", "slash_command", "update_model", "moe_dispatch", "inject_skill", "voice_transcribed", "quit"];
 export type EngineEventType = (typeof ENGINE_EVENT_TYPES)[number];
 export type TuiActionType = (typeof TUI_ACTION_TYPES)[number];
 export declare const ConnectionState: z.ZodEnum<["connecting", "connected", "disconnected", "error"]>;
@@ -55,8 +55,8 @@ export declare function messageSchema<T extends string, P extends z.ZodRawShape>
     type: z.ZodString;
     /** Optional correlation ID for request/response pairing. */
     id: z.ZodOptional<z.ZodString>;
-    /** Unix epoch milliseconds when the message was created. */
-    timestamp: z.ZodNumber;
+    /** Unix epoch milliseconds when the message was created. Rust does NOT send this — defaults to Date.now(). */
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 }, {
     type: z.ZodLiteral<T>;
 } & P>, "strip", z.ZodTypeAny, z.objectUtil.addQuestionMarks<z.baseObjectOutputType<z.objectUtil.extendShape<{
@@ -64,8 +64,8 @@ export declare function messageSchema<T extends string, P extends z.ZodRawShape>
     type: z.ZodString;
     /** Optional correlation ID for request/response pairing. */
     id: z.ZodOptional<z.ZodString>;
-    /** Unix epoch milliseconds when the message was created. */
-    timestamp: z.ZodNumber;
+    /** Unix epoch milliseconds when the message was created. Rust does NOT send this — defaults to Date.now(). */
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 }, {
     type: z.ZodLiteral<T>;
 } & P>>, any> extends infer T_1 ? { [k in keyof T_1]: T_1[k]; } : never, z.baseObjectInputType<z.objectUtil.extendShape<{
@@ -73,8 +73,8 @@ export declare function messageSchema<T extends string, P extends z.ZodRawShape>
     type: z.ZodString;
     /** Optional correlation ID for request/response pairing. */
     id: z.ZodOptional<z.ZodString>;
-    /** Unix epoch milliseconds when the message was created. */
-    timestamp: z.ZodNumber;
+    /** Unix epoch milliseconds when the message was created. Rust does NOT send this — defaults to Date.now(). */
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 }, {
     type: z.ZodLiteral<T>;
 } & P>> extends infer T_2 ? { [k_1 in keyof T_2]: T_2[k_1]; } : never>;

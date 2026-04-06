@@ -50,19 +50,19 @@ function formatElapsed(secs: number): string {
   return `${m}m ${String(s).padStart(2, '0')}s`;
 }
 
-function getPermissionDisplay(mode?: string): { icon: string; color: string; label: string } {
+function getPermissionDisplay(mode: string | undefined, colors: SemanticColors): { icon: string; color: string; label: string } {
   switch (mode) {
     case 'read-only':
-      return { icon: 'R', color: '#0088FF', label: 'read-only' };
+      return { icon: 'R', color: colors.status.running, label: 'read-only' };
     case 'workspace-write':
-      return { icon: 'W', color: '#FFD700', label: 'workspace' };
+      return { icon: 'W', color: colors.status.warning, label: 'workspace' };
     case 'prompt':
     case undefined:
-      return { icon: 'P', color: '#00BFFF', label: 'prompt' };
+      return { icon: 'P', color: colors.text.accent, label: 'prompt' };
     case 'danger-full-access':
-      return { icon: 'F', color: '#FF4444', label: 'full-access' };
+      return { icon: 'F', color: colors.status.error, label: 'full-access' };
     default:
-      return { icon: '?', color: '#888888', label: mode || 'unknown' };
+      return { icon: '?', color: colors.text.secondary, label: mode || 'unknown' };
   }
 }
 
@@ -79,27 +79,27 @@ export function SidebarActivity({
   totalTokens = 0,
 }: SidebarActivityProps): React.ReactElement {
   const textColor = isFocused ? colors.sidebar.itemSelected : colors.text.primary;
-  const perm = getPermissionDisplay(permissionMode);
+  const perm = getPermissionDisplay(permissionMode, colors);
 
   return (
     <Box flexDirection="column">
       {/* Tool calls */}
       <Box>
-        <Text color="#0088FF"> {'\u21C5'} </Text>
+        <Text color={colors.text.accent}> {'\u21C5'} </Text>
         <Text color={textColor}>
           {activity.toolCallCount} tool calls
         </Text>
       </Box>
       {/* Tokens */}
       <Box>
-        <Text color="#00CC44"> {'\u2193'} </Text>
+        <Text color={colors.status.done}> {'\u2193'} </Text>
         <Text color={textColor}>
           {formatTokens(totalTokens)} tokens
         </Text>
       </Box>
       {/* Elapsed */}
       <Box>
-        <Text color="#FFD700"> {'\u2299'} </Text>
+        <Text color={colors.status.warning}> {'\u2299'} </Text>
         <Text color={textColor}>
           {formatElapsed(elapsedSecs)} elapsed
         </Text>
@@ -118,7 +118,7 @@ export function SidebarActivity({
         if (dpConfig) {
           return (
             <Box>
-              <Text color="#FFD700">{' \u2605'} </Text>
+              <Text color={colors.status.warning}>{' \u2605'} </Text>
               <Text color={textColor}>
                 {dpConfig.displayName}
               </Text>

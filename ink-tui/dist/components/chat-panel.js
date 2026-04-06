@@ -16,8 +16,8 @@ import { jsx as _jsx, jsxs as _jsxs } from "react/jsx-runtime";
  * Uses Ink's <Static> for fully-rendered (non-streaming) messages
  * to optimize re-render performance.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Box, Static, Text } from 'ink';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Box, Text } from 'ink';
 import { MessageList } from './message-list.js';
 import { useUIState, useUIActions } from '../contexts/ui-state-context.js';
 import { useChatActions } from '../contexts/chat-context.js';
@@ -25,23 +25,6 @@ import { useTheme } from '../contexts/theme-context.js';
 import { useKeypress } from '../hooks/use-keypress.js';
 import { Command } from '../key/commands.js';
 import { useEngine } from '../engine/engine-context.js';
-// ---------------------------------------------------------------------------
-// Internal: find the last streaming message index
-// ---------------------------------------------------------------------------
-function findStreamingBoundary(messages) {
-    for (let i = messages.length - 1; i >= 0; i--) {
-        const msg = messages[i];
-        if (msg.kind === 'assistant' && msg.streaming) {
-            // Everything before this index can be treated as "static"
-            return i;
-        }
-        if (msg.kind === 'tool_call' && msg.status === 'running') {
-            return i;
-        }
-    }
-    // No streaming message — everything is static
-    return messages.length;
-}
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -55,21 +38,23 @@ export function ChatPanel({ messages }) {
     // Track visible height for page-scroll calculations
     const [visibleHeight, setVisibleHeight] = useState(20);
     const containerRef = useRef(null);
-    // Split messages into static (fully rendered) and dynamic (streaming/active)
-    const streamingBoundary = useMemo(() => findStreamingBoundary(messages), [messages]);
-    const staticMessages = useMemo(() => messages.slice(0, streamingBoundary), [messages, streamingBoundary]);
-    const dynamicMessages = useMemo(() => messages.slice(streamingBoundary), [messages, streamingBoundary]);
     // --- Scroll mode keypress handler (priority 5) ---
     const handleScrollKey = useCallback((input, _key, command) => {
         if (!scrollMode)
             return false;
         switch (command) {
-            case Command.SCROLL_UP: {
+            // k/Up arrow — move up. Up arrow resolves to HISTORY_UP (earlier
+            // in enum) rather than SCROLL_UP, so accept both.
+            case Command.SCROLL_UP:
+            case Command.HISTORY_UP: {
                 const newIndex = Math.max(0, focusedMessageIndex - 1);
                 actions.setFocusedMessage(newIndex);
                 return true;
             }
-            case Command.SCROLL_DOWN: {
+            // j/Down arrow — move down. Down arrow resolves to HISTORY_DOWN
+            // (earlier in enum) rather than SCROLL_DOWN, so accept both.
+            case Command.SCROLL_DOWN:
+            case Command.HISTORY_DOWN: {
                 const newIndex = Math.min(messages.length - 1, focusedMessageIndex + 1);
                 actions.setFocusedMessage(newIndex);
                 return true;
@@ -82,7 +67,11 @@ export function ChatPanel({ messages }) {
                 actions.setFocusedMessage(messages.length - 1);
                 return true;
             }
-            case Command.EXIT_SCROLL_MODE: {
+            case Command.EXIT_SCROLL_MODE:
+            case Command.ENTER_SCROLL_MODE: {
+                // Both resolve to Escape — when already in scroll mode, exit it.
+                // The command resolver may map Escape to ENTER_SCROLL_MODE
+                // (first in enum order) even when we need EXIT_SCROLL_MODE.
                 actions.exitScrollMode();
                 return true;
             }
@@ -98,8 +87,11 @@ export function ChatPanel({ messages }) {
                 actions.setFocusedMessage(newIndex);
                 return true;
             }
-            // Toggle expand on focused message (Enter or Space)
-            case Command.TOGGLE_EXPAND: {
+            // Toggle expand on focused message (Enter)
+            // The resolver maps Return to SUBMIT (first in enum), so we
+            // also accept SUBMIT here when in scroll mode.
+            case Command.TOGGLE_EXPAND:
+            case Command.SUBMIT: {
                 const focused = messages[focusedMessageIndex];
                 if (focused) {
                     if (focused.kind === 'tool_call') {
@@ -126,20 +118,29 @@ export function ChatPanel({ messages }) {
                 }
                 return true;
             }
-            // KB feedback
+            // KB feedback — only consume the key when focused on a KB card,
+            // otherwise fall through so 'y' can still copy to clipboard.
             case Command.FEEDBACK_POSITIVE: {
                 const focused = messages[focusedMessageIndex];
                 if (focused && focused.kind === 'kb_result') {
                     engine.sendKbFeedback(focused.queryId, 'positive');
+                    return true;
                 }
-                return true;
+                return false;
             }
             case Command.FEEDBACK_NEGATIVE: {
                 const focused = messages[focusedMessageIndex];
                 if (focused && focused.kind === 'kb_result') {
                     engine.sendKbFeedback(focused.queryId, 'negative');
+                    return true;
                 }
-                return true;
+                return false;
+            }
+            // '/' — exit scroll mode and let the character fall through to the
+            // input handler so it inserts '/' and triggers autocomplete.
+            case Command.START_SEARCH: {
+                actions.exitScrollMode();
+                return false; // don't consume — input handler will insert '/'
             }
             default:
                 break;
@@ -184,14 +185,10 @@ export function ChatPanel({ messages }) {
                     // Dynamic import to avoid top-level async in component
                     import('clipboardy').then((clip) => {
                         clip.default.writeSync(textToCopy);
+                        actions.showToast('Copied to clipboard');
                     }).catch(() => {
-                        // Silently fail if clipboard not available
+                        actions.showToast('Clipboard not available', 2000, 'warning');
                     });
-                    // Brief notification via status bar message
-                    actions.setPhase('done', 'Copied!');
-                    setTimeout(() => {
-                        actions.setPhase('idle');
-                    }, 1500);
                 }
             }
             return true;
@@ -222,8 +219,19 @@ export function ChatPanel({ messages }) {
             actions.exitScrollMode();
             return true;
         }
+        // PgUp/PgDn outside scroll mode — enter scroll mode and page
+        if (command === Command.SCROLL_UP_PAGE) {
+            actions.enterScrollMode();
+            const target = Math.max(0, messages.length - 1 - Math.max(1, visibleHeight - 2));
+            actions.setFocusedMessage(target);
+            return true;
+        }
+        if (command === Command.SCROLL_DOWN_PAGE) {
+            // If not in scroll mode, PgDn at the bottom is a no-op
+            return false;
+        }
         return false;
-    }, [actions, messages.length]);
+    }, [actions, messages.length, visibleHeight]);
     useKeypress(handleEnterScrollMode, {
         isActive: !scrollMode && messages.length > 0,
         priority: 0,
@@ -238,10 +246,6 @@ export function ChatPanel({ messages }) {
     }, [autoScroll, messages.length]);
     // --- Render ---
     const showScrollIndicator = scrollMode;
-    return (_jsxs(Box, { flexDirection: "column", flexGrow: 1, paddingX: 1, overflow: "hidden", children: [showScrollIndicator && (_jsxs(Box, { height: 1, flexShrink: 0, children: [_jsx(Text, { color: colors.status.warning, bold: true, children: ' SCROLL ' }), _jsx(Text, { color: colors.text.secondary, dimColor: true, children: "j/k:nav  g/G:top/bottom  Esc:back" })] })), staticMessages.length > 0 && (_jsx(Static, { items: staticMessages, children: (msg) => (_jsx(Box, { flexDirection: "column", children: _jsx(MessageList, { messages: [msg], focusedIndex: scrollMode && focusedMessageIndex < streamingBoundary
-                            ? focusedMessageIndex - messages.indexOf(msg)
-                            : -1 }) }, `static-${msg.id}`)) })), dynamicMessages.length > 0 && (_jsx(MessageList, { messages: dynamicMessages, focusedIndex: scrollMode
-                    ? focusedMessageIndex - streamingBoundary
-                    : -1 })), messages.length === 0 && (_jsx(Box, { flexDirection: "column", flexGrow: 1, justifyContent: "center", alignItems: "center", children: _jsx(Text, { color: colors.text.secondary, dimColor: true, children: "Type a message to get started" }) }))] }));
+    return (_jsxs(Box, { flexDirection: "column", flexGrow: 1, overflow: "hidden", children: [showScrollIndicator && (_jsxs(Box, { height: 1, flexShrink: 0, children: [_jsx(Text, { color: colors.status.warning, bold: true, children: ' SCROLL ' }), _jsx(Text, { color: colors.text.secondary, dimColor: true, children: "j/k:nav  g/G:top/bottom  Esc:back" })] })), messages.length > 0 && (_jsx(MessageList, { messages: messages, focusedIndex: scrollMode ? focusedMessageIndex : -1 })), messages.length === 0 && (_jsx(Box, { flexDirection: "column", flexGrow: 1, justifyContent: "center", alignItems: "center", children: _jsx(Text, { color: colors.text.secondary, dimColor: true, children: "Type a message to get started" }) }))] }));
 }
 //# sourceMappingURL=chat-panel.js.map

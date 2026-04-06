@@ -60,14 +60,14 @@ function isActivePhase(phase) {
         phase === 'searching');
 }
 /**
- * Build full keybinding hints string matching Ratatui.
- * Shows ALL hints regardless of mode.
+ * Build keybinding hints string matching Ratatui.
+ * Clean, minimal hints — only the essentials.
  */
 function getHints(_mode, phase) {
     if (isActivePhase(phase)) {
-        return 'Esc:input \u00B7 Tab:section \u00B7 j/k:nav \u00B7 Ctrl+C:cancel \u00B7 Ctrl+B:bg \u00B7 Ctrl+P:mode \u00B7 F2:hide';
+        return 'Esc:scroll \u00B7 Ctrl+C:stop \u00B7 Ctrl+B:bg \u00B7 Ctrl+P:mode \u00B7 F2:sidebar';
     }
-    return 'Esc:input \u00B7 Tab:section \u00B7 j/k:nav \u00B7 Ctrl+C:quit \u00B7 Ctrl+B:bg \u00B7 Ctrl+P:mode \u00B7 F2:hide';
+    return 'Esc:scroll \u00B7 Ctrl+C:quit \u00B7 Ctrl+B:bg \u00B7 Ctrl+P:mode \u00B7 F2:sidebar';
 }
 // ---------------------------------------------------------------------------
 // Component

@@ -6,7 +6,7 @@
  * but represent the final display state of each message.
  */
 
-import type { SystemLevel } from './messages.js';
+import type { DiffInfo, SubQuestionResult, SystemLevel } from './messages.js';
 
 // ---------------------------------------------------------------------------
 // Message variants
@@ -49,6 +49,7 @@ export interface ToolCallChatMessage {
   status: 'running' | 'completed' | 'failed';
   output: string;
   durationMs: number;
+  diff?: DiffInfo;
   expanded: boolean;
   readonly timestamp: number;
 }
@@ -59,6 +60,7 @@ export interface KBResultChatMessage {
   readonly queryId: number;
   readonly query: string;
   readonly intent: string;
+  readonly subQuestions: readonly SubQuestionResult[];
   readonly answer?: string;
   readonly latencyMs: number;
   readonly fromCache: boolean;
