@@ -2807,6 +2807,7 @@ fn run_headless(
         max_turns: None,
     };
 
+    let startup_tx = ui_tx.clone();
     let orchestrator = orchestrator::AgentOrchestrator::new(config, ui_tx, action_rx, None);
 
     // Fire SessionStart hooks
@@ -2822,6 +2823,39 @@ fn run_headless(
     rt.block_on(async {
         // Spawn orchestrator in background
         let orchestrator_handle = tokio::spawn(orchestrator.run());
+
+        // Emit startup events so the TUI has initial state
+        {
+            use events::UiEvent;
+
+            let version = env!("CARGO_PKG_VERSION").to_string();
+            let display_name = std::env::var("USERNAME")
+                .or_else(|_| std::env::var("USER"))
+                .unwrap_or_else(|_| "User".to_string());
+
+            let _ = startup_tx.send(UiEvent::Banner {
+                version,
+                display_name,
+                email: None,
+                organization: None,
+                provider: None,
+                model_display: model.clone(),
+                credits: None,
+                working_dir: cwd.display().to_string(),
+                tips: Some(vec![
+                    "Type a prompt to get started".to_string(),
+                    "Ctrl+E to toggle sidebar".to_string(),
+                    "/help for all commands".to_string(),
+                ]),
+            }).await;
+
+            let _ = startup_tx.send(UiEvent::StatusUpdate {
+                phase: "idle".to_string(),
+                label: None,
+                elapsed_ms: 0,
+                tokens_remaining: None,
+            }).await;
+        }
 
         // Run headless JSON bridge (no terminal setup needed)
         let result = tui::headless::run(ui_rx, action_tx).await;

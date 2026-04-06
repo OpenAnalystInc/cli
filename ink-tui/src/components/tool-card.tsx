@@ -131,14 +131,34 @@ export function ToolCard({
   const statusIcon = status === 'running'
     ? { char: spinner.frame, color: spinner.color }
     : status === 'completed'
-      ? { char: '✓', color: colors.status.done }
-      : { char: '✗', color: colors.status.error };
+      ? { char: '\u2713', color: colors.status.done }
+      : { char: '\u2717', color: colors.status.error };
 
   // Duration label.
   const durationLabel = durationMs != null ? formatDuration(durationMs) : '';
 
+  // ── Compact mode ──────────────────────────────────────────────────────
+  // Completed/failed tools without diffs render as a single clean line,
+  // matching Claude Code's compact tool-call display style.
+  const isCompact = status !== 'running' && !expanded && diff == null;
+
+  if (isCompact) {
+    return (
+      <Box paddingLeft={2}>
+        <Text color={statusIcon.color}>{statusIcon.char} </Text>
+        <Text color={colors.text.accent} bold>{toolName}</Text>
+        <Text color={colors.text.secondary}>({inputPreview(input)})</Text>
+        {durationLabel !== '' && (
+          <Text color={colors.text.secondary}> \u2500\u2500 {durationLabel}</Text>
+        )}
+      </Box>
+    );
+  }
+
+  // ── Full bordered card (running, expanded, or has diff) ───────────────
+
   // Expand chevron.
-  const chevron = expanded ? '▾' : '▸';
+  const chevron = expanded ? '\u25BE' : '\u25B8';
 
   // Output lines for expanded view.
   const outputLines = output?.split('\n') ?? [];
@@ -157,7 +177,7 @@ export function ToolCard({
         <Text color={statusIcon.color}>{statusIcon.char} </Text>
         <Text color={colors.text.accent} bold>{toolName}</Text>
         {durationLabel !== '' && (
-          <Text color={colors.text.secondary}> {' '}── {durationLabel} </Text>
+          <Text color={colors.text.secondary}> {' '}\u2500\u2500 {durationLabel} </Text>
         )}
         <Text color={effectiveBorderColor}> {chevron}</Text>
       </Box>

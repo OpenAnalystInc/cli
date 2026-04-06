@@ -14,10 +14,9 @@ import { DefaultLayout } from './layouts/default-layout.js';
 export function App({ engineConfig }) {
     const config = engineConfig ?? {
         binaryPath: process.env['OA_ENGINE_PATH'] || 'openanalyst',
-        mock: process.env['OA_MOCK'] === '1' || process.argv.includes('--mock'),
         autoRestart: true,
         maxRestartAttempts: 3,
     };
-    return (_jsx(TerminalProvider, { children: _jsx(ThemeProvider, { children: _jsx(KeypressProvider, { children: _jsx(UIStateProvider, { children: _jsx(ChatProvider, { children: _jsx(PlaywrightMCPProvider, { autoStart: !config.mock, children: _jsx(EngineProvider, { config: config, children: _jsx(SessionProvider, { children: _jsx(DefaultLayout, {}) }) }) }) }) }) }) }) }));
+    return (_jsx(TerminalProvider, { children: _jsx(ThemeProvider, { children: _jsx(KeypressProvider, { children: _jsx(UIStateProvider, { children: _jsx(ChatProvider, { children: _jsx(PlaywrightMCPProvider, { autoStart: true, children: _jsx(EngineProvider, { config: config, children: _jsx(SessionProvider, { children: _jsx(DefaultLayout, {}) }) }) }) }) }) }) }) }));
 }
 //# sourceMappingURL=app.js.map

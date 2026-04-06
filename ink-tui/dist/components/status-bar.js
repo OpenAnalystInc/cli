@@ -73,11 +73,33 @@ function getHints(_mode, phase) {
 // Component
 // ---------------------------------------------------------------------------
 export function StatusBar() {
-    const { phase, phaseLabel, elapsedMs, tokensRemaining, mode, voiceRecording, } = useUIState();
+    const { phase, phaseLabel, elapsedMs, tokensRemaining, mode, voiceRecording, sidebarAgents, } = useUIState();
     const { colors } = useTheme();
     // Track whether the "done" checkmark is still visible (auto-hides after 2s).
     const [showDone, setShowDone] = useState(false);
     const doneTimerRef = useRef(null);
+    // Track "cooked" time: the duration of the last active phase.
+    const [lastCookedMs, setLastCookedMs] = useState(null);
+    const turnStartRef = useRef(null);
+    const prevPhaseRef = useRef(phase);
+    useEffect(() => {
+        const prevPhase = prevPhaseRef.current;
+        prevPhaseRef.current = phase;
+        // When entering an active phase, record the start time.
+        if (isActivePhase(phase) && !isActivePhase(prevPhase)) {
+            turnStartRef.current = Date.now();
+            setLastCookedMs(null);
+        }
+        // When leaving an active phase for done/idle, capture elapsed.
+        if (!isActivePhase(phase) && isActivePhase(prevPhase) && turnStartRef.current != null) {
+            setLastCookedMs(Date.now() - turnStartRef.current);
+            turnStartRef.current = null;
+        }
+        // When entering a NEW active phase from idle/done, clear the cooked display.
+        if (isActivePhase(phase) && (prevPhase === 'idle' || prevPhase === 'done')) {
+            setLastCookedMs(null);
+        }
+    }, [phase]);
     useEffect(() => {
         if (phase === 'done') {
             setShowDone(true);
@@ -96,6 +118,8 @@ export function StatusBar() {
     }, [phase]);
     const active = isActivePhase(phase);
     const hints = getHints(mode, phase);
+    // Count background agents currently running.
+    const runningAgentCount = sidebarAgents.filter((a) => a.status === 'Running').length;
     // -- Left side --
     let leftContent = null;
     if (voiceRecording) {
@@ -106,11 +130,18 @@ export function StatusBar() {
         const tokenPart = tokensRemaining != null
             ? ` \u00B7 \u2193 ${formatTokens(tokensRemaining)} tokens`
             : '';
-        const statsStr = `(${elapsed}${tokenPart})`;
-        leftContent = (_jsxs(Box, { children: [_jsx(OaSpinner, { active: true, label: phaseLabel || 'Working...' }), _jsxs(Text, { color: colors.text.secondary, children: [" ", statsStr] })] }));
+        const agentPart = runningAgentCount > 0
+            ? ` \u00B7 ${runningAgentCount} agent${runningAgentCount > 1 ? 's' : ''} running`
+            : '';
+        const statsStr = `(${elapsed}${tokenPart}${agentPart})`;
+        leftContent = (_jsxs(Box, { children: [_jsxs(Text, { color: colors.text.accent, children: ['\u273B', " "] }), _jsx(OaSpinner, { active: true, label: phaseLabel || 'Working...' }), _jsxs(Text, { color: colors.text.secondary, children: [" ", statsStr] })] }));
     }
-    else if (phase === 'done' && showDone) {
-        leftContent = (_jsxs(Text, { color: colors.status.done, bold: true, children: ['\u2713', " Done"] }));
+    else if ((phase === 'done' && showDone) || (phase === 'idle' && lastCookedMs != null)) {
+        const cookedStr = formatElapsed(lastCookedMs ?? 0);
+        const agentPart = runningAgentCount > 0
+            ? ` \u00B7 ${runningAgentCount} agent${runningAgentCount > 1 ? 's' : ''} still running`
+            : '';
+        leftContent = (_jsxs(Box, { children: [_jsx(Text, { color: colors.status.done, children: '\u273B' }), _jsxs(Text, { color: colors.text.secondary, children: [" Cooked for ", cookedStr, agentPart] })] }));
     }
     else if (phase === 'error') {
         leftContent = (_jsxs(Text, { color: colors.status.error, bold: true, children: ['\u2717', " Error"] }));

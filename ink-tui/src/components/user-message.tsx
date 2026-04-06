@@ -57,7 +57,7 @@ export const UserMessage = React.memo(function UserMessage({
     >
       <Box width={2} flexShrink={0}>
         <Text color={promptColor} bold>
-          {'> '}
+          {'\u276F '}
         </Text>
       </Box>
       <Box flexGrow={1}>

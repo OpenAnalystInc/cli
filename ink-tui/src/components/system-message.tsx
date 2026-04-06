@@ -62,18 +62,18 @@ export const SystemMessage = React.memo(function SystemMessage({
     case 'error':
       bulletColor = colors.status.error;
       textColor = colors.status.error;
-      bullet = '\u25cf'; // filled circle
+      bullet = '\u2717'; // ✗
       break;
     case 'warning':
       bulletColor = colors.status.warning;
       textColor = colors.status.warning;
-      bullet = '\u25cf';
+      bullet = '\u26A0'; // ⚠
       break;
     case 'info':
     default:
       bulletColor = colors.text.secondary;
       textColor = colors.text.secondary;
-      bullet = '\u25cf';
+      bullet = '\u2139'; // ℹ
       break;
   }
 

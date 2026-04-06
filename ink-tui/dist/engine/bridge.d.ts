@@ -2,9 +2,8 @@
  * EngineBridge — class-based wrapper around the child-process management logic.
  *
  * This is NOT a React component. It manages the Rust engine child process lifecycle
- * (or a mock simulator) and emits typed events via EventEmitter. The EngineProvider
- * context uses this class internally, but it can also be used standalone in tests
- * or non-React scripts.
+ * and emits typed events via EventEmitter. The EngineProvider context uses this
+ * class internally, but it can also be used standalone in tests or non-React scripts.
  *
  * Communication protocol:
  *   - stdin:  TUI -> Engine  (JSON Lines, one action per line)
@@ -27,8 +26,6 @@ export interface BridgeConfig {
     autoRestart?: boolean;
     /** Max restart attempts before giving up. Defaults to 3. */
     maxRestartAttempts?: number;
-    /** If true, use mock engine instead of a real process. */
-    mock?: boolean;
 }
 export interface BridgeEvents {
     event: [EngineEvent];
@@ -39,7 +36,6 @@ export interface BridgeEvents {
 export declare class EngineBridge extends EventEmitter {
     private proc;
     private rl;
-    private mockEmitter;
     private restartCount;
     private _connectionState;
     private _config;
@@ -77,7 +73,4 @@ export declare class EngineBridge extends EventEmitter {
     private setConnectionState;
     private processLine;
     private spawnEngine;
-    private startMock;
-    private handleMockAction;
-    private simulateMockResponse;
 }

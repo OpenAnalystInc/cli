@@ -1149,6 +1149,7 @@ version = "2.0.12"
 dependencies = [
  "api",
  "chrono",
+ "commands",
  "events",
  "plugins",
  "runtime",

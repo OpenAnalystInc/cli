@@ -9,9 +9,8 @@
  * - Provides typed action methods (sendPrompt, cancelAgent, etc.)
  * - Handles process crash with optional auto-restart
  * - Tracks connection state: connecting | connected | disconnected | error
- * - Mock mode for UI development without a real engine
  */
-import { type EngineEvent, type StreamDelta, type StreamEnd, type ToolCallStart, type ToolCallUpdate, type ToolCallEnd, type PermissionRequest, type AskUserRequest, type StatusUpdate, type AgentSpawned, type AgentStatusChanged, type AgentCompleted, type AgentFailed, type UsageUpdate, type KbResult, type SystemMessage, type Banner, type SidebarUpdate, type ModelInfo, type ContextFilesUpdate, type PermissionMode, type ActionCategory, type TuiAction } from '../types/messages.js';
+import { type StreamDelta, type StreamEnd, type ToolCallStart, type ToolCallUpdate, type ToolCallEnd, type PermissionRequest, type AskUserRequest, type StatusUpdate, type AgentSpawned, type AgentStatusChanged, type AgentCompleted, type AgentFailed, type UsageUpdate, type KbResult, type SystemMessage, type Banner, type SidebarUpdate, type ModelInfo, type ContextFilesUpdate, type PermissionMode, type ActionCategory } from '../types/messages.js';
 import { type ConnectionState } from '../types/protocol.js';
 export interface EngineEventHandlers {
     onStreamDelta?: (event: StreamDelta) => void;
@@ -49,8 +48,6 @@ export interface EngineConfig {
     autoRestart?: boolean;
     /** Max restart attempts before giving up. Defaults to 3. */
     maxRestartAttempts?: number;
-    /** If true, use mock engine instead of a real process. */
-    mock?: boolean;
 }
 export interface UseEngineReturn {
     /** Current connection state. */
@@ -92,18 +89,3 @@ export interface UseEngineReturn {
     restart: () => void;
 }
 export declare function useEngine(config?: EngineConfig, handlers?: EngineEventHandlers): UseEngineReturn;
-export interface MockEngine {
-    /** Emit a mock event to registered handlers. */
-    emit: (event: EngineEvent) => void;
-    /** Register an event handler. Returns unsubscribe function. */
-    on: (handler: (event: EngineEvent) => void) => () => void;
-    /** Send an action (triggers mock responses). */
-    send: (action: TuiAction) => void;
-    /** Dispose of the mock engine. */
-    dispose: () => void;
-}
-/**
- * Create a standalone mock engine instance for testing and UI development.
- * This is not a React hook — use it in test files or non-React contexts.
- */
-export declare function createMockEngine(): MockEngine;

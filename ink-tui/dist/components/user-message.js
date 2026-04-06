@@ -26,6 +26,6 @@ export const UserMessage = React.memo(function UserMessage({ text, isSlashComman
             return text;
         return text;
     }, [text]);
-    return (_jsxs(Box, { flexDirection: "row", paddingLeft: 0, marginTop: 1, ...(isFocused ? {} : {}), children: [_jsx(Box, { width: 2, flexShrink: 0, children: _jsx(Text, { color: promptColor, bold: true, children: '> ' }) }), _jsx(Box, { flexGrow: 1, children: _jsx(Text, { color: textColor, bold: true, wrap: "wrap", children: displayText }) })] }));
+    return (_jsxs(Box, { flexDirection: "row", paddingLeft: 0, marginTop: 1, ...(isFocused ? {} : {}), children: [_jsx(Box, { width: 2, flexShrink: 0, children: _jsx(Text, { color: promptColor, bold: true, children: '\u276F ' }) }), _jsx(Box, { flexGrow: 1, children: _jsx(Text, { color: textColor, bold: true, wrap: "wrap", children: displayText }) })] }));
 });
 //# sourceMappingURL=user-message.js.map

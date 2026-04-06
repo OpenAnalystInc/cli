@@ -29,7 +29,7 @@ import { DefaultLayout } from './layouts/default-layout.js';
 // ---------------------------------------------------------------------------
 
 export interface AppProps {
-  /** Engine configuration. Defaults to mock mode if OA_MOCK=1 or --mock flag. */
+  /** Engine configuration. Defaults to spawning 'openanalyst' binary. */
   engineConfig?: BridgeConfig;
 }
 
@@ -40,7 +40,6 @@ export interface AppProps {
 export function App({ engineConfig }: AppProps): React.ReactElement {
   const config: BridgeConfig = engineConfig ?? {
     binaryPath: process.env['OA_ENGINE_PATH'] || 'openanalyst',
-    mock: process.env['OA_MOCK'] === '1' || process.argv.includes('--mock'),
     autoRestart: true,
     maxRestartAttempts: 3,
   };
@@ -51,7 +50,7 @@ export function App({ engineConfig }: AppProps): React.ReactElement {
         <KeypressProvider>
           <UIStateProvider>
             <ChatProvider>
-              <PlaywrightMCPProvider autoStart={!config.mock}>
+              <PlaywrightMCPProvider autoStart={true}>
                 <EngineProvider config={config}>
                   <SessionProvider>
                     <DefaultLayout />
