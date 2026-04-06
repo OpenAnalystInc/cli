@@ -9,8 +9,7 @@
  * This launcher:
  *   1. Finds the native Rust engine binary (native/ dir or system PATH)
  *   2. Launches the Ink TUI with OA_ENGINE_PATH env var
- *   3. Falls back to --mock mode if no binary found (TUI still works)
- *   4. Supports --headless flag to bypass TUI and run Rust engine directly
+ *   3. Supports --headless flag to bypass TUI and run Rust engine directly
  */
 
 const { spawn, execFileSync } = require("child_process");
@@ -130,7 +129,6 @@ if (!tuiEntry) {
 const env = {
   ...process.env,
   OA_ENGINE_PATH: binaryPath || "",
-  OA_MOCK: binaryPath ? "0" : "1",
 };
 
 const child = spawn(process.execPath, [tuiEntry, ...args], {

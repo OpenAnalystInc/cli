@@ -24,11 +24,11 @@ use events::{
     Action, AgentSpawnRequest, AgentSpawnRx, AgentStatus, AgentType,
     UiEvent, UiEventTx, ActionRx,
 };
-use runtime::PermissionMode;
+use runtime::{CompactionConfig, PermissionMode, Session};
 use tokio::sync::Mutex;
 
 use crate::registry::AgentRegistry;
-use crate::router::ModelRouter;
+use crate::router::{ActionCategory, ModelRouter, ModelTier};
 
 /// Configuration for the orchestrator.
 #[derive(Debug, Clone)]
@@ -50,6 +50,8 @@ pub struct AgentOrchestrator {
     ui_tx: UiEventTx,
     action_rx: ActionRx,
     agent_spawn_rx: Option<AgentSpawnRx>,
+    /// Persistent session shared across all turns — enables multi-turn conversation memory.
+    session: Arc<Mutex<Session>>,
 }
 
 impl AgentOrchestrator {
@@ -69,6 +71,7 @@ impl AgentOrchestrator {
             ui_tx,
             action_rx,
             agent_spawn_rx,
+            session: Arc::new(Mutex::new(Session::default())),
         }
     }
 
@@ -84,14 +87,15 @@ impl AgentOrchestrator {
                         Some(Action::PermissionResponse { request_id, allow }) => {
                             self.resolve_permission(&request_id, allow).await;
                         }
-                        Some(Action::CancelAgent(id)) => {
+                        Some(Action::CancelAgent { agent_id }) => {
+                            let id = agent_id.unwrap_or_default();
                             self.cancel_agent(&id).await;
                         }
-                        Some(Action::UpdateModel(model)) => {
+                        Some(Action::UpdateModel { model }) => {
                             self.config.model = model.clone();
                             self.router = ModelRouter::from_default_model(&model);
                         }
-                        Some(Action::UpdatePermissions(mode)) => {
+                        Some(Action::UpdatePermissions { mode }) => {
                             if let Some(pm) = parse_permission_mode(&mode) {
                                 self.config.permission_mode = pm;
                             }
@@ -99,7 +103,7 @@ impl AgentOrchestrator {
                         Some(Action::MoeDispatch { commands }) => {
                             self.handle_moe_dispatch(commands).await;
                         }
-                        Some(Action::InjectSkill(command)) => {
+                        Some(Action::InjectSkill { command }) => {
                             // Mid-task skill injection: spawn a new agent for this command
                             self.handle_skill_injection(command).await;
                         }
@@ -113,7 +117,42 @@ impl AgentOrchestrator {
                             self.resolve_ask_user(&request_id, response).await;
                         }
                         Some(Action::Quit) | None => break,
-                        Some(Action::SlashCommand(_)) => {}
+                        Some(Action::SlashCommand { command }) => {
+                            self.handle_slash_command(command).await;
+                        }
+                        Some(Action::ToggleContextFile { path, action }) => {
+                            let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                                content: format!("Context file {action}: {path}"),
+                                level: "info".to_string(),
+                            }).await;
+                        }
+                        Some(Action::ChangeRouting { category, tier }) => {
+                            if let (Some(cat), Some(t)) = (
+                                ActionCategory::from_str_opt(&category),
+                                ModelTier::from_str_opt(&tier),
+                            ) {
+                                self.router.table.set_tier(cat, t);
+                                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                                    content: format!("Routing updated: {category} -> {tier}"),
+                                    level: "info".to_string(),
+                                }).await;
+                            } else {
+                                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                                    content: format!("Invalid routing: category={category}, tier={tier}. Use explore/research/code/write + fast/balanced/capable."),
+                                    level: "warning".to_string(),
+                                }).await;
+                            }
+                        }
+                        Some(Action::ClearChat { .. }) => {
+                            {
+                                let mut guard = self.session.lock().await;
+                                *guard = Session::default();
+                            }
+                            let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                                content: "Chat cleared.".to_string(),
+                                level: "info".to_string(),
+                            }).await;
+                        }
                     }
                 }
                 spawn_req = async {
@@ -179,6 +218,7 @@ impl AgentOrchestrator {
         let agent_id_clone = agent_id.clone();
         let registry_for_handle = self.registry.clone();
         let registry_for_worker = self.registry.clone();
+        let session = self.session.clone();
 
         let handle = tokio::spawn(async move {
             let result = worker::run_agent_turn(
@@ -188,6 +228,7 @@ impl AgentOrchestrator {
                 ui_tx.clone(),
                 effective_effort,
                 registry_for_worker,
+                session,
             )
             .await;
 
@@ -279,8 +320,10 @@ impl AgentOrchestrator {
                 eprintln!("[orchestrator] TUI channel closed — event dropped");
             }
 
+            // Sub-agents get a fresh session (no persistence needed — they're one-shot tasks)
+            let sub_session = Arc::new(Mutex::new(Session::default()));
             let result =
-                worker::run_agent_turn(agent_id.clone(), task, config, ui_tx.clone(), effort_budget, registry_for_worker).await;
+                worker::run_agent_turn(agent_id.clone(), task, config, ui_tx.clone(), effort_budget, registry_for_worker, sub_session).await;
 
             match result {
                 Ok(()) => {
@@ -429,6 +472,8 @@ impl AgentOrchestrator {
                         eprintln!("[orchestrator] TUI channel closed — event dropped");
                     }
 
+                    // MOE sub-agents get fresh sessions (one-shot parallel tasks)
+                    let moe_session = Arc::new(Mutex::new(Session::default()));
                     let result = worker::run_agent_turn(
                         agent_id.clone(),
                         prompt,
@@ -436,6 +481,7 @@ impl AgentOrchestrator {
                         ui_tx.clone(),
                         effort,
                         registry.clone(),
+                        moe_session,
                     ).await;
 
                     match result {
@@ -541,9 +587,11 @@ impl AgentOrchestrator {
                 eprintln!("[orchestrator] TUI channel closed — event dropped");
             }
 
+            // Skill injection agents get fresh sessions (one-shot tasks)
+            let skill_session = Arc::new(Mutex::new(Session::default()));
             let result = worker::run_agent_turn(
                 agent_id.clone(), prompt, config, ui_tx.clone(),
-                Some(route.effort_budget), registry.clone(),
+                Some(route.effort_budget), registry.clone(), skill_session,
             ).await;
 
             match result {
@@ -572,6 +620,213 @@ impl AgentOrchestrator {
 
         let mut reg = self.registry.lock().await;
         reg.set_handle(&agent_id_for_handle, handle);
+    }
+
+    /// Handle a slash command from the TUI — routes to local handling or the commands crate.
+    async fn handle_slash_command(&mut self, command: String) {
+        let cmd_str = if command.starts_with('/') {
+            command.clone()
+        } else {
+            format!("/{command}")
+        };
+
+        let trimmed = cmd_str.trim_start_matches('/');
+        let (cmd_name, cmd_args) = match trimmed.split_once(char::is_whitespace) {
+            Some((name, args)) => (name, Some(args.trim())),
+            None => (trimmed, None),
+        };
+
+        match cmd_name {
+            "clear" => {
+                {
+                    let mut guard = self.session.lock().await;
+                    *guard = Session::default();
+                }
+                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                    content: "Chat cleared.".to_string(),
+                    level: "info".to_string(),
+                }).await;
+            }
+            "model" => {
+                if let Some(model) = cmd_args {
+                    self.config.model = model.to_string();
+                    self.router = ModelRouter::from_default_model(model);
+                    let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                        content: format!("Model changed to: {model}"),
+                        level: "info".to_string(),
+                    }).await;
+                    let _ = self.ui_tx.send(UiEvent::ModelInfo {
+                        name: model.to_string(),
+                        provider: String::new(),
+                    }).await;
+                } else {
+                    let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                        content: format!("Current model: {}", self.config.model),
+                        level: "info".to_string(),
+                    }).await;
+                }
+            }
+            "help" => {
+                let help_text = commands::render_slash_command_help();
+                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                    content: help_text,
+                    level: "info".to_string(),
+                }).await;
+            }
+            "version" => {
+                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                    content: format!("OpenAnalyst CLI v{}", env!("CARGO_PKG_VERSION")),
+                    level: "info".to_string(),
+                }).await;
+            }
+            "compact" => {
+                let msg = {
+                    let guard = self.session.lock().await;
+                    let before = guard.messages.len();
+                    let compact_config = CompactionConfig::default();
+                    let result = runtime::compact_session(&guard, compact_config);
+                    if result.removed_message_count == 0 {
+                        "Compaction skipped: session is below the compaction threshold.".to_string()
+                    } else {
+                        // Apply the compacted session
+                        drop(guard);
+                        let mut guard = self.session.lock().await;
+                        let after_count = result.compacted_session.messages.len();
+                        *guard = result.compacted_session;
+                        format!("Session compacted: {before} -> {after_count} messages")
+                    }
+                };
+                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                    content: msg,
+                    level: "info".to_string(),
+                }).await;
+            }
+            "status" => {
+                let guard = self.session.lock().await;
+                let msg_count = guard.messages.len();
+                let estimated_tokens = runtime::estimate_session_tokens(&guard);
+                drop(guard);
+                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                    content: format!(
+                        "Session: {} messages, ~{} tokens\nModel: {}\nPermission mode: {:?}",
+                        msg_count, estimated_tokens, self.config.model, self.config.permission_mode
+                    ),
+                    level: "info".to_string(),
+                }).await;
+            }
+            "cost" => {
+                let guard = self.session.lock().await;
+                let estimated_tokens = runtime::estimate_session_tokens(&guard);
+                drop(guard);
+                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                    content: format!("Session tokens (estimated): {estimated_tokens}"),
+                    level: "info".to_string(),
+                }).await;
+            }
+            "permissions" => {
+                if let Some(mode_str) = cmd_args {
+                    if let Some(pm) = parse_permission_mode(mode_str) {
+                        self.config.permission_mode = pm;
+                        let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                            content: format!("Permission mode changed to: {mode_str}"),
+                            level: "info".to_string(),
+                        }).await;
+                    } else {
+                        let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                            content: format!("Unknown permission mode: {mode_str}. Use: read-only, workspace-write, danger-full-access, prompt, allow."),
+                            level: "warning".to_string(),
+                        }).await;
+                    }
+                } else {
+                    let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                        content: format!("Current permission mode: {:?}", self.config.permission_mode),
+                        level: "info".to_string(),
+                    }).await;
+                }
+            }
+            "route" => {
+                let table = self.router.render_table();
+                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                    content: table,
+                    level: "info".to_string(),
+                }).await;
+            }
+            "effort" => {
+                if let Some(args) = cmd_args {
+                    // Parse: "/effort <level>" (global) or "/effort <category> <level>"
+                    let parts: Vec<&str> = args.split_whitespace().collect();
+                    match parts.len() {
+                        1 => {
+                            if let Some(effort) = crate::router::EffortLevel::from_str_opt(parts[0]) {
+                                self.router.table.set_effort_all(effort);
+                                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                                    content: format!("Effort set to {} for all categories.", effort),
+                                    level: "info".to_string(),
+                                }).await;
+                            } else {
+                                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                                    content: format!("Unknown effort level: {}. Use: low, medium, high, max.", parts[0]),
+                                    level: "warning".to_string(),
+                                }).await;
+                            }
+                        }
+                        2 => {
+                            if let (Some(cat), Some(effort)) = (
+                                ActionCategory::from_str_opt(parts[0]),
+                                crate::router::EffortLevel::from_str_opt(parts[1]),
+                            ) {
+                                self.router.table.set_effort(cat, effort);
+                                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                                    content: format!("Effort for {} set to {}.", cat, effort),
+                                    level: "info".to_string(),
+                                }).await;
+                            } else {
+                                let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                                    content: "Usage: /effort <level> or /effort <category> <level>".to_string(),
+                                    level: "warning".to_string(),
+                                }).await;
+                            }
+                        }
+                        _ => {
+                            let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                                content: "Usage: /effort <level> or /effort <category> <level>".to_string(),
+                                level: "warning".to_string(),
+                            }).await;
+                        }
+                    }
+                } else {
+                    let table = self.router.render_table();
+                    let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                        content: table,
+                        level: "info".to_string(),
+                    }).await;
+                }
+            }
+            _ => {
+                // For all other commands, try the commands crate
+                let session_guard = self.session.lock().await;
+                let compact_config = CompactionConfig::default();
+                if let Some(result) = commands::handle_slash_command(&cmd_str, &session_guard, compact_config) {
+                    // If the command returned a modified session, apply it
+                    let new_session = result.session;
+                    drop(session_guard);
+                    {
+                        let mut guard = self.session.lock().await;
+                        *guard = new_session;
+                    }
+                    let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                        content: result.message,
+                        level: "info".to_string(),
+                    }).await;
+                } else {
+                    drop(session_guard);
+                    let _ = self.ui_tx.send(UiEvent::SystemMessage {
+                        content: format!("Unknown command: /{cmd_name}. Type /help for available commands."),
+                        level: "warning".to_string(),
+                    }).await;
+                }
+            }
+        }
     }
 }
 

@@ -2,7 +2,7 @@
  * Entry point — renders the Ink TUI app.
  *
  * Handles:
- *   - CLI argument parsing (--mock for development mode)
+ *   - CLI argument parsing
  *   - Graceful shutdown on Ctrl+C / SIGTERM
  *   - Uncaught error handling
  */
@@ -16,14 +16,11 @@ import type { BridgeConfig } from './engine/index.js';
 // CLI argument parsing
 // ---------------------------------------------------------------------------
 
-const args = process.argv.slice(2);
-const isMock = args.includes('--mock') || process.env['OA_MOCK'] === '1';
 const enginePath = process.env['OA_ENGINE_PATH'] || 'openanalyst';
 
 const engineConfig: BridgeConfig = {
   binaryPath: enginePath,
-  mock: isMock,
-  autoRestart: !isMock,
+  autoRestart: true,
   maxRestartAttempts: 3,
 };
 

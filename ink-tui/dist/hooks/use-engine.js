@@ -9,12 +9,10 @@
  * - Provides typed action methods (sendPrompt, cancelAgent, etc.)
  * - Handles process crash with optional auto-restart
  * - Tracks connection state: connecting | connected | disconnected | error
- * - Mock mode for UI development without a real engine
  */
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
-import { EventEmitter } from 'node:events';
 import { EngineEventSchema, } from '../types/messages.js';
 // ---------------------------------------------------------------------------
 // Timestamp helper
@@ -36,7 +34,6 @@ export function useEngine(config = {}, handlers = {}) {
     const restartCountRef = useRef(0);
     const handlersRef = useRef(handlers);
     const configRef = useRef(config);
-    const mockEmitterRef = useRef(null);
     // Keep refs up to date
     handlersRef.current = handlers;
     configRef.current = config;
@@ -67,11 +64,6 @@ export function useEngine(config = {}, handlers = {}) {
     }, []);
     // -- Send a raw JSON line to the engine stdin --
     const send = useCallback((jsonLine) => {
-        if (configRef.current.mock && mockEmitterRef.current) {
-            // In mock mode, emit to the mock emitter so the mock engine can react
-            mockEmitterRef.current.emit('action', jsonLine);
-            return;
-        }
         const proc = processRef.current;
         if (proc?.stdin?.writable) {
             proc.stdin.write(jsonLine);
@@ -99,10 +91,8 @@ export function useEngine(config = {}, handlers = {}) {
     // -- Spawn the real engine process --
     const spawnEngine = useCallback(() => {
         const cfg = configRef.current;
-        if (cfg.mock)
-            return; // Don't spawn in mock mode
         const binaryPath = cfg.binaryPath ?? 'openanalyst';
-        const args = cfg.args ?? ['--json-rpc'];
+        const args = cfg.args ?? ['--headless'];
         setConnectionState('connecting');
         handlersRef.current.onConnectionStateChange?.('connecting');
         const proc = spawn(binaryPath, args, {
@@ -175,49 +165,9 @@ export function useEngine(config = {}, handlers = {}) {
             }
         });
     }, [processLine, dispatchEvent]);
-    // -- Start mock engine --
-    const startMock = useCallback(() => {
-        const emitter = new EventEmitter();
-        mockEmitterRef.current = emitter;
-        setConnectionState('connected');
-        handlersRef.current.onConnectionStateChange?.('connected');
-        // Emit a banner on start
-        setTimeout(() => {
-            dispatchEvent({
-                type: 'banner',
-                timestamp: now(),
-                version: '2.0.12',
-                displayName: 'Developer',
-                email: 'dev@openanalyst.ai',
-                provider: 'OpenAnalyst Inc',
-                modelDisplay: 'oa-4-turbo (mock)',
-                workingDir: process.cwd(),
-                tips: [
-                    'This is mock mode — no real engine is running',
-                    'Type a prompt to see simulated streaming',
-                    'Ctrl+P to cycle permission modes',
-                ],
-            });
-        }, 100);
-        // React to TUI actions in mock mode
-        emitter.on('action', (jsonLine) => {
-            try {
-                const action = JSON.parse(jsonLine);
-                handleMockAction(action, dispatchEvent);
-            }
-            catch {
-                // Ignore parse errors in mock mode
-            }
-        });
-    }, [dispatchEvent]);
     // -- Lifecycle: spawn on mount, kill on unmount --
     useEffect(() => {
-        if (configRef.current.mock) {
-            startMock();
-        }
-        else {
-            spawnEngine();
-        }
+        spawnEngine();
         return () => {
             // Cleanup
             rlRef.current?.close();
@@ -230,7 +180,6 @@ export function useEngine(config = {}, handlers = {}) {
                         proc.kill('SIGKILL');
                 }, 2000);
             }
-            mockEmitterRef.current?.removeAllListeners();
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -259,15 +208,9 @@ export function useEngine(config = {}, handlers = {}) {
             proc.kill('SIGTERM');
         }
         rlRef.current?.close();
-        mockEmitterRef.current?.removeAllListeners();
         restartCountRef.current = 0;
-        if (configRef.current.mock) {
-            startMock();
-        }
-        else {
-            spawnEngine();
-        }
-    }, [spawnEngine, startMock]);
+        spawnEngine();
+    }, [spawnEngine]);
     return {
         connectionState,
         sendPrompt,
@@ -286,211 +229,6 @@ export function useEngine(config = {}, handlers = {}) {
         injectSkill,
         quit,
         restart,
-    };
-}
-function handleMockAction(action, dispatch) {
-    switch (action.type) {
-        case 'submit_prompt': {
-            const text = action.text ?? '';
-            simulateResponse(text, dispatch);
-            break;
-        }
-        case 'cancel_agent': {
-            dispatch({
-                type: 'system_message',
-                timestamp: now(),
-                content: 'Agent cancelled (mock)',
-                level: 'info',
-            });
-            dispatch({
-                type: 'status_update',
-                timestamp: now(),
-                phase: 'idle',
-                elapsedMs: 0,
-            });
-            break;
-        }
-        case 'permission_response': {
-            dispatch({
-                type: 'system_message',
-                timestamp: now(),
-                content: `Permission ${action.allow ? 'allow' : 'deny'}ed (mock)`,
-                level: 'info',
-            });
-            break;
-        }
-        case 'ask_user_response': {
-            dispatch({
-                type: 'system_message',
-                timestamp: now(),
-                content: `User responded: "${action.response}" (mock)`,
-                level: 'info',
-            });
-            break;
-        }
-        case 'clear_chat': {
-            dispatch({
-                type: 'system_message',
-                timestamp: now(),
-                content: 'Chat cleared (mock)',
-                level: 'info',
-            });
-            break;
-        }
-        default:
-            break;
-    }
-}
-/**
- * Simulate a full response cycle: thinking -> tool call -> streaming -> done.
- */
-function simulateResponse(prompt, dispatch) {
-    const agentId = 'mock-primary';
-    let elapsed = 0;
-    // Phase: thinking
-    dispatch({
-        type: 'status_update',
-        timestamp: now(),
-        phase: 'thinking',
-        elapsedMs: 0,
-    });
-    // Simulate a tool call after 300ms
-    setTimeout(() => {
-        elapsed = 300;
-        dispatch({
-            type: 'tool_call_start',
-            timestamp: now(),
-            agentId,
-            callId: 'mock-tool-1',
-            toolName: 'Read',
-            inputPreview: 'src/index.ts',
-        });
-        dispatch({
-            type: 'status_update',
-            timestamp: now(),
-            phase: 'reading_file',
-            label: 'index.ts',
-            elapsedMs: elapsed,
-        });
-    }, 300);
-    // Complete tool call after 600ms
-    setTimeout(() => {
-        elapsed = 600;
-        dispatch({
-            type: 'tool_call_end',
-            timestamp: now(),
-            agentId,
-            callId: 'mock-tool-1',
-            isError: false,
-            output: '// Entry point\nimport { App } from "./app";\n// ...',
-            duration: 280,
-        });
-        dispatch({
-            type: 'status_update',
-            timestamp: now(),
-            phase: 'thinking',
-            elapsedMs: elapsed,
-        });
-    }, 600);
-    // Stream response chunks starting at 800ms
-    const responseText = `I've read the file. Here's what I found regarding "${prompt}":\n\nThe project is structured as a standard TypeScript application with React components rendered via Ink for terminal UI.\n\n**Key observations:**\n- Entry point initializes the Ink renderer\n- App component manages the layout tree\n- All communication with the engine happens through JSON-RPC over stdin/stdout`;
-    const words = responseText.split(' ');
-    let wordIndex = 0;
-    const streamInterval = setInterval(() => {
-        if (wordIndex >= words.length) {
-            clearInterval(streamInterval);
-            // Stream end
-            dispatch({
-                type: 'stream_delta',
-                timestamp: now(),
-                agentId,
-                text: '',
-            });
-            dispatch({
-                type: 'stream_end',
-                timestamp: now(),
-                agentId,
-            });
-            dispatch({
-                type: 'status_update',
-                timestamp: now(),
-                phase: 'done',
-                elapsedMs: elapsed,
-            });
-            dispatch({
-                type: 'usage_update',
-                timestamp: now(),
-                agentId,
-                inputTokens: 1250,
-                outputTokens: words.length * 2,
-            });
-            // Return to idle after 1s
-            setTimeout(() => {
-                dispatch({
-                    type: 'status_update',
-                    timestamp: now(),
-                    phase: 'idle',
-                    elapsedMs: 0,
-                });
-            }, 1000);
-            return;
-        }
-        const chunk = (wordIndex === 0 ? '' : ' ') + words[wordIndex];
-        elapsed += 50;
-        dispatch({
-            type: 'stream_delta',
-            timestamp: now(),
-            agentId,
-            text: chunk,
-        });
-        wordIndex++;
-    }, 50);
-    // Start streaming after tool call completes
-    setTimeout(() => {
-        // The interval already started above but won't begin emitting until 800ms
-    }, 800);
-}
-/**
- * Create a standalone mock engine instance for testing and UI development.
- * This is not a React hook — use it in test files or non-React contexts.
- */
-export function createMockEngine() {
-    const emitter = new EventEmitter();
-    const handlers = new Set();
-    const dispatch = (event) => {
-        for (const handler of handlers) {
-            handler(event);
-        }
-    };
-    // Emit banner on creation
-    setTimeout(() => {
-        dispatch({
-            type: 'banner',
-            timestamp: now(),
-            version: '2.0.12',
-            displayName: 'Mock User',
-            email: 'mock@openanalyst.ai',
-            provider: 'OpenAnalyst Inc',
-            modelDisplay: 'oa-4-turbo (mock)',
-            workingDir: '/mock/workspace',
-            tips: ['Mock engine active', 'Use engine.send() to simulate actions'],
-        });
-    }, 0);
-    return {
-        emit: dispatch,
-        on(handler) {
-            handlers.add(handler);
-            return () => {
-                handlers.delete(handler);
-            };
-        },
-        send(action) {
-            handleMockAction(action, dispatch);
-        },
-        dispose() {
-            handlers.clear();
-            emitter.removeAllListeners();
-        },
     };
 }
 //# sourceMappingURL=use-engine.js.map

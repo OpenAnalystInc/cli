@@ -15,7 +15,7 @@
 import React from 'react';
 import { type BridgeConfig } from './engine/index.js';
 export interface AppProps {
-    /** Engine configuration. Defaults to mock mode if OA_MOCK=1 or --mock flag. */
+    /** Engine configuration. Defaults to spawning 'openanalyst' binary. */
     engineConfig?: BridgeConfig;
 }
 export declare function App({ engineConfig }: AppProps): React.ReactElement;

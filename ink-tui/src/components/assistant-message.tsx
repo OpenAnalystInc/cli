@@ -7,8 +7,9 @@
  */
 
 import React from 'react';
-import { Box } from 'ink';
+import { Box, Text } from 'ink';
 import { MarkdownRenderer } from './markdown-renderer.js';
+import { useTheme } from '../contexts/theme-context.js';
 
 // ---------------------------------------------------------------------------
 // Props
@@ -32,14 +33,21 @@ export const AssistantMessage = React.memo(function AssistantMessage({
   streaming,
   isFocused,
 }: AssistantMessageProps): React.ReactElement {
+  const { colors } = useTheme();
+
   return (
     <Box
-      flexDirection="column"
-      paddingLeft={2}
+      flexDirection="row"
       marginTop={0}
       {...(isFocused ? {} : {})}
     >
-      <MarkdownRenderer content={content} isStreaming={streaming} />
+      {/* Leading bullet — Claude Code style indicator */}
+      <Box width={2} flexShrink={0}>
+        <Text color={colors.text.accent}>{'\u25CF'} </Text>
+      </Box>
+      <Box flexDirection="column" flexGrow={1}>
+        <MarkdownRenderer content={content} isStreaming={streaming} />
+      </Box>
     </Box>
   );
 });

@@ -40,18 +40,18 @@ export const SystemMessage = React.memo(function SystemMessage({ text, level, is
         case 'error':
             bulletColor = colors.status.error;
             textColor = colors.status.error;
-            bullet = '\u25cf'; // filled circle
+            bullet = '\u2717'; // ✗
             break;
         case 'warning':
             bulletColor = colors.status.warning;
             textColor = colors.status.warning;
-            bullet = '\u25cf';
+            bullet = '\u26A0'; // ⚠
             break;
         case 'info':
         default:
             bulletColor = colors.text.secondary;
             textColor = colors.text.secondary;
-            bullet = '\u25cf';
+            bullet = '\u2139'; // ℹ
             break;
     }
     return (_jsxs(Box, { flexDirection: "row", paddingLeft: 0, marginTop: 0, ...(isFocused ? {} : {}), children: [_jsx(Box, { width: 2, flexShrink: 0, children: _jsxs(Text, { color: bulletColor, children: [bullet, " "] }) }), _jsx(Box, { flexGrow: 1, children: _jsx(Text, { color: textColor, dimColor: level === 'info', wrap: "wrap", children: text }) })] }));

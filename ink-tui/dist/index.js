@@ -4,13 +4,10 @@ import { App } from './app.js';
 // ---------------------------------------------------------------------------
 // CLI argument parsing
 // ---------------------------------------------------------------------------
-const args = process.argv.slice(2);
-const isMock = args.includes('--mock') || process.env['OA_MOCK'] === '1';
 const enginePath = process.env['OA_ENGINE_PATH'] || 'openanalyst';
 const engineConfig = {
     binaryPath: enginePath,
-    mock: isMock,
-    autoRestart: !isMock,
+    autoRestart: true,
     maxRestartAttempts: 3,
 };
 // ---------------------------------------------------------------------------

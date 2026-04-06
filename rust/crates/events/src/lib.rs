@@ -249,6 +249,67 @@ pub enum UiEvent {
         default: Option<String>,
     },
 
+    // ── Status & System ──
+    /// Status update — phase changes (thinking, reading_file, idle, done, error).
+    #[serde(rename_all = "camelCase")]
+    StatusUpdate {
+        phase: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        label: Option<String>,
+        elapsed_ms: u64,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tokens_remaining: Option<u64>,
+    },
+
+    /// System message — errors, warnings, info displayed in the TUI.
+    #[serde(rename_all = "camelCase")]
+    SystemMessage {
+        content: String,
+        level: String, // "error" | "warning" | "info"
+    },
+
+    /// Banner — startup information sent once on connect.
+    #[serde(rename_all = "camelCase")]
+    Banner {
+        version: String,
+        display_name: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        email: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        organization: Option<String>,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        provider: Option<String>,
+        model_display: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        credits: Option<String>,
+        working_dir: String,
+        #[serde(skip_serializing_if = "Option::is_none")]
+        tips: Option<Vec<String>>,
+    },
+
+    /// Sidebar update — agents, files, plans, routing, activity.
+    #[serde(rename_all = "camelCase")]
+    SidebarUpdate {
+        agents: Vec<serde_json::Value>,
+        files: Vec<serde_json::Value>,
+        plans: Vec<serde_json::Value>,
+        routing: serde_json::Value,
+        activity: serde_json::Value,
+    },
+
+    /// Model info update.
+    #[serde(rename_all = "camelCase")]
+    ModelInfo {
+        name: String,
+        provider: String,
+    },
+
+    /// Context files changed.
+    #[serde(rename_all = "camelCase")]
+    ContextFilesUpdate {
+        files: Vec<serde_json::Value>,
+    },
+
     // ── Animation ──
     /// Periodic tick for spinner animations and elapsed time updates.
     /// Skipped in headless mode — not serialized to stdout.
@@ -305,13 +366,25 @@ pub enum Action {
         allow: bool,
     },
     /// User requested cancellation of an agent.
-    CancelAgent(AgentId),
+    #[serde(rename_all = "camelCase")]
+    CancelAgent {
+        agent_id: Option<AgentId>,
+    },
     /// User issued a slash command.
-    SlashCommand(String),
+    #[serde(rename_all = "camelCase")]
+    SlashCommand {
+        command: String,
+    },
     /// User changed the default model — update orchestrator config + router.
-    UpdateModel(String),
+    #[serde(rename_all = "camelCase")]
+    UpdateModel {
+        model: String,
+    },
     /// User changed the permission mode.
-    UpdatePermissions(String),
+    #[serde(rename_all = "camelCase")]
+    UpdatePermissions {
+        mode: String,
+    },
     /// MOE dispatch — multiple chained commands to run as parallel agents.
     #[serde(rename_all = "camelCase")]
     MoeDispatch {
@@ -319,7 +392,10 @@ pub enum Action {
         commands: Vec<String>,
     },
     /// Mid-task skill injection — run a slash command while agents are working.
-    InjectSkill(String),
+    #[serde(rename_all = "camelCase")]
+    InjectSkill {
+        command: String,
+    },
     /// Voice transcription completed — place text in input box for review.
     #[serde(rename_all = "camelCase")]
     VoiceTranscribed { text: String },
@@ -337,6 +413,20 @@ pub enum Action {
         request_id: String,
         response: String,
     },
+    /// User toggled a context file on/off.
+    #[serde(rename_all = "camelCase")]
+    ToggleContextFile {
+        path: String,
+        action: String,
+    },
+    /// User changed the routing configuration.
+    #[serde(rename_all = "camelCase")]
+    ChangeRouting {
+        category: String,
+        tier: String,
+    },
+    /// User cleared the chat history.
+    ClearChat {},
     /// User requested to quit.
     Quit,
 }

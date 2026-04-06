@@ -26,6 +26,7 @@ const STREAM_EVENT_TIMEOUT: Duration = Duration::from_secs(30);
 ///
 /// Uses `spawn_blocking` to bridge the sync `ConversationRuntime` to the async world.
 /// A dedicated tokio runtime is created inside the blocking thread for async API calls.
+/// The `session` parameter enables persistent multi-turn conversation memory.
 pub async fn run_agent_turn(
     agent_id: AgentId,
     prompt: String,
@@ -33,9 +34,10 @@ pub async fn run_agent_turn(
     ui_tx: UiEventTx,
     effort_budget: Option<u32>,
     registry: Arc<Mutex<AgentRegistry>>,
+    session: Arc<Mutex<runtime::Session>>,
 ) -> Result<(), String> {
     let result = tokio::task::spawn_blocking(move || {
-        run_turn_blocking(agent_id, &prompt, &config, &ui_tx, effort_budget, registry)
+        run_turn_blocking(agent_id, &prompt, &config, &ui_tx, effort_budget, registry, session)
     })
     .await;
 
@@ -54,9 +56,10 @@ fn run_turn_blocking(
     ui_tx: &UiEventTx,
     effort_budget: Option<u32>,
     registry: Arc<Mutex<AgentRegistry>>,
+    session_mutex: Arc<Mutex<runtime::Session>>,
 ) -> Result<(), String> {
     use plugins::{PluginManager, PluginManagerConfig};
-    use runtime::{ConfigLoader, ConversationRuntime, Session};
+    use runtime::{ConfigLoader, ConversationRuntime};
     use tools::GlobalToolRegistry;
 
     // Load configuration
@@ -105,6 +108,12 @@ fn run_turn_blocking(
         LoopDetectionService::new(config.max_turns.unwrap_or(200))
     ));
 
+    // Shared queue for call_ids: API client pushes when ToolCallStart is emitted,
+    // executor pops when ToolCallEnd is emitted. This bridges the gap between
+    // the API streaming layer (which knows call_ids) and the tool executor (which doesn't).
+    let pending_call_ids: std::sync::Arc<std::sync::Mutex<Vec<String>>> =
+        std::sync::Arc::new(std::sync::Mutex::new(Vec::new()));
+
     // Create channel-based implementations
     let api_client = ChannelApiClient {
         agent_id: agent_id.clone(),
@@ -116,6 +125,7 @@ fn run_turn_blocking(
         ui_tx: ui_tx.clone(),
         effort_budget,
         _loop_detector: loop_detector.clone(),
+        pending_call_ids: pending_call_ids.clone(),
     };
 
     let tool_executor = ChannelToolExecutor {
@@ -125,12 +135,26 @@ fn run_turn_blocking(
         mcp_connections,
         loop_detector,
         registry: registry.clone(),
+        pending_call_ids,
     };
 
     let permission_policy = runtime::PermissionPolicy::new(config.permission_mode);
 
-    // Build the conversation runtime
-    let session = Session::default();
+    // Emit StatusUpdate: thinking phase starts
+    let _ = ui_tx.blocking_send(UiEvent::StatusUpdate {
+        phase: "thinking".to_string(),
+        label: Some(truncate_utf8(prompt, 60)),
+        elapsed_ms: 0,
+        tokens_remaining: None,
+    });
+
+    // Clone the persistent session for this turn (preserves multi-turn conversation memory)
+    let session = {
+        let guard = session_mutex.blocking_lock();
+        guard.clone()
+    };
+
+    // Build the conversation runtime with the persistent session
     let mut runtime = ConversationRuntime::new_with_features(
         session,
         api_client,
@@ -148,11 +172,26 @@ fn run_turn_blocking(
         registry,
     };
 
-    let _summary = runtime
+    let result = runtime
         .run_turn(prompt, Some(&mut prompter))
-        .map_err(|e| e.to_string())?;
+        .map_err(|e| e.to_string());
 
-    Ok(())
+    // Save the updated session back (with the new user message + assistant response)
+    {
+        let updated_session = runtime.into_session();
+        let mut guard = session_mutex.blocking_lock();
+        *guard = updated_session;
+    }
+
+    // Emit StatusUpdate: idle (turn complete)
+    let _ = ui_tx.blocking_send(UiEvent::StatusUpdate {
+        phase: "idle".to_string(),
+        label: None,
+        elapsed_ms: 0,
+        tokens_remaining: None,
+    });
+
+    result.map(|_| ())
 }
 
 // ── Channel-based ApiClient ──
@@ -169,6 +208,9 @@ struct ChannelApiClient {
     ui_tx: UiEventTx,
     effort_budget: Option<u32>,
     _loop_detector: std::sync::Arc<std::sync::Mutex<LoopDetectionService>>,
+    /// Shared queue: API client pushes call_ids here when emitting ToolCallStart,
+    /// executor pops them when emitting ToolCallEnd.
+    pending_call_ids: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
 }
 
 impl ApiClient for ChannelApiClient {
@@ -176,6 +218,14 @@ impl ApiClient for ChannelApiClient {
         use api::{
             ContentBlockDelta, MessageRequest, StreamEvent as ApiStreamEvent, ToolDefinition,
         };
+
+        // Emit StatusUpdate: API call starting
+        let _ = self.ui_tx.try_send(UiEvent::StatusUpdate {
+            phase: "thinking".to_string(),
+            label: None,
+            elapsed_ms: 0,
+            tokens_remaining: None,
+        });
 
         let tool_defs: Vec<ToolDefinition> = self
             .tool_registry
@@ -258,6 +308,10 @@ impl ApiClient for ChannelApiClient {
                             },
                             ApiStreamEvent::ContentBlockStop(_) => {
                                 if let Some((id, name, input)) = pending_tool.take() {
+                                    // Push call_id to shared queue for the executor to pop later
+                                    if let Ok(mut ids) = self.pending_call_ids.lock() {
+                                        ids.push(id.clone());
+                                    }
                                     let _ = ui_tx.try_send(UiEvent::ToolCallStart {
                                         agent_id: agent_id.clone(),
                                         call_id: id.clone(),
@@ -325,10 +379,20 @@ struct ChannelToolExecutor {
     mcp_connections: Vec<runtime::mcp_bridge::McpConnection>,
     loop_detector: std::sync::Arc<std::sync::Mutex<LoopDetectionService>>,
     registry: std::sync::Arc<Mutex<AgentRegistry>>,
+    /// Shared queue: pops call_ids pushed by the API client's ToolCallStart emission.
+    pending_call_ids: std::sync::Arc<std::sync::Mutex<Vec<String>>>,
 }
 
 impl ToolExecutor for ChannelToolExecutor {
     fn execute(&mut self, tool_name: &str, input: &str) -> Result<String, ToolError> {
+        // Emit StatusUpdate: tool execution phase
+        let _ = self.ui_tx.blocking_send(UiEvent::StatusUpdate {
+            phase: tool_name.to_string(),
+            label: Some(truncate_utf8(input, 40)),
+            elapsed_ms: 0,
+            tokens_remaining: None,
+        });
+
         // Loop detection: check for repeated identical tool calls
         {
             if let Ok(mut detector) = self.loop_detector.lock() {
@@ -412,7 +476,7 @@ impl ToolExecutor for ChannelToolExecutor {
             // Send tool completion to TUI
             let _ = self.ui_tx.blocking_send(UiEvent::ToolCallEnd {
                 agent_id: self.agent_id.clone(),
-                call_id: String::new(),
+                call_id: self.pop_call_id(),
                 output: format!("User answered: {response}"),
                 is_error: false,
                 duration: start.elapsed(),
@@ -468,7 +532,7 @@ impl ToolExecutor for ChannelToolExecutor {
         // Send tool completion event to TUI
         if self.ui_tx.blocking_send(UiEvent::ToolCallEnd {
             agent_id: self.agent_id.clone(),
-            call_id: String::new(),
+            call_id: self.pop_call_id(),
             output: truncate_utf8(&output, 500),
             is_error,
             duration,
@@ -486,6 +550,20 @@ impl ToolExecutor for ChannelToolExecutor {
 }
 
 impl ChannelToolExecutor {
+    /// Pop the next call_id from the shared queue (pushed by API client's ToolCallStart).
+    /// Falls back to a generated ID if the queue is empty (shouldn't happen in normal flow).
+    fn pop_call_id(&self) -> String {
+        if let Ok(mut ids) = self.pending_call_ids.lock() {
+            if !ids.is_empty() {
+                return ids.remove(0);
+            }
+        }
+        format!("tool-{}-{}", self.agent_id, std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_millis())
+    }
+
     /// Execute an MCP tool by finding its server connection and dispatching the call.
     fn execute_mcp_tool(&mut self, tool_name: &str, input: &serde_json::Value) -> Result<String, String> {
         for conn in &mut self.mcp_connections {

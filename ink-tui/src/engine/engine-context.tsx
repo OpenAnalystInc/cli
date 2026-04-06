@@ -2,7 +2,7 @@
  * EngineProvider — React context that connects the EngineBridge to the UI.
  *
  * This is the integration glue. It:
- *   1. Creates an EngineBridge on mount (real or mock based on config)
+ *   1. Creates an EngineBridge on mount (connects to Rust engine)
  *   2. Listens to bridge 'event' emissions
  *   3. Maps each EngineEvent to the appropriate ChatActions and UIActions calls
  *   4. Exposes the bridge and convenience methods via useEngine()

@@ -89,12 +89,40 @@ export function StatusBar(): React.ReactElement {
     tokensRemaining,
     mode,
     voiceRecording,
+    sidebarAgents,
   } = useUIState();
   const { colors } = useTheme();
 
   // Track whether the "done" checkmark is still visible (auto-hides after 2s).
   const [showDone, setShowDone] = useState(false);
   const doneTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Track "cooked" time: the duration of the last active phase.
+  const [lastCookedMs, setLastCookedMs] = useState<number | null>(null);
+  const turnStartRef = useRef<number | null>(null);
+  const prevPhaseRef = useRef<AgentPhase>(phase);
+
+  useEffect(() => {
+    const prevPhase = prevPhaseRef.current;
+    prevPhaseRef.current = phase;
+
+    // When entering an active phase, record the start time.
+    if (isActivePhase(phase) && !isActivePhase(prevPhase)) {
+      turnStartRef.current = Date.now();
+      setLastCookedMs(null);
+    }
+
+    // When leaving an active phase for done/idle, capture elapsed.
+    if (!isActivePhase(phase) && isActivePhase(prevPhase) && turnStartRef.current != null) {
+      setLastCookedMs(Date.now() - turnStartRef.current);
+      turnStartRef.current = null;
+    }
+
+    // When entering a NEW active phase from idle/done, clear the cooked display.
+    if (isActivePhase(phase) && (prevPhase === 'idle' || prevPhase === 'done')) {
+      setLastCookedMs(null);
+    }
+  }, [phase]);
 
   useEffect(() => {
     if (phase === 'done') {
@@ -116,6 +144,11 @@ export function StatusBar(): React.ReactElement {
   const active = isActivePhase(phase);
   const hints = getHints(mode, phase);
 
+  // Count background agents currently running.
+  const runningAgentCount = sidebarAgents.filter(
+    (a) => a.status === 'Running',
+  ).length;
+
   // -- Left side --
   let leftContent: React.ReactElement | null = null;
 
@@ -130,19 +163,28 @@ export function StatusBar(): React.ReactElement {
     const tokenPart = tokensRemaining != null
       ? ` \u00B7 \u2193 ${formatTokens(tokensRemaining)} tokens`
       : '';
-    const statsStr = `(${elapsed}${tokenPart})`;
+    const agentPart = runningAgentCount > 0
+      ? ` \u00B7 ${runningAgentCount} agent${runningAgentCount > 1 ? 's' : ''} running`
+      : '';
+    const statsStr = `(${elapsed}${tokenPart}${agentPart})`;
 
     leftContent = (
       <Box>
+        <Text color={colors.text.accent}>{'\u273B'} </Text>
         <OaSpinner active label={phaseLabel || 'Working...'} />
         <Text color={colors.text.secondary}> {statsStr}</Text>
       </Box>
     );
-  } else if (phase === 'done' && showDone) {
+  } else if ((phase === 'done' && showDone) || (phase === 'idle' && lastCookedMs != null)) {
+    const cookedStr = formatElapsed(lastCookedMs ?? 0);
+    const agentPart = runningAgentCount > 0
+      ? ` \u00B7 ${runningAgentCount} agent${runningAgentCount > 1 ? 's' : ''} still running`
+      : '';
     leftContent = (
-      <Text color={colors.status.done} bold>
-        {'\u2713'} Done
-      </Text>
+      <Box>
+        <Text color={colors.status.done}>{'\u273B'}</Text>
+        <Text color={colors.text.secondary}> Cooked for {cookedStr}{agentPart}</Text>
+      </Box>
     );
   } else if (phase === 'error') {
     leftContent = (
