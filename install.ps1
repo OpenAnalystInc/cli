@@ -104,7 +104,16 @@ if (-not $Downloaded) {
     exit 1
 }
 
-# ── Step 2: PATH ──
+# ── Step 2: Install npm package (TUI + proper entry point) ──
+Dim "   "; Acc "$([char]0x203A)"; Dim " Installing TUI package..."
+try {
+    $npmOutput = npm install -g @openanalystinc/openanalyst-cli@$Version 2>&1
+    Write-Host " " -NoNewline; Grn "$([char]0x2713)"; Dim " npm package installed"; Nl
+} catch {
+    Write-Host " " -NoNewline; Yl "npm install skipped"; Nl
+}
+
+# ── Step 3: PATH ──
 Dim "   "; Acc "$([char]0x203A)"; Dim " Configuring PATH..."
 $CurrentPath = [Environment]::GetEnvironmentVariable("Path", "User")
 if ($CurrentPath -notlike "*$InstallDir*") {

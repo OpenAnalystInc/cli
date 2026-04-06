@@ -2741,29 +2741,22 @@ fn run_tui(
     allowed_tools: Option<AllowedToolSet>,
     permission_mode: PermissionMode,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // Launch the TUI via the npm package (npx runs the Ink TUI which
-    // spawns this binary in --headless mode for the engine bridge).
-    let npx_result = std::process::Command::new(if cfg!(windows) { "npx.cmd" } else { "npx" })
-        .args(["@openanalystinc/openanalyst-cli"])
-        .status();
-
-    match npx_result {
-        Ok(status) if status.success() => Ok(()),
-        Ok(_) => {
-            // npx failed — fall back to headless mode
-            run_headless(model, allowed_tools, permission_mode)
-        }
-        Err(_) => {
-            // npx not found — fall back to headless mode
-            eprintln!();
-            eprintln!("  \x1b[33mNode.js is required for the terminal UI.\x1b[0m");
-            eprintln!("  Install it from: \x1b[1mhttps://nodejs.org\x1b[0m");
-            eprintln!();
-            eprintln!("  Or install the TUI: \x1b[1mnpm install -g @openanalystinc/openanalyst-cli\x1b[0m");
-            eprintln!();
-            run_headless(model, allowed_tools, permission_mode)
-        }
-    }
+    // When called without --headless, this binary is the engine only.
+    // The TUI is launched via: npx @openanalystinc/openanalyst-cli
+    // which calls bin/cli.js → spawns this binary with --headless.
+    //
+    // If the user runs the binary directly (not via npm), show a clean message.
+    eprintln!();
+    eprintln!("  \x1b[38;2;255;140;0m\x1b[1mOpenAnalyst CLI v{}\x1b[0m", env!("CARGO_PKG_VERSION"));
+    eprintln!();
+    eprintln!("  To launch the terminal UI, run:");
+    eprintln!("    \x1b[1mnpx @openanalystinc/openanalyst-cli\x1b[0m");
+    eprintln!();
+    eprintln!("  Or install globally:");
+    eprintln!("    \x1b[1mnpm install -g @openanalystinc/openanalyst-cli\x1b[0m");
+    eprintln!("    \x1b[1mopenanalyst\x1b[0m");
+    eprintln!();
+    Ok(())
 }
 
 /// Run in headless JSON-RPC mode for the Ink TUI bridge.
