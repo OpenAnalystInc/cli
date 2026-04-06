@@ -1,6 +1,6 @@
 {
   "name": "@openanalyst/ink-tui",
-  "version": "2.0.12",
+  "version": "2.0.13",
   "description": "OpenAnalyst CLI terminal UI — React + Ink",
   "license": "MIT",
   "type": "module",
