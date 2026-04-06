@@ -2,7 +2,7 @@
 
 **The Universal AI Agent for Your Terminal.**
 
-Connect to any major LLM provider through a single, unified terminal interface. 8 providers, 65+ commands, 21 built-in tools, smart model routing, multi-agent orchestration, and a full-featured TUI.
+Connect to any major LLM provider through a single, unified terminal interface. 8 providers, 65+ commands, 22 built-in tools, smart model routing, multi-agent orchestration, and a full-featured TUI.
 
 ## Install
 
@@ -40,7 +40,7 @@ openanalyst
 |---------|----------------|
 | **Providers** | OpenAnalyst, Anthropic, OpenAI, Google Gemini, xAI, OpenRouter, Amazon Bedrock, Stability AI |
 | **Commands** | 65+ slash commands — /commit, /pr, /model, /knowledge, /image, /bughunter, /swarm |
-| **Tools** | 21 built-in — bash, PowerShell, file I/O, grep, glob, web search/fetch, REPL, agents, KB |
+| **Tools** | 22 built-in — bash, PowerShell, file I/O, grep, glob, web search/fetch, REPL, agents, KB |
 | **TUI** | Full terminal UI with branded banner, inline tool cards, diff view, streaming markdown |
 | **Model Routing** | Smart per-task routing — fast models for explore, balanced for code, capable for planning |
 | **Agents** | Autonomous agent, swarm execution, background tasks |
