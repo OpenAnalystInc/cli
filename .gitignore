@@ -29,7 +29,6 @@ Thumbs.db
 node_modules/
 package-lock.json
 kb_response.json
-.github/
 
 # Archived ratatui TUI (replaced by Ink TUI)
 _archived/
