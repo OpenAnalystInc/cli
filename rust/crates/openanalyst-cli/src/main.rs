@@ -494,8 +494,11 @@ fn run() -> Result<(), Box<dyn std::error::Error>> {
             allowed_tools,
             permission_mode,
             use_tui,
+            headless,
         } => {
-            if use_tui {
+            if headless {
+                run_headless(model, allowed_tools, permission_mode)?;
+            } else if use_tui {
                 run_tui(model, allowed_tools, permission_mode)?;
             } else {
                 // Legacy REPL mode (--no-tui)
@@ -544,6 +547,7 @@ enum CliAction {
         allowed_tools: Option<AllowedToolSet>,
         permission_mode: PermissionMode,
         use_tui: bool,
+        headless: bool,
     },
     Agent {
         task: String,
@@ -582,6 +586,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
     let mut permission_mode = default_permission_mode();
     let mut wants_version = false;
     let mut wants_no_tui = false;
+    let mut wants_headless = false;
     let mut allowed_tool_values = Vec::new();
     let mut rest = Vec::new();
     let mut index = 0;
@@ -594,6 +599,10 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
             }
             "--no-tui" => {
                 wants_no_tui = true;
+                index += 1;
+            }
+            "--headless" => {
+                wants_headless = true;
                 index += 1;
             }
             "--model" => {
@@ -686,6 +695,7 @@ fn parse_args(args: &[String]) -> Result<CliAction, String> {
             allowed_tools,
             permission_mode,
             use_tui: !wants_no_tui,
+            headless: wants_headless,
         });
     }
     if matches!(rest.first().map(String::as_str), Some("--help" | "-h")) {
@@ -2731,26 +2741,51 @@ fn run_tui(
     allowed_tools: Option<AllowedToolSet>,
     permission_mode: PermissionMode,
 ) -> Result<(), Box<dyn std::error::Error>> {
+    // The ratatui TUI has been archived. Redirect to headless mode which
+    // communicates with the Ink TUI via JSON-RPC over stdio.
+    eprintln!();
+    eprintln!("  \x1b[33mThe built-in ratatui TUI has been replaced by the Ink TUI.\x1b[0m");
+    eprintln!("  Launching in \x1b[1m--headless\x1b[0m mode (JSON-RPC bridge for Ink TUI).");
+    eprintln!();
+    eprintln!("  To use the new TUI, run: \x1b[1mnpx openanalyst\x1b[0m");
+    eprintln!("  The Ink TUI will automatically spawn the Rust engine in headless mode.");
+    eprintln!();
+
+    // Fall through to headless mode so the engine is still functional
+    run_headless(model, allowed_tools, permission_mode)
+}
+
+/// Run in headless JSON-RPC mode for the Ink TUI bridge.
+///
+/// Instead of launching the ratatui TUI, this mode:
+/// - Serializes `UiEvent`s as JSON Lines to stdout (one per line)
+/// - Reads `Action`s as JSON Lines from stdin (one per line)
+///
+/// The Ink TUI spawns this process and communicates over the stdio pipes.
+/// No terminal setup/teardown is performed — stdout remains a normal pipe.
+fn run_headless(
+    model: String,
+    allowed_tools: Option<AllowedToolSet>,
+    permission_mode: PermissionMode,
+) -> Result<(), Box<dyn std::error::Error>> {
     use orchestrator::OrchestratorConfig;
-    use tui::banner::BannerAccountInfo;
 
     let (ui_tx, ui_rx) = tokio::sync::mpsc::channel(256);
     let (action_tx, action_rx) = tokio::sync::mpsc::channel(64);
 
     let cwd = env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
 
-    // Folder trust check — warn if workspace is blocked
+    // Folder trust check
     let trust_info = runtime::discover_trust(&cwd);
     if trust_info.level == runtime::TrustLevel::Blocked {
-        eprintln!("Workspace is blocked by trust policy: {}", trust_info.reason);
+        eprintln!("[headless] Workspace is blocked by trust policy: {}", trust_info.reason);
         return Err("Blocked workspace".into());
     }
 
-    // IDE detection — inject into system prompt for context-aware behavior
-    let _ide = runtime::detect_ide();
+    // IDE detection
     let ide_context = runtime::ide_context_string();
 
-    // Load system prompt with IDE context
+    // Load system prompt
     let mut system_prompt = runtime::load_system_prompt(&cwd, DEFAULT_DATE, "Windows", "11")?;
     if !ide_context.is_empty() {
         system_prompt.push(ide_context);
@@ -2765,43 +2800,15 @@ fn run_tui(
         allowed_tools,
         cwd: cwd.clone(),
         system_prompt,
-        max_turns: None, // Use default (200 turns)
+        max_turns: None,
     };
 
     let orchestrator = orchestrator::AgentOrchestrator::new(config, ui_tx, action_rx, None);
 
-    let mut app = tui::app::App::new(ui_rx, action_tx, &model);
-
-    // Set banner info
-    let account = fetch_startup_account_info(&model);
-    app.set_banner(BannerAccountInfo {
-        display_name: account.display_name,
-        model_display: account.model_display,
-        provider_name: account.provider_name,
-        user_email: account.user_email,
-        credits: account.credits,
-        organization: account.organization,
-        cwd: cwd.display().to_string(),
-        version: VERSION.to_string(),
-    });
-
-    // Count configured MCP servers for status display
-    if let Ok(loader) = runtime::ConfigLoader::default_for(&cwd).load() {
-        let mcp_count = loader.mcp().servers().len();
-        app.sidebar_state.mcp_servers_connected = mcp_count;
-    }
-
-    // Install panic hook to restore terminal on crash
-    let original_hook = std::panic::take_hook();
-    std::panic::set_hook(Box::new(move |info| {
-        let _ = tui::restore_terminal();
-        original_hook(info);
-    }));
-
     // Fire SessionStart hooks
     let hook_runner = if let Ok(cfg) = runtime::ConfigLoader::default_for(&cwd).load() {
         let hr = runtime::HookRunner::from_feature_config(cfg.feature_config());
-        let _ = hr.run_session_start("tui");
+        let _ = hr.run_session_start("headless");
         Some(hr)
     } else {
         None
@@ -2812,34 +2819,23 @@ fn run_tui(
         // Spawn orchestrator in background
         let orchestrator_handle = tokio::spawn(orchestrator.run());
 
-        // Run TUI event loop
-        let terminal = tui::setup_terminal()?;
-        let result = tui::event_loop::run_event_loop(app, terminal).await;
-        tui::restore_terminal()?;
+        // Run headless JSON bridge (no terminal setup needed)
+        let result = tui::headless::run(ui_rx, action_tx).await;
 
         // Fire SessionEnd hooks
         if let Some(hr) = &hook_runner {
-            let _ = hr.run_session_end("tui_exit");
+            let _ = hr.run_session_end("headless_exit");
         }
 
-        // Send Quit to orchestrator and wait for clean shutdown
+        // Clean shutdown
         orchestrator_handle.abort();
         let _ = orchestrator_handle.await;
 
-        // If user logged out (credentials cleared), show re-login instructions
-        let has_creds = env::var("OPENANALYST_AUTH_TOKEN").ok().filter(|v| !v.is_empty()).is_some()
-            || env::var("ANTHROPIC_API_KEY").ok().filter(|v| !v.is_empty()).is_some()
-            || env::var("OPENAI_API_KEY").ok().filter(|v| !v.is_empty()).is_some()
-            || env::var("GEMINI_API_KEY").ok().filter(|v| !v.is_empty()).is_some();
-        if !has_creds {
-            println!();
-            println!("  \x1b[38;5;45m\u{2713}\x1b[0m \x1b[1mLogged out.\x1b[0m");
-            println!();
-            println!("  Run \x1b[1mopenanalyst login\x1b[0m to authenticate again.");
-            println!();
+        if let Err(e) = result {
+            eprintln!("[headless] Error: {e}");
         }
 
-        result
+        Ok::<(), io::Error>(())
     })?;
 
     Ok(())
@@ -8146,6 +8142,10 @@ fn print_help_to(out: &mut impl Write) -> io::Result<()> {
     writeln!(out, "  --allowedTools TOOLS       Restrict enabled tools (repeatable; comma-separated aliases supported)")?;
     writeln!(
         out,
+        "  --headless                 JSON-RPC mode: emit events as JSON Lines on stdout, read actions from stdin"
+    )?;
+    writeln!(
+        out,
         "  --version, -V              Print version and build information locally"
     )?;
     writeln!(out)?;
@@ -8241,6 +8241,7 @@ mod tests {
                 allowed_tools: None,
                 permission_mode: PermissionMode::DangerFullAccess,
                 use_tui: true,
+                headless: false,
             }
         );
     }
@@ -8335,6 +8336,7 @@ mod tests {
                 allowed_tools: None,
                 permission_mode: PermissionMode::ReadOnly,
                 use_tui: true,
+                headless: false,
             }
         );
     }
@@ -8358,6 +8360,7 @@ mod tests {
                 ),
                 permission_mode: PermissionMode::DangerFullAccess,
                 use_tui: true,
+                headless: false,
             }
         );
     }
