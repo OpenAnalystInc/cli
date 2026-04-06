@@ -2,6 +2,16 @@
 //!
 //! This crate defines the message protocol that flows through `tokio::sync::mpsc` channels,
 //! connecting the async Ratatui event loop with the blocking `ConversationRuntime` workers.
+//!
+//! ## Headless JSON protocol
+//!
+//! When the `--headless` flag is used, `UiEvent` is serialized to JSON Lines on stdout
+//! and `Action` is deserialized from JSON Lines on stdin. The serde attributes on these
+//! enums produce JSON matching the Ink TUI's `messages.ts` schema:
+//!
+//! - Enum variants use `#[serde(tag = "type", rename_all = "snake_case")]`
+//! - Struct fields use `#[serde(rename_all = "camelCase")]`
+//! - `Duration` fields are serialized as millisecond integers via a helper module
 
 use std::time::Duration;
 
@@ -48,18 +58,23 @@ pub enum AgentStatus {
 // ── Diff information for tool call cards ──
 
 /// A single line in a diff hunk.
-#[derive(Debug, Clone)]
+///
+/// Serializes as `{"kind": "context"|"added"|"removed", "text": "..."}` to match
+/// the Ink TUI's `DiffLineSchema`.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "kind", rename_all = "lowercase")]
 pub enum DiffLine {
     /// Unchanged context line.
-    Context(String),
+    Context { text: String },
     /// Added line (shown in green).
-    Added(String),
+    Added { text: String },
     /// Removed line (shown in red).
-    Removed(String),
+    Removed { text: String },
 }
 
 /// A contiguous diff hunk with line numbers and changes.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DiffHunk {
     /// Starting line number in the new file.
     pub new_start: usize,
@@ -70,7 +85,8 @@ pub struct DiffHunk {
 }
 
 /// Structured diff information for Edit/Write tool calls.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct DiffInfo {
     /// File path that was modified.
     pub file_path: String,
@@ -93,24 +109,55 @@ pub enum PanelId {
     AgentPanel,
 }
 
+// ── Duration serialization helpers ──
+
+/// Serde helper: serialize `Duration` as integer milliseconds.
+mod duration_as_millis {
+    use std::time::Duration;
+    use serde::{self, Deserialize, Deserializer, Serializer};
+
+    pub fn serialize<S>(duration: &Duration, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_u64(duration.as_millis() as u64)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Duration, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let millis = u64::deserialize(deserializer)?;
+        Ok(Duration::from_millis(millis))
+    }
+}
+
 // ── UI-bound events (backend → TUI) ──
 
 /// Events emitted by the orchestrator/agent workers and consumed by the TUI render loop.
-#[derive(Debug, Clone)]
+///
+/// In headless mode, each variant is serialized as a JSON object with a `"type"` discriminator
+/// field using snake_case naming (e.g., `StreamDelta` → `"stream_delta"`), and all struct
+/// fields use camelCase (e.g., `agent_id` → `"agentId"`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum UiEvent {
     // ── Streaming ──
     /// A chunk of assistant text arrived.
+    #[serde(rename_all = "camelCase")]
     StreamDelta {
         agent_id: AgentId,
         text: String,
     },
     /// The assistant finished streaming for this turn.
+    #[serde(rename_all = "camelCase")]
     StreamEnd {
         agent_id: AgentId,
     },
 
     // ── Tool calls ──
     /// A tool execution is starting.
+    #[serde(rename_all = "camelCase")]
     ToolCallStart {
         agent_id: AgentId,
         call_id: String,
@@ -118,11 +165,13 @@ pub enum UiEvent {
         input_preview: String,
     },
     /// A tool execution completed.
+    #[serde(rename_all = "camelCase")]
     ToolCallEnd {
         agent_id: AgentId,
         call_id: String,
         output: String,
         is_error: bool,
+        #[serde(with = "duration_as_millis")]
         duration: Duration,
         /// Structured diff info for Edit/Write tools (renders as rich diff in TUI).
         diff: Option<DiffInfo>,
@@ -130,6 +179,7 @@ pub enum UiEvent {
 
     // ── Permissions ──
     /// The backend needs the user to approve a tool invocation.
+    #[serde(rename_all = "camelCase")]
     PermissionRequest {
         request_id: String,
         agent_id: AgentId,
@@ -140,6 +190,7 @@ pub enum UiEvent {
 
     // ── Agent lifecycle ──
     /// A new agent was spawned.
+    #[serde(rename_all = "camelCase")]
     AgentSpawned {
         agent_id: AgentId,
         parent_id: Option<AgentId>,
@@ -147,16 +198,19 @@ pub enum UiEvent {
         task: String,
     },
     /// An agent's status changed.
+    #[serde(rename_all = "camelCase")]
     AgentStatusChanged {
         agent_id: AgentId,
         status: AgentStatus,
     },
     /// An agent completed successfully.
+    #[serde(rename_all = "camelCase")]
     AgentCompleted {
         agent_id: AgentId,
         result: String,
     },
     /// An agent failed with an error.
+    #[serde(rename_all = "camelCase")]
     AgentFailed {
         agent_id: AgentId,
         error: String,
@@ -164,6 +218,7 @@ pub enum UiEvent {
 
     // ── Usage ──
     /// Token usage update from a streaming response.
+    #[serde(rename_all = "camelCase")]
     UsageUpdate {
         agent_id: AgentId,
         input_tokens: u32,
@@ -172,6 +227,7 @@ pub enum UiEvent {
 
     // ── Knowledge Base ──
     /// Knowledge base query completed with structured agentic results.
+    #[serde(rename_all = "camelCase")]
     KnowledgeResult {
         query_id: i64,
         query: String,
@@ -184,6 +240,7 @@ pub enum UiEvent {
 
     // ── AskUser ──
     /// The agent wants to ask the user a question via modal dialog.
+    #[serde(rename_all = "camelCase")]
     AskUserRequest {
         request_id: String,
         agent_id: AgentId,
@@ -194,11 +251,13 @@ pub enum UiEvent {
 
     // ── Animation ──
     /// Periodic tick for spinner animations and elapsed time updates.
+    /// Skipped in headless mode — not serialized to stdout.
     Tick,
 }
 
 /// A sub-question result from the agentic RAG pipeline.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct SubQuestionResult {
     pub sub_question: String,
     pub intent: String,
@@ -207,6 +266,7 @@ pub struct SubQuestionResult {
 
 /// A single chunk result from the knowledge base.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct KbChunkResult {
     pub chunk_id: String,
     pub text: String,
@@ -224,15 +284,22 @@ pub struct KbChunkResult {
 // ── User actions (TUI → backend) ──
 
 /// Actions sent from the TUI to the backend orchestrator.
-#[derive(Debug, Clone)]
+///
+/// In headless mode, each variant is deserialized from a JSON object with a `"type"`
+/// discriminator using snake_case naming (e.g., `SubmitPrompt` → `"submit_prompt"`),
+/// and all struct fields use camelCase.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", rename_all = "snake_case")]
 pub enum Action {
     /// User submitted a prompt with optional effort/model overrides.
+    #[serde(rename_all = "camelCase")]
     SubmitPrompt {
         text: String,
         effort_budget: Option<u32>,
         model_override: Option<String>,
     },
     /// User responded to a permission request.
+    #[serde(rename_all = "camelCase")]
     PermissionResponse {
         request_id: String,
         allow: bool,
@@ -246,6 +313,7 @@ pub enum Action {
     /// User changed the permission mode.
     UpdatePermissions(String),
     /// MOE dispatch — multiple chained commands to run as parallel agents.
+    #[serde(rename_all = "camelCase")]
     MoeDispatch {
         /// Raw command strings (e.g., ["/bughunter src/", "/commit", "/pr"])
         commands: Vec<String>,
@@ -253,8 +321,10 @@ pub enum Action {
     /// Mid-task skill injection — run a slash command while agents are working.
     InjectSkill(String),
     /// Voice transcription completed — place text in input box for review.
+    #[serde(rename_all = "camelCase")]
     VoiceTranscribed { text: String },
     /// User submitted feedback for a knowledge query.
+    #[serde(rename_all = "camelCase")]
     KnowledgeFeedback {
         query_id: i64,
         rating: String,  // "positive" | "negative" | "corrected"
@@ -262,6 +332,7 @@ pub enum Action {
         correction: String,
     },
     /// User responded to an AskUser question.
+    #[serde(rename_all = "camelCase")]
     AskUserResponse {
         request_id: String,
         response: String,
@@ -274,6 +345,7 @@ pub enum Action {
 
 /// Request to spawn a new sub-agent, sent from the Agent tool to the orchestrator.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
 pub struct AgentSpawnRequest {
     /// Type of agent to spawn.
     pub agent_type: AgentType,

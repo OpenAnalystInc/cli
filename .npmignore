@@ -9,25 +9,33 @@ vscode-extension/
 docs/
 assets/
 scripts/build.js
+Dev/
+
+# Ink TUI source (only dist/ ships)
+ink-tui/src/
+ink-tui/reference/
+ink-tui/node_modules/
+ink-tui/tsconfig.json
+ink-tui/*.tsbuildinfo
 
 # Build artifacts
-*.map
 *.d.ts.map
 *.js.map
 target/
-native/
 
 # Dev files
 .git/
 .github/
 .claude/
+.10x/
 .openanalyst/
 .vscode/
 .idea/
+.env
 *.log
 *.tmp
 
-# Config
+# Config files (not needed at runtime)
 .gitignore
 .openanalyst.json
 CLAUDE.md
@@ -38,6 +46,8 @@ RESEARCH.md
 CODE_OF_CONDUCT.md
 CONTRIBUTING.md
 SECURITY.md
+MINIO-ANALYSIS.md
+UI-UX-COMPARISON.md
 
 # Node dev
 node_modules/
@@ -45,6 +55,14 @@ package-lock.json
 tsconfig.json
 *.tsbuildinfo
 
+# TypeScript source (keep .d.ts declarations)
+*.ts
+!*.d.ts
+
 # Archives
 archive/
+_archived/
 .omx/
+
+# MCP server (dev only)
+mcp-server/

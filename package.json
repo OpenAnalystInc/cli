@@ -1,6 +1,6 @@
 {
   "name": "@openanalystinc/openanalyst-cli",
-  "version": "2.0.10",
+  "version": "2.0.11",
   "description": "OpenAnalyst CLI — The Universal AI Agent for Your Terminal. 7 LLM providers (OpenAnalyst, Anthropic Claude, OpenAI GPT, Google Gemini, xAI Grok, OpenRouter, Amazon Bedrock), 65+ slash commands, 24 built-in tools, smart model routing, multi-agent orchestration, knowledge base RAG, voice input, and TUI with full tool execution.",
   "bin": {
     "openanalyst": "bin/cli.js"
@@ -12,9 +12,33 @@
     "bin/",
     "scripts/postinstall.js",
     "native/",
+    "ink-tui/dist/",
+    "ink-tui/package.json",
     "README.md",
     "LICENSE"
   ],
+  "dependencies": {
+    "@playwright/mcp": "^0.0.70",
+    "ansi-escapes": "^7.3.0",
+    "chalk": "^4.1.2",
+    "cli-spinners": "^2.9.2",
+    "clipboardy": "~5.2.0",
+    "color-convert": "^2.0.1",
+    "diff": "^8.0.3",
+    "fzf": "^0.5.2",
+    "highlight.js": "^11.11.1",
+    "ink": "npm:@jrichman/ink@6.6.7",
+    "ink-gradient": "^3.0.0",
+    "ink-spinner": "^5.0.0",
+    "lowlight": "^3.3.0",
+    "react": "^19.2.0",
+    "shell-quote": "^1.8.3",
+    "sql.js": "^1.14.1",
+    "string-width": "^8.1.0",
+    "strip-ansi": "^7.1.0",
+    "tinygradient": "^1.1.5",
+    "zod": "^3.23.8"
+  },
   "keywords": [
     "cli",
     "ai",
@@ -66,5 +90,13 @@
   "bugs": {
     "url": "https://github.com/OpenAnalystInc/cli/issues"
   },
-  "homepage": "https://openanalyst.com"
+  "homepage": "https://openanalyst.com",
+  "devDependencies": {
+    "@types/node": "^25.5.2",
+    "@types/react": "^19.2.14",
+    "@xterm/headless": "^6.0.0",
+    "tsx": "^4.21.0",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.2"
+  }
 }

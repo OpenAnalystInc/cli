@@ -1,3 +1,15 @@
+// ─────────────────────────────────────────────────────────────────────────────
+// OAuth infrastructure for OpenAnalyst CLI.
+//
+// Only Google Gemini uses OAuth (browser-based login with PKCE).
+// All other providers (OpenAI, Anthropic, xAI, OpenRouter, Bedrock, Stability)
+// use API keys directly — saved to .env, credentials.json, and SQLite via
+// the `save_provider_credential()` function in the CLI binary.
+//
+// Anthropic restricts OAuth tokens to Claude Code only.
+// OpenAI restricts OAuth tokens to Codex CLI only.
+// ─────────────────────────────────────────────────────────────────────────────
+
 use std::collections::BTreeMap;
 use std::fs;
 use std::io;

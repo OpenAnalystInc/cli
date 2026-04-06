@@ -647,15 +647,15 @@ fn parse_diff_info(output: &str) -> Option<DiffInfo> {
         for line in patch_lines {
             let s = line.as_str().unwrap_or("");
             if let Some(text) = s.strip_prefix('+') {
-                diff_lines.push(DiffLine::Added(text.to_string()));
+                diff_lines.push(DiffLine::Added { text: text.to_string() });
                 total_added += 1;
             } else if let Some(text) = s.strip_prefix('-') {
-                diff_lines.push(DiffLine::Removed(text.to_string()));
+                diff_lines.push(DiffLine::Removed { text: text.to_string() });
                 total_removed += 1;
             } else if let Some(text) = s.strip_prefix(' ') {
-                diff_lines.push(DiffLine::Context(text.to_string()));
+                diff_lines.push(DiffLine::Context { text: text.to_string() });
             } else {
-                diff_lines.push(DiffLine::Context(s.to_string()));
+                diff_lines.push(DiffLine::Context { text: s.to_string() });
             }
         }
 
