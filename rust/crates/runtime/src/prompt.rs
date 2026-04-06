@@ -232,6 +232,9 @@ fn discover_instruction_files(cwd: &Path) -> std::io::Result<Vec<ContextFile>> {
             dir.join("OPENANALYST.local.md"),
             dir.join(".openanalyst").join("OPENANALYST.md"),
             dir.join(".openanalyst").join("instructions.md"),
+            // Claude Code compatibility fallbacks
+            dir.join("CLAUDE.md"),
+            dir.join(".claude").join("CLAUDE.md"),
         ] {
             push_context_file(&mut files, candidate)?;
         }

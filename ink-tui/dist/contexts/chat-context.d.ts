@@ -11,7 +11,7 @@
  */
 import React, { type ReactNode } from 'react';
 import type { ChatMessage, KBResultChatMessage, BannerChatMessage, FileOutputType } from '../types/chat.js';
-import type { SystemLevel } from '../types/messages.js';
+import type { DiffInfo, SystemLevel } from '../types/messages.js';
 export interface ChatActions {
     /** Add a user message. */
     pushUser(text: string): void;
@@ -26,7 +26,7 @@ export interface ChatActions {
     /** Update a tool call's output. */
     updateToolCall(toolId: string, output: string): void;
     /** Complete a tool call. */
-    completeToolCall(toolId: string, status: 'completed' | 'failed', output: string, durationMs: number): void;
+    completeToolCall(toolId: string, status: 'completed' | 'failed', output: string, durationMs: number, diff?: DiffInfo): void;
     /** Add a banner message. */
     pushBanner(data: Omit<BannerChatMessage, 'kind' | 'id' | 'timestamp'>): void;
     /** Add a KB result. */

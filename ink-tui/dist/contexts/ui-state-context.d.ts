@@ -9,7 +9,7 @@
  * subscribe to UIActionsContext and avoid re-rendering on every state tick.
  */
 import React, { type ReactNode } from 'react';
-import type { AgentPhase, PermissionMode } from '../types/messages.js';
+import type { AgentPhase, PermissionMode, AgentInfo, FileInfo, PlanInfo, RoutingTable, ActivityInfo, AgentStatus } from '../types/messages.js';
 export type AppMode = 'idle' | 'streaming' | 'scroll' | 'sidebar_focused' | 'voice_recording';
 export type InputMode = 'ready' | 'agent_running' | 'plan_running' | 'streaming';
 export interface PermissionDialogState {
@@ -17,7 +17,7 @@ export interface PermissionDialogState {
     agentId: string;
     toolName: string;
     toolInput: string;
-    requiredMode: PermissionMode;
+    requiredMode: string;
     filePath?: string;
     description?: string;
     selectedButton: 'allow' | 'deny';
@@ -60,9 +60,24 @@ export interface UIState {
     contextFiles: string[];
     creditBalance: string | null;
     mcpServerCount: number;
+    sidebarAgents: AgentInfo[];
+    sidebarFiles: FileInfo[];
+    sidebarPlans: PlanInfo[];
+    sidebarRouting: RoutingTable;
+    sidebarActivity: ActivityInfo;
+    totalInputTokens: number;
+    totalOutputTokens: number;
+    /** Per-model cost tracking: model name → { inputTokens, outputTokens, cost } */
+    modelCosts: Record<string, {
+        inputTokens: number;
+        outputTokens: number;
+        cost: number;
+    }>;
     terminalWidth: number;
     terminalHeight: number;
     exitPending: boolean;
+    toastMessage: string | null;
+    toastType: 'info' | 'warning' | 'error';
 }
 export interface UIActions {
     toggleSidebar(): void;
@@ -96,7 +111,16 @@ export interface UIActions {
     setMcpServerCount(count: number): void;
     setAutocomplete(visible: boolean, items?: string[], index?: number): void;
     setVoiceRecording(recording: boolean): void;
+    setSidebarAgents(agents: AgentInfo[]): void;
+    setSidebarFiles(files: FileInfo[]): void;
+    setSidebarPlans(plans: PlanInfo[]): void;
+    setSidebarRouting(routing: RoutingTable): void;
+    setSidebarActivity(activity: ActivityInfo): void;
+    updateAgentStatus(agentId: string, status: AgentStatus): void;
+    addUsage(inputTokens: number, outputTokens: number, model?: string): void;
     clearChat(): void;
+    showToast(message: string, durationMs?: number, type?: 'info' | 'warning' | 'error'): void;
+    dismissToast(): void;
 }
 export interface UIStateProviderProps {
     children: ReactNode;

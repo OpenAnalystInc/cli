@@ -39,14 +39,16 @@ const MessageItem = React.memo(function MessageItem({ message, isFocused, }) {
         case 'system':
             return (_jsx(SystemMessage, { text: message.text, level: message.level, isFocused: isFocused }));
         case 'tool_call':
-            return (_jsx(ToolCard, { toolId: message.toolId, toolName: message.toolName, status: message.status, input: message.inputPreview, output: message.output || undefined, durationMs: message.durationMs, expanded: message.expanded, onToggleExpand: () => {
+            return (_jsx(ToolCard, { toolId: message.toolId, toolName: message.toolName, status: message.status, input: message.inputPreview, output: message.output || undefined, durationMs: message.durationMs, diff: message.diff, expanded: message.expanded, onToggleExpand: () => {
                     chatActions.toggleToolCardExpand(message.toolId);
                 }, isFocused: isFocused }));
         case 'kb_result':
-            return (_jsx(KnowledgeCard, { queryId: String(message.queryId), subQuestions: [{
-                        question: message.query,
-                        results: [],
-                    }], answer: message.answer ?? '', cached: message.fromCache, graphExpanded: false, durationMs: message.latencyMs, expanded: message.expanded, activeTabIndex: message.activeTab, onToggleExpand: () => {
+            return (_jsx(KnowledgeCard, { queryId: String(message.queryId), subQuestions: message.subQuestions.length > 0
+                    ? message.subQuestions.map((sq) => ({
+                        question: sq.subQuestion,
+                        results: [...sq.results],
+                    }))
+                    : [{ question: message.query, results: [] }], answer: message.answer ?? '', cached: message.fromCache, graphExpanded: message.subQuestions.some((sq) => sq.results.some((r) => r.graphExpanded)), durationMs: message.latencyMs, expanded: message.expanded, activeTabIndex: message.activeTab, onToggleExpand: () => {
                     chatActions.toggleKBExpand(message.id);
                 }, onTabChange: (index) => {
                     chatActions.setKBActiveTab(message.id, index);

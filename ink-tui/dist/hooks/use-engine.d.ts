@@ -11,14 +11,14 @@
  * - Tracks connection state: connecting | connected | disconnected | error
  * - Mock mode for UI development without a real engine
  */
-import { type EngineEvent, type StreamDelta, type StreamEnd, type ToolCallStart, type ToolCallUpdate, type ToolCallComplete, type PermissionRequest, type AskUserRequest, type StatusUpdate, type AgentSpawned, type AgentStatusChanged, type AgentCompleted, type AgentFailed, type UsageUpdate, type KbResult, type SystemMessage, type Banner, type SidebarUpdate, type ModelInfo, type ContextFilesUpdate, type PermissionMode, type ActionCategory, type TuiAction } from '../types/messages.js';
+import { type EngineEvent, type StreamDelta, type StreamEnd, type ToolCallStart, type ToolCallUpdate, type ToolCallEnd, type PermissionRequest, type AskUserRequest, type StatusUpdate, type AgentSpawned, type AgentStatusChanged, type AgentCompleted, type AgentFailed, type UsageUpdate, type KbResult, type SystemMessage, type Banner, type SidebarUpdate, type ModelInfo, type ContextFilesUpdate, type PermissionMode, type ActionCategory, type TuiAction } from '../types/messages.js';
 import { type ConnectionState } from '../types/protocol.js';
 export interface EngineEventHandlers {
     onStreamDelta?: (event: StreamDelta) => void;
     onStreamEnd?: (event: StreamEnd) => void;
     onToolCallStart?: (event: ToolCallStart) => void;
     onToolCallUpdate?: (event: ToolCallUpdate) => void;
-    onToolCallComplete?: (event: ToolCallComplete) => void;
+    onToolCallComplete?: (event: ToolCallEnd) => void;
     onPermissionRequest?: (event: PermissionRequest) => void;
     onAskUserRequest?: (event: AskUserRequest) => void;
     onStatusUpdate?: (event: StatusUpdate) => void;

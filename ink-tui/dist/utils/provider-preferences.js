@@ -19,36 +19,44 @@ import { credentialManager, PROVIDER_CONFIG } from './credential-manager.js';
 // Model catalog (mirrors Rust MODEL_REGISTRY)
 // ---------------------------------------------------------------------------
 const MODEL_CATALOG = [
-    // -- OpenAI --
+    // ── OpenAI (April 2026) ──
+    { id: 'gpt-5.4', name: 'GPT-5.4', provider: 'openai', aliases: ['5.4', 'gpt5'], tier: 'capable', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
+    { id: 'gpt-5.4-mini', name: 'GPT-5.4 Mini', provider: 'openai', aliases: ['5.4-mini'], tier: 'balanced', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
+    { id: 'gpt-5.4-nano', name: 'GPT-5.4 Nano', provider: 'openai', aliases: ['5.4-nano'], tier: 'fast', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
     { id: 'gpt-4o', name: 'GPT-4o', provider: 'openai', aliases: ['4o'], tier: 'capable', contextWindow: 128_000, supportsVision: true, supportsTools: true },
     { id: 'gpt-4o-mini', name: 'GPT-4o Mini', provider: 'openai', aliases: ['4o-mini', 'mini'], tier: 'fast', contextWindow: 128_000, supportsVision: true, supportsTools: true },
     { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'openai', aliases: ['4.1'], tier: 'capable', contextWindow: 1_047_576, supportsVision: true, supportsTools: true },
     { id: 'gpt-4.1-mini', name: 'GPT-4.1 Mini', provider: 'openai', aliases: ['4.1-mini'], tier: 'balanced', contextWindow: 1_047_576, supportsVision: true, supportsTools: true },
     { id: 'gpt-4.1-nano', name: 'GPT-4.1 Nano', provider: 'openai', aliases: ['4.1-nano', 'nano'], tier: 'fast', contextWindow: 1_047_576, supportsVision: true, supportsTools: true },
     { id: 'o3', name: 'o3', provider: 'openai', aliases: [], tier: 'capable', contextWindow: 200_000, supportsVision: false, supportsTools: true },
+    { id: 'o3-pro', name: 'o3 Pro', provider: 'openai', aliases: [], tier: 'capable', contextWindow: 200_000, supportsVision: false, supportsTools: true },
     { id: 'o3-mini', name: 'o3 Mini', provider: 'openai', aliases: [], tier: 'balanced', contextWindow: 200_000, supportsVision: false, supportsTools: true },
     { id: 'o4-mini', name: 'o4 Mini', provider: 'openai', aliases: [], tier: 'balanced', contextWindow: 200_000, supportsVision: true, supportsTools: true },
     { id: 'codex-mini', name: 'Codex Mini', provider: 'openai', aliases: ['codex'], tier: 'fast', contextWindow: 200_000, supportsVision: false, supportsTools: true },
-    // -- Anthropic --
-    { id: 'claude-opus-4-6', name: 'Opus 4', provider: 'anthropic', aliases: ['opus', 'opus-4'], tier: 'capable', contextWindow: 200_000, supportsVision: true, supportsTools: true },
-    { id: 'claude-sonnet-4-6', name: 'Sonnet 4', provider: 'anthropic', aliases: ['sonnet', 'sonnet-4'], tier: 'balanced', contextWindow: 200_000, supportsVision: true, supportsTools: true },
+    // ── Anthropic (Claude — April 2026) ──
+    { id: 'claude-opus-4-6', name: 'Opus 4.6', provider: 'anthropic', aliases: ['opus', 'opus-4.6'], tier: 'capable', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
+    { id: 'claude-sonnet-4-6', name: 'Sonnet 4.6', provider: 'anthropic', aliases: ['sonnet', 'sonnet-4.6'], tier: 'balanced', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
     { id: 'claude-haiku-4-5-20251213', name: 'Haiku 4.5', provider: 'anthropic', aliases: ['haiku'], tier: 'fast', contextWindow: 200_000, supportsVision: true, supportsTools: true },
-    // -- Google Gemini --
-    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'gemini', aliases: ['gemini-pro', 'gemini'], tier: 'capable', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
+    // ── Google Gemini (April 2026) ──
+    { id: 'gemini-3.1-pro', name: 'Gemini 3.1 Pro', provider: 'gemini', aliases: ['gemini-pro', 'gemini'], tier: 'capable', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
+    { id: 'gemini-3-flash', name: 'Gemini 3 Flash', provider: 'gemini', aliases: ['gemini-3-flash'], tier: 'balanced', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
+    { id: 'gemini-3.1-flash-lite', name: 'Gemini 3.1 Flash-Lite', provider: 'gemini', aliases: ['gemini-lite'], tier: 'fast', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
+    { id: 'gemini-2.5-pro', name: 'Gemini 2.5 Pro', provider: 'gemini', aliases: [], tier: 'capable', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
     { id: 'gemini-2.5-flash', name: 'Gemini 2.5 Flash', provider: 'gemini', aliases: ['gemini-flash', 'flash'], tier: 'fast', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
-    { id: 'gemini-2.0-flash', name: 'Gemini 2.0 Flash', provider: 'gemini', aliases: ['gemini-2-flash'], tier: 'fast', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
-    { id: 'gemini-2.0-flash-lite', name: 'Gemini 2.0 Flash Lite', provider: 'gemini', aliases: ['gemini-lite'], tier: 'fast', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
-    { id: 'gemini-1.5-pro', name: 'Gemini 1.5 Pro', provider: 'gemini', aliases: [], tier: 'balanced', contextWindow: 2_000_000, supportsVision: true, supportsTools: true },
-    { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', provider: 'gemini', aliases: [], tier: 'fast', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
-    // -- xAI --
-    { id: 'grok-3', name: 'Grok 3', provider: 'xai', aliases: ['grok'], tier: 'capable', contextWindow: 131_072, supportsVision: false, supportsTools: true },
-    { id: 'grok-3-mini', name: 'Grok 3 Mini', provider: 'xai', aliases: ['grok-mini'], tier: 'fast', contextWindow: 131_072, supportsVision: false, supportsTools: true },
-    { id: 'grok-2', name: 'Grok 2', provider: 'xai', aliases: [], tier: 'balanced', contextWindow: 131_072, supportsVision: false, supportsTools: true },
-    // -- OpenRouter (meta-provider) --
+    // ── xAI Grok (April 2026) ──
+    { id: 'grok-4', name: 'Grok 4', provider: 'xai', aliases: ['grok'], tier: 'capable', contextWindow: 2_000_000, supportsVision: true, supportsTools: true },
+    { id: 'grok-4-fast', name: 'Grok 4 Fast', provider: 'xai', aliases: ['grok-fast'], tier: 'fast', contextWindow: 2_000_000, supportsVision: true, supportsTools: true },
+    { id: 'grok-3', name: 'Grok 3', provider: 'xai', aliases: [], tier: 'balanced', contextWindow: 131_072, supportsVision: false, supportsTools: true },
+    // ── DeepSeek (March 2026) ──
+    { id: 'deepseek-v4', name: 'DeepSeek V4', provider: 'openrouter', aliases: ['deepseek', 'ds-v4'], tier: 'capable', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
+    { id: 'deepseek-r2', name: 'DeepSeek R2', provider: 'openrouter', aliases: ['ds-r2'], tier: 'balanced', contextWindow: 1_000_000, supportsVision: false, supportsTools: true },
+    // ── Meta Llama 4 (via OpenRouter) ──
+    { id: 'llama-4-maverick', name: 'Llama 4 Maverick', provider: 'openrouter', aliases: ['llama', 'maverick'], tier: 'balanced', contextWindow: 1_000_000, supportsVision: true, supportsTools: true },
+    // ── OpenRouter (meta-provider) ──
     { id: 'openrouter/auto', name: 'Auto (best available)', provider: 'openrouter', aliases: ['auto'], tier: 'balanced', contextWindow: 200_000, supportsVision: true, supportsTools: true },
-    // -- Amazon Bedrock --
+    // ── Amazon Bedrock ──
     { id: 'bedrock/claude', name: 'Bedrock Claude', provider: 'bedrock', aliases: ['bedrock'], tier: 'capable', contextWindow: 200_000, supportsVision: true, supportsTools: true },
-    // -- OpenAnalyst (default wrapper) --
+    // ── OpenAnalyst ──
     { id: 'openanalyst-beta', name: 'OpenAnalyst Beta', provider: 'openanalyst', aliases: ['oa-beta', 'default'], tier: 'balanced', contextWindow: 200_000, supportsVision: true, supportsTools: true },
 ];
 // ---------------------------------------------------------------------------

@@ -63,14 +63,10 @@ const SECTION_TITLES: Record<Section, string> = {
   [Section.Activity]: 'Activity',
 };
 
-// Section header colors (unfocused state) matching Ratatui
-const SECTION_COLORS: Record<Section, string> = {
-  [Section.Agents]:   '#FF6B6B', // red/orange for Agents
-  [Section.Files]:    '#00BFFF', // cyan for Files
-  [Section.Plans]:    '#00BFFF', // cyan for Plans
-  [Section.Routing]:  '#00BFFF', // cyan for Routing
-  [Section.Activity]: '#00FF7F', // green for Activity
-};
+/**
+ * Section header colors resolved at render time from semantic tokens.
+ * Agents=error (red/orange), Files/Plans/Routing=accent (cyan), Activity=done (green).
+ */
 
 // ---------------------------------------------------------------------------
 // Default empty data
@@ -150,7 +146,7 @@ export function Sidebar({
   onFileToggle,
   onPlanSelect,
 }: SidebarProps): React.ReactElement {
-  const { sidebarFocused, permissionMode, elapsedMs, tokensRemaining } = useUIState();
+  const { sidebarFocused, permissionMode, elapsedMs, tokensRemaining, totalInputTokens, totalOutputTokens } = useUIState();
   const actions = useUIActions();
   const { colors } = useTheme();
 
@@ -184,18 +180,26 @@ export function Sidebar({
 
       switch (command) {
         // --- Section navigation ---
-        case Command.SIDEBAR_NEXT_SECTION: {
+        // Tab/Shift+Tab may resolve to NEXT_TAB/PREV_TAB (earlier in enum)
+        // instead of the sidebar-specific commands. Accept both.
+        case Command.SIDEBAR_NEXT_SECTION:
+        case Command.NEXT_TAB: {
           setActiveSection((prev) => ((prev + 1) % SECTION_COUNT) as Section);
           return true;
         }
 
-        case Command.SIDEBAR_PREV_SECTION: {
+        case Command.SIDEBAR_PREV_SECTION:
+        case Command.PREV_TAB: {
           setActiveSection((prev) => ((prev - 1 + SECTION_COUNT) % SECTION_COUNT) as Section);
           return true;
         }
 
         // --- Item navigation ---
-        case Command.SIDEBAR_NEXT_ITEM: {
+        // j/Down resolve to SCROLL_DOWN or HISTORY_DOWN (earlier in enum)
+        // rather than SIDEBAR_NEXT_ITEM. Accept all equivalent commands.
+        case Command.SIDEBAR_NEXT_ITEM:
+        case Command.SCROLL_DOWN:
+        case Command.HISTORY_DOWN: {
           const max = itemCount(activeSection, agents, files, plans);
           if (max === 0) return true;
           setSelectedIndices((prev) => ({
@@ -205,7 +209,11 @@ export function Sidebar({
           return true;
         }
 
-        case Command.SIDEBAR_PREV_ITEM: {
+        // k/Up resolve to SCROLL_UP or HISTORY_UP (earlier in enum)
+        // rather than SIDEBAR_PREV_ITEM. Accept all equivalent commands.
+        case Command.SIDEBAR_PREV_ITEM:
+        case Command.SCROLL_UP:
+        case Command.HISTORY_UP: {
           setSelectedIndices((prev) => ({
             ...prev,
             [activeSection]: Math.max(prev[activeSection] - 1, 0),
@@ -214,7 +222,10 @@ export function Sidebar({
         }
 
         // --- Action on selected item ---
-        case Command.SIDEBAR_ACTION: {
+        // Return resolves to SUBMIT (first in enum) rather than
+        // SIDEBAR_ACTION. Accept both when sidebar is focused.
+        case Command.SIDEBAR_ACTION:
+        case Command.SUBMIT: {
           // If the section is collapsed, expand it instead of performing action
           if (collapsed[activeSection]) {
             setCollapsed((prev) => ({ ...prev, [activeSection]: false }));
@@ -257,9 +268,15 @@ export function Sidebar({
           return true;
         }
 
-        // --- Exit sidebar ---
-        case Command.SIDEBAR_EXIT: {
-          actions.hideSidebar();
+        // --- Exit sidebar focus (keep visible, return focus to input) ---
+        case Command.SIDEBAR_EXIT:
+        case Command.EXIT_SCROLL_MODE:
+        case Command.ENTER_SCROLL_MODE: {
+          // The command resolver iterates enum values in order, so shared
+          // key bindings (Escape, i) may resolve to whichever command
+          // appears first: ENTER_SCROLL_MODE or EXIT_SCROLL_MODE instead
+          // of SIDEBAR_EXIT. Accept all three when sidebar is focused.
+          actions.toggleSidebar(); // Focused -> unfocus (stays visible)
           return true;
         }
 
@@ -279,6 +296,17 @@ export function Sidebar({
     priority: 5,
   });
 
+  // -- Resolve section header color from semantic tokens --
+  const getSectionColor = (section: Section): string => {
+    switch (section) {
+      case Section.Agents:   return colors.status.error;   // red/orange
+      case Section.Files:    return colors.text.accent;    // cyan
+      case Section.Plans:    return colors.text.accent;    // cyan
+      case Section.Routing:  return colors.text.accent;    // cyan
+      case Section.Activity: return colors.status.done;    // green
+    }
+  };
+
   // -- Section header renderer (matches Ratatui design) --
   const renderSectionHeader = (section: Section): React.ReactElement => {
     const isActive = sidebarFocused && section === activeSection;
@@ -288,7 +316,7 @@ export function Sidebar({
       // Focused: yellow bold with arrows (matches Ratatui: `>> Title <<` style)
       return (
         <Box key={`header-${section}`}>
-          <Text color="#FFD700" bold backgroundColor="#333333">
+          <Text color={colors.status.warning} bold backgroundColor={colors.sidebar.border}>
             {'\u25B8'} {title} {'\u25C2'}
           </Text>
         </Box>
@@ -296,7 +324,7 @@ export function Sidebar({
     }
 
     // Unfocused: section-specific color, bold
-    const headerColor = SECTION_COLORS[section];
+    const headerColor = getSectionColor(section);
     return (
       <Box key={`header-${section}`}>
         <Text color={headerColor} bold>
@@ -363,7 +391,7 @@ export function Sidebar({
             colors={colors}
             permissionMode={permissionMode}
             elapsedSecs={Math.floor(elapsedMs / 1000)}
-            totalTokens={tokensRemaining ?? 0}
+            totalTokens={totalInputTokens + totalOutputTokens}
           />
         );
     }

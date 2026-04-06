@@ -34,7 +34,8 @@ import { useEngine } from '../engine/engine-context.js';
 import { Command } from '../key/commands.js';
 import { ModeBadge } from './mode-badge.js';
 import { ContextFileTags } from './context-file-tags.js';
-import { parseSlashCommand, formatHelpText } from '../utils/slash-commands.js';
+import { parseSlashCommand, formatHelpText, getCommandList } from '../utils/slash-commands.js';
+import { Autocomplete, type AutocompleteItem } from './autocomplete.js';
 import { useSessionContext } from '../contexts/session-context.js';
 import { useVoice } from '../hooks/use-voice.js';
 import { useCredits } from '../hooks/use-credits.js';
@@ -267,8 +268,8 @@ function handleLogoutCommand(
       clearCreditCache();
       credits.refresh();
       chatActions.pushSystem(
-        'All credentials removed (Gemini OAuth token preserved).\nUse /login to add new credentials.',
-        'info',
+        'All credentials removed.\n\nYou need an API key to use OpenAnalyst.\nRun /login <provider> <key> to configure a new one.\n\nOr type /exit to return to your terminal.',
+        'error',
       );
     });
     return;
@@ -321,13 +322,30 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
   // Text state
   const [text, setText] = useState('');
   const [cursorPos, setCursorPos] = useState(0);
+  const [vimEnabled, setVimEnabled] = useState(false);
   const [vimMode, setVimMode] = useState<VimMode>('insert');
 
   // Track whether we are actively navigating history
   const isNavigatingHistory = useRef(false);
 
+  // Message queue — when user types while AI is running, queue it
+  const [queuedMessage, setQueuedMessage] = useState<string | null>(null);
+
+  // Autocomplete state for slash commands
+  const [acVisible, setAcVisible] = useState(false);
+  const [acItems, setAcItems] = useState<AutocompleteItem[]>([]);
+  const [acIndex, setAcIndex] = useState(0);
+
+  // Build the full autocomplete list from slash commands (memoized)
+  const allSlashCommands = React.useMemo<AutocompleteItem[]>(() => {
+    return getCommandList().map((cmd) => ({
+      name: `/${cmd.name}`,
+      description: cmd.description,
+    }));
+  }, []);
+
   // Derived state
-  const isDisabled = ui.inputMode === 'agent_running' || ui.inputMode === 'streaming' || ui.inputMode === 'plan_running';
+  const isAgentBusy = ui.inputMode === 'agent_running' || ui.inputMode === 'streaming' || ui.inputMode === 'plan_running';
   const permConfig = PERMISSION_CONFIGS[ui.permissionMode];
 
   // Determine line color (the horizontal rule and prompt icon)
@@ -342,19 +360,79 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
   const lineCount = text.split('\n').length;
   const dynamicHeight = Math.min(Math.max(lineCount + 2, INPUT_MIN_HEIGHT), INPUT_MAX_HEIGHT);
 
+  // Update autocomplete dropdown as user types
+  useEffect(() => {
+    if (text.startsWith('/') && !text.includes('\n')) {
+      const query = text.toLowerCase();
+      const filtered = allSlashCommands.filter((cmd) =>
+        cmd.name.toLowerCase().startsWith(query),
+      );
+      if (filtered.length > 0 && text.length > 1) {
+        setAcItems(filtered);
+        setAcIndex(0);
+        setAcVisible(true);
+      } else if (text === '/') {
+        // Show all commands when just "/" is typed
+        setAcItems(allSlashCommands);
+        setAcIndex(0);
+        setAcVisible(true);
+      } else {
+        setAcVisible(false);
+      }
+    } else {
+      setAcVisible(false);
+    }
+  }, [text, allSlashCommands]);
+
+  // Auto-send queued message when agent finishes
+  useEffect(() => {
+    if (!isAgentBusy && queuedMessage) {
+      const queued = queuedMessage;
+      setQueuedMessage(null);
+      // Small delay to let UI settle
+      setTimeout(() => {
+        onSubmit?.(queued);
+      }, 100);
+    }
+  }, [isAgentBusy, queuedMessage, onSubmit]);
+
   // Submit handler -- routes slash commands locally or to engine
   const handleSubmit = useCallback(() => {
     const trimmed = text.trim();
-    if (!trimmed || isDisabled) return;
+    if (!trimmed) return;
+
+    // If agent is busy, queue the message for later
+    if (isAgentBusy) {
+      setQueuedMessage(trimmed);
+      chatActions.pushSystem(`Message queued: "${trimmed.length > 60 ? trimmed.slice(0, 60) + '...' : trimmed}"`, 'info');
+      setText('');
+      setCursorPos(0);
+      return;
+    }
 
     history.push(trimmed);
 
-    // Check for slash commands
+    // Check for slash commands — support multiple commands in one input
+    // e.g., "/clear /model gpt-4o" or "/compact /status"
     if (trimmed.startsWith('/')) {
-      const parsed = parseSlashCommand(trimmed);
-      if (parsed) {
-        // Show the user input in chat
-        chatActions.pushUser(trimmed);
+      // Split multiple commands: each /command starts a new command
+      const commandParts = trimmed.match(/\/[^\\/]+/g) || [trimmed];
+      const isMulti = commandParts.length > 1;
+
+      // Show the full user input in chat once
+      chatActions.pushUser(trimmed);
+
+      for (const cmdPart of commandParts) {
+        const singleCmd = cmdPart.trim();
+        if (!singleCmd.startsWith('/')) continue;
+
+        const parsed = parseSlashCommand(singleCmd);
+        if (!parsed) continue;
+
+        if (isMulti) {
+          // Show each sub-command as a system message for clarity
+          chatActions.pushSystem(`Running: ${singleCmd}`, 'info');
+        }
 
         if (parsed.handler === 'local') {
           // Handle locally
@@ -380,6 +458,71 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
               chatActions.pushSystem(output, 'info');
               break;
             }
+            case 'exit':
+            case 'quit':
+              engine.quit();
+              process.exit(0);
+              break;
+
+            case 'sidebar':
+              actions.toggleSidebar();
+              break;
+
+            case 'permissions':
+            case 'perm': {
+              const permArgs = parsed.args.trim();
+              if (permArgs) {
+                // Cycle to the requested mode
+                const modeNames: Record<string, string> = {
+                  'default': 'prompt', 'prompt': 'prompt',
+                  'plan': 'read-only', 'read-only': 'read-only',
+                  'accept-edits': 'workspace-write', 'workspace': 'workspace-write', 'workspace-write': 'workspace-write',
+                  'danger': 'danger-full-access', 'full': 'danger-full-access', 'full-access': 'danger-full-access', 'allow': 'danger-full-access',
+                };
+                const target = modeNames[permArgs.toLowerCase()];
+                if (target) {
+                  // Cycle until we reach the target mode (max 4 cycles)
+                  for (let i = 0; i < 4; i++) {
+                    if (ui.permissionMode === target) break;
+                    actions.cyclePermissionMode();
+                  }
+                  chatActions.pushSystem(`Permission mode: ${permArgs}`, 'info');
+                } else {
+                  chatActions.pushSystem(
+                    `Unknown mode: "${permArgs}"\n\nAvailable modes:\n  default — Ask before running tools\n  plan — Read-only, planning only\n  accept-edits — Auto-approve file edits\n  danger — Full auto-approve (no prompts)\n\nOr use Ctrl+P to cycle.`,
+                    'error',
+                  );
+                }
+              } else {
+                // No args — show current and cycle
+                const modeLabels: Record<string, string> = {
+                  'prompt': 'Default (ask before tools)',
+                  'read-only': 'Plan (read-only)',
+                  'workspace-write': 'Accept Edits (auto-approve file changes)',
+                  'danger-full-access': 'Danger (full auto-approve)',
+                };
+                const current = modeLabels[ui.permissionMode] || ui.permissionMode;
+                actions.cyclePermissionMode();
+                chatActions.pushSystem(`Permission mode: ${current}\nCycled to next mode. Use Ctrl+P to cycle, or /permissions <mode> to set directly.`, 'info');
+              }
+              break;
+            }
+
+            case 'vim': {
+              const newVimState = !vimEnabled;
+              setVimEnabled(newVimState);
+              if (!newVimState) {
+                setVimMode('insert'); // Reset to insert when disabling
+              }
+              chatActions.pushSystem(
+                newVimState
+                  ? 'Vim mode: ON\n\nControls:\n  Esc — NORMAL mode\n  i — INSERT mode\n  h/j/k/l — cursor movement\n  0/$ — start/end of line\n  x — delete char\n  o — new line below'
+                  : 'Vim mode: OFF\n\nInput behaves like a normal text box.',
+                'info',
+              );
+              break;
+            }
+
             case 'resume': {
               const args = parsed.args.trim();
               if (args === 'list') {
@@ -420,16 +563,28 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
           }
         } else {
           // Send to engine via bridge
-          engine.bridge.slashCommand(trimmed);
+          engine.bridge.slashCommand(singleCmd);
         }
+      } // end for loop over commandParts
 
-        setText('');
-        setCursorPos(0);
-        setVimMode('insert');
-        isNavigatingHistory.current = false;
-        return;
-      }
-      // Unknown slash command -- still submit as regular prompt
+      setText('');
+      setCursorPos(0);
+      setVimMode('insert');
+      isNavigatingHistory.current = false;
+      return;
+    }
+
+    // Check if any API key is configured before sending to AI
+    const hasKey = credentialManager.listCredentials().length > 0;
+    if (!hasKey) {
+      chatActions.pushUser(trimmed);
+      chatActions.pushSystem(
+        'No API key configured. Run /login <provider> <key> to get started.\n\nExample:\n  /login openai sk-abc123...\n  /login anthropic sk-ant-abc123...',
+        'error',
+      );
+      setText('');
+      setCursorPos(0);
+      return;
     }
 
     onSubmit?.(trimmed);
@@ -437,7 +592,7 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
     setCursorPos(0);
     setVimMode('insert');
     isNavigatingHistory.current = false;
-  }, [text, isDisabled, history, onSubmit, chatActions, engine]);
+  }, [text, isAgentBusy, history, onSubmit, chatActions, engine]);
 
   // Insert a character at cursor position
   const insertChar = useCallback((char: string) => {
@@ -509,11 +664,11 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
   // Keypress handler at priority 3 (input mode)
   useKeypress(
     useCallback((input, key, command) => {
-      // Don't consume events when disabled (let them pass to global handlers)
-      if (isDisabled) return false;
+      // When agent is busy, still allow typing but block submit (handled in handleSubmit)
+      // Don't block keypresses — user can type and queue messages
 
-      // --- Vim normal mode handling ---
-      if (vimMode === 'normal') {
+      // --- Vim normal mode handling (only when vim is enabled) ---
+      if (vimEnabled && vimMode === 'normal') {
         // Mode transitions
         if (input === 'i') { setVimMode('insert'); return true; }
         if (input === 'I') { moveHome(); setVimMode('insert'); return true; }
@@ -552,15 +707,14 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
 
       // --- Insert mode handling ---
 
-      // Escape -> enter normal mode
+      // Escape — always propagate (scroll mode, etc.)
       if (key.escape) {
-        // If the input is empty and not navigating history, let escape
-        // propagate to enter scroll mode (handled by command matching)
-        if (text.length === 0 && command === Command.ENTER_SCROLL_MODE) {
-          setVimMode('normal');
-          return false; // Let the scroll mode handler pick it up
-        }
-        setVimMode('normal');
+        return false;
+      }
+
+      // Ctrl+M — toggle vim normal/insert mode (only when vim enabled)
+      if (key.ctrl && input === 'm' && vimEnabled) {
+        setVimMode(vimMode === 'normal' ? 'insert' : 'normal');
         return true;
       }
 
@@ -678,11 +832,7 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
         return true;
       }
 
-      // Ctrl+E -> move to end
-      if (key.ctrl && input === 'e') {
-        setCursorPos(text.length);
-        return true;
-      }
+      // Ctrl+E -> toggle sidebar (handled by global handler, don't consume here)
 
       // Ctrl+W -> delete word backward
       if (key.ctrl && input === 'w') {
@@ -696,31 +846,35 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
 
       return false;
     }, [
-      isDisabled, vimMode, text, cursorPos, ui.contextFiles,
+      isAgentBusy, vimMode, text, cursorPos, ui.contextFiles,
       handleSubmit, insertChar, handleBackspace, handleDelete,
       moveLeft, moveRight, moveHome, moveEnd,
       historyUp, historyDown, actions, voice,
     ]),
-    { isActive: !isDisabled, priority: 3 },
+    { isActive: true, priority: 3 },
   );
 
   // Voice recording keypress handler (priority 7 -- intercepts during recording)
   useKeypress(
     useCallback((input, key, command) => {
-      if (command === Command.VOICE_STOP) {
-        if (key.escape) {
-          // Esc cancels without transcribing
-          voice.cancelRecording();
-        } else {
-          // Space or Enter: stop + transcribe
-          voice.stopRecording().then((transcript) => {
-            if (transcript) {
-              setText(transcript);
-              setCursorPos(transcript.length);
-              setVimMode('insert');
-            }
-          });
-        }
+      // VOICE_STOP is bound to Space, Escape, and Return, but the
+      // command resolver maps these to earlier-in-enum commands
+      // (START_VOICE_RECORDING, ENTER_SCROLL_MODE, SUBMIT). Check
+      // raw keys instead of the resolved command.
+      if (key.escape) {
+        // Esc cancels without transcribing
+        voice.cancelRecording();
+        return true;
+      }
+      if (input === ' ' || key.return) {
+        // Space or Enter: stop + transcribe
+        voice.stopRecording().then((transcript) => {
+          if (transcript) {
+            setText(transcript);
+            setCursorPos(transcript.length);
+            setVimMode('insert');
+          }
+        });
         return true;
       }
       // Block all other keys during voice recording
@@ -729,39 +883,103 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
     { isActive: voice.isRecording, priority: 7 },
   );
 
+  // Autocomplete keypress handler (priority 5 -- above input, below dialogs)
+  const handleAcSelect = useCallback((item: AutocompleteItem) => {
+    // Replace the current text with the selected command
+    const hasSpace = item.name.length < text.length;
+    setText(item.name + (hasSpace ? '' : ' '));
+    setCursorPos(item.name.length + 1);
+    setAcVisible(false);
+  }, [text]);
+
+  useKeypress(
+    useCallback((_input, key, command) => {
+      if (command === Command.AC_NEXT || key.downArrow) {
+        setAcIndex((prev) => Math.min(acItems.length - 1, prev + 1));
+        return true;
+      }
+      if (command === Command.AC_PREV || key.upArrow) {
+        setAcIndex((prev) => Math.max(0, prev - 1));
+        return true;
+      }
+      if (command === Command.AC_ACCEPT || key.tab) {
+        const item = acItems[acIndex];
+        if (item) {
+          setText(item.name + ' ');
+          setCursorPos(item.name.length + 1);
+          setAcVisible(false);
+        }
+        return true;
+      }
+      if (command === Command.AC_ACCEPT_SUBMIT || key.return) {
+        const item = acItems[acIndex];
+        if (item) {
+          // Enter on autocomplete = submit the command directly
+          setText(item.name);
+          setAcVisible(false);
+          // Submit after a tick so state updates
+          setTimeout(() => handleSubmit(), 0);
+        }
+        return true;
+      }
+      if (command === Command.AC_DISMISS || key.escape) {
+        setAcVisible(false);
+        return true;
+      }
+      return false;
+    }, [acItems, acIndex]),
+    { isActive: acVisible, priority: 5 },
+  );
+
   // -------------------------------------------------------------------------
   // Render helpers
   // -------------------------------------------------------------------------
 
+  // Helper: render text with slash commands highlighted in orange bold
+  const slashCmdColor = colors.text.slashCommand; // OA Orange
+
+  const renderColorizedText = (txt: string, defaultColor: string): React.ReactElement[] => {
+    // Find /command patterns and colorize them
+    const parts: React.ReactElement[] = [];
+    const regex = /(\/[a-zA-Z][\w-]*)/g;
+    let lastIdx = 0;
+    let matchArr: RegExpExecArray | null;
+    let partIdx = 0;
+
+    while ((matchArr = regex.exec(txt)) !== null) {
+      // Text before the command
+      if (matchArr.index > lastIdx) {
+        parts.push(<Text key={`t${partIdx++}`} color={defaultColor}>{txt.slice(lastIdx, matchArr.index)}</Text>);
+      }
+      // The /command itself — orange bold
+      parts.push(<Text key={`c${partIdx++}`} color={slashCmdColor} bold>{matchArr[1]}</Text>);
+      lastIdx = matchArr.index + matchArr[1]!.length;
+    }
+    // Remaining text after last command
+    if (lastIdx < txt.length) {
+      parts.push(<Text key={`t${partIdx++}`} color={defaultColor}>{txt.slice(lastIdx)}</Text>);
+    }
+    if (parts.length === 0) {
+      parts.push(<Text key="t0" color={defaultColor}>{txt}</Text>);
+    }
+    return parts;
+  };
+
   // Get the visible text with cursor indicator
   const renderTextWithCursor = (): React.ReactElement[] => {
-    if (isDisabled) {
-      const disabledLabel = ui.inputMode === 'streaming'
-        ? 'Responding...'
-        : ui.inputMode === 'agent_running'
-          ? `${ui.inputLabel || 'Agent running'}...`
-          : `${ui.inputLabel || 'Plan running'}...`;
-
-      return [
-        <Text key="disabled" color={colors.text.secondary} dimColor>
-          {`  ${disabledLabel}`}
-        </Text>,
-      ];
-    }
-
     if (text.length === 0) {
-      // Placeholder
-      const placeholder = vimMode === 'normal'
-        ? "  Press 'i' for INSERT mode"
-        : '  Type your message or @path/to/file';
+      // Show arrow prompt + cursor block + placeholder text
       return [
-        <Text key="placeholder" color={colors.text.secondary} dimColor>
-          {placeholder}
+        <Text key="placeholder">
+          <Text color={lineColor} bold>{'\u276F'} </Text>
+          <Text backgroundColor={colors.text.accent} color="#000000">{' '}</Text>
+          <Text color={colors.text.secondary} dimColor> Type a message or </Text>
+          <Text color={slashCmdColor} dimColor>/command</Text>
         </Text>,
       ];
     }
 
-    // Render text with a visible cursor
+    // Render arrow prompt + text with a visible cursor
     const lines = text.split('\n');
     const elements: React.ReactElement[] = [];
 
@@ -772,31 +990,34 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
       const lineEnd = lineStart + line.length;
 
       if (cursorPos >= lineStart && cursorPos <= lineEnd) {
-        // Cursor is on this line
+        // Cursor is on this line — split around cursor for highlighting
         const localCursor = cursorPos - lineStart;
         const before = line.slice(0, localCursor);
         const cursorChar = line[localCursor] ?? ' ';
         const after = line.slice(localCursor + 1);
 
+        const arrow = lineIdx === 0 ? '\u276F ' : '  ';
         elements.push(
           <Text key={`line-${lineIdx}`}>
-            <Text color={colors.text.primary}>{'  '}{before}</Text>
+            <Text color={lineColor} bold>{arrow}</Text>
+            {renderColorizedText(before, colors.text.primary)}
             <Text color={vimMode === 'normal' ? '#000000' : colors.text.primary}
                   backgroundColor={vimMode === 'normal' ? colors.text.primary : colors.text.accent}>
               {cursorChar}
             </Text>
-            <Text color={colors.text.primary}>{after}</Text>
+            {renderColorizedText(after, colors.text.primary)}
           </Text>,
         );
       } else {
+        const arrow = lineIdx === 0 ? '\u276F ' : '  ';
         elements.push(
-          <Text key={`line-${lineIdx}`} color={colors.text.primary}>
-            {'  '}{line}
+          <Text key={`line-${lineIdx}`}>
+            <Text color={lineColor} bold>{arrow}</Text>
+            {renderColorizedText(line, colors.text.primary)}
           </Text>,
         );
       }
 
-      // +1 for the newline character between lines
       charIndex = lineEnd + 1;
     }
 
@@ -811,7 +1032,7 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
     // Build left portion: icon + hint + vim mode
     const leftParts: React.ReactElement[] = [];
 
-    if (isDisabled) {
+    if (isAgentBusy) {
       const icon = ui.inputMode === 'streaming' ? '\u2819' : '\u25CF';
       const hintColor = ui.inputMode === 'streaming'
         ? colors.border.input.streaming
@@ -833,34 +1054,49 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
       leftParts.push(
         <Text key="hint" color={colors.text.secondary}>Enter to send {'\u00B7'} Ctrl+P mode </Text>,
       );
-      if (vimMode === 'normal') {
-        leftParts.push(
-          <Text key="vim" color={colors.status.warning} bold>[N] </Text>,
-        );
-      } else {
-        leftParts.push(
-          <Text key="vim" color={colors.status.done} bold>[I] </Text>,
-        );
-      }
     }
 
-    // Build right portion: badges + branch badge
+    // Queued message indicator
+    if (queuedMessage) {
+      leftParts.push(
+        <Text key="queued" color={colors.status.warning} bold> [queued] </Text>,
+      );
+    }
+
+    // Build right portion: colorful badges embedded in the horizontal rule
+    // Like Ratatui: ──── [⚡ Danger] [model] [No-Git] ────
     const rightParts: React.ReactElement[] = [];
 
-    // Permission mode badge (only when not default)
-    if (!isDisabled && ui.permissionMode !== 'prompt') {
+    // Horizontal rule fills space between left text and badges
+    rightParts.push(
+      <Text key="rule" color={lineColor}>{'\u2500'.repeat(3)} </Text>,
+    );
+
+    // Permission mode badge — colorful, always shown
+    rightParts.push(
+      <ModeBadge
+        key="mode"
+        label={`${permConfig.icon} ${permConfig.label}`}
+        bgColor={lineColor}
+        textColor="#000000"
+      />,
+    );
+    rightParts.push(<Text key="mode-sep"> </Text>);
+
+    // Model badge — gray background, only if configured (not "Run /login")
+    if (ui.currentModel && !ui.currentModel.startsWith('Run')) {
       rightParts.push(
         <ModeBadge
-          key="mode"
-          label={`${permConfig.icon} ${permConfig.label}`}
-          bgColor={lineColor}
-          textColor="#000000"
+          key="model"
+          label={ui.currentModel}
+          bgColor={colors.background.badge.model}
+          textColor={colors.text.primary}
         />,
       );
-      rightParts.push(<Text key="mode-sep"> </Text>);
+      rightParts.push(<Text key="model-sep"> </Text>);
     }
 
-    // Active agent badge
+    // Active agent badge — purple
     if (ui.activeAgent) {
       rightParts.push(
         <ModeBadge
@@ -873,26 +1109,15 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
       rightParts.push(<Text key="agent-sep"> </Text>);
     }
 
-    // Model badge
-    if (ui.currentModel) {
-      rightParts.push(
-        <ModeBadge
-          key="model"
-          label={ui.currentModel}
-          bgColor={colors.background.badge.model}
-          textColor={colors.text.primary}
-        />,
-      );
-      rightParts.push(<Text key="model-sep"> </Text>);
-    }
-
-    // Branch badge at the end of the horizontal line
+    // Git branch badge — blue background (like Ratatui)
     const branchText = ui.currentBranch || 'No-Git';
-
-    // Calculate how much space the left text + right badges take
-    // We'll let Ink handle the layout via flexbox
     rightParts.push(
-      <Text key="branch" color={lineColor}>[{branchText}]</Text>,
+      <ModeBadge
+        key="branch"
+        label={branchText}
+        bgColor={colors.text.accent}
+        textColor="#000000"
+      />,
     );
 
     return (
@@ -936,23 +1161,59 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
       );
     }
 
+    // Build cost display
+    const modelEntries = Object.entries(ui.modelCosts);
+    const totalCost = modelEntries.reduce((sum, [, v]) => sum + v.cost, 0);
+    const totalTokens = ui.totalInputTokens + ui.totalOutputTokens;
+
     const rightParts: React.ReactElement[] = [];
 
-    // Real credit balance from API provider
-    const creditLabel = credits.provider !== 'unknown'
-      ? `${credits.provider}: ${credits.balance}`
-      : credits.balance;
+    if (totalCost > 0) {
+      // Show per-model costs: "Sonnet 4: $2.65, GPT-4o: $0.12 · Total: $2.77"
+      const costParts = modelEntries
+        .filter(([, v]) => v.cost > 0.001)
+        .sort((a, b) => b[1].cost - a[1].cost)
+        .map(([model, v]) => `${model}: $${v.cost.toFixed(2)}`)
+        .join(', ');
 
-    rightParts.push(
-      <Text key="credits" color={credits.loading ? colors.text.secondary : colors.status.done} dimColor={credits.loading}>
-        {creditLabel}
-      </Text>,
-    );
+      rightParts.push(
+        <Text key="model-costs" color={colors.text.secondary} dimColor>
+          {costParts}
+        </Text>,
+      );
+      rightParts.push(
+        <Text key="total" color={colors.status.done}>
+          {' \u00B7 Total: $'}{totalCost.toFixed(2)}
+        </Text>,
+      );
+    } else if (totalTokens > 0) {
+      // No cost data yet but tokens used
+      const formatted = totalTokens >= 1000
+        ? `${(totalTokens / 1000).toFixed(1)}k tokens`
+        : `${totalTokens} tokens`;
+      rightParts.push(
+        <Text key="tokens" color={colors.text.secondary} dimColor>
+          {formatted}
+        </Text>,
+      );
+    } else {
+      // No usage yet — show API credits or balance
+      const creditLabel = credits.loading
+        ? 'checking\u2026'
+        : credits.provider !== 'unknown' && credits.balance.startsWith('$')
+          ? credits.balance
+          : 'API credits';
+      rightParts.push(
+        <Text key="credits" color={colors.text.secondary} dimColor>
+          {creditLabel}
+        </Text>,
+      );
+    }
 
     if (ui.mcpServerCount > 0) {
       rightParts.push(
         <Text key="mcp" color={colors.status.done} dimColor>
-          {rightParts.length > 0 ? ' ' : ''}MCP:{ui.mcpServerCount}
+          {' \u00B7 MCP:'}{ui.mcpServerCount}
         </Text>,
       );
     }
@@ -966,28 +1227,95 @@ export function InputBox({ onSubmit }: InputBoxProps): React.ReactElement {
   };
 
   // -------------------------------------------------------------------------
-  // Main render -- NO BORDER BOX, just stacked lines
+  // Main render -- Single-line bordered box that changes color with mode
   // -------------------------------------------------------------------------
 
   return (
-    <Box
-      flexDirection="column"
-      width={terminal.width}
-      minHeight={INPUT_MIN_HEIGHT}
-      height={dynamicHeight}
-    >
-      {/* -- Prompt line: icon + hints + badges + [branch] -- */}
-      {renderPromptLine()}
+    <Box flexDirection="column" width={terminal.width}>
+      {/* -- Autocomplete dropdown (appears above prompt line) -- */}
+      {acVisible && acItems.length > 0 && (
+        <Autocomplete
+          items={acItems}
+          selectedIndex={acIndex}
+          visible={acVisible}
+          onSelect={handleAcSelect}
+          onDismiss={() => setAcVisible(false)}
+          maxVisible={8}
+        />
+      )}
 
-      {/* -- Horizontal rule in permission mode color -- */}
-      {renderHorizontalRule()}
+      {/* -- Input box with badges embedded in the top border line -- */}
+      {/* Top border: ╭─ icon hint ──────── [Mode] [Model] [Branch] ─╮ */}
+      {(() => {
+        // Build the left title: "icon Enter to send · Ctrl+P mode"
+        const icon = isAgentBusy
+          ? (ui.inputMode === 'streaming' ? '\u2819' : '\u25CF')
+          : permConfig.icon;
+        const hintText = isAgentBusy
+          ? (ui.inputMode === 'streaming' ? 'Responding...' : `${ui.inputLabel || 'Running'}`)
+          : 'Enter to send \u00B7 Ctrl+P mode';
+        const leftTitle = `${icon} ${hintText}`;
 
-      {/* -- Input area -- */}
-      <Box flexDirection="column" flexGrow={1} paddingX={0}>
-        {renderTextWithCursor()}
-      </Box>
+        // Build badge strings for width calculation
+        const modeBadge = ` ${permConfig.icon} ${permConfig.label} `;
+        const modelBadge = (ui.currentModel && !ui.currentModel.startsWith('Run'))
+          ? ` ${ui.currentModel} `
+          : '';
+        const branchBadge = ` ${ui.currentBranch || 'No-Git'} `;
 
-      {/* -- Bottom line: context files left, credits right -- */}
+        // Calculate fill dashes
+        const badgesWidth = modeBadge.length + (modelBadge ? modelBadge.length + 1 : 0) + branchBadge.length + 2;
+        const leftTitleWidth = leftTitle.length + 2; // +2 for ╭─ prefix
+        const fillWidth = Math.max(1, terminal.width - leftTitleWidth - badgesWidth - 3);
+
+        return (
+          <Text>
+            <Text color={lineColor}>{'\u256D\u2500'}</Text>
+            <Text color={isAgentBusy ? colors.text.secondary : lineColor} bold={!isAgentBusy}>{` ${leftTitle} `}</Text>
+            <Text color={lineColor}>{'\u2500'.repeat(fillWidth)}</Text>
+            <Text backgroundColor={lineColor} color="#000000" bold>{modeBadge}</Text>
+            {modelBadge ? <Text> </Text> : null}
+            {modelBadge ? <Text backgroundColor={colors.background.badge.model} color={colors.text.primary} bold>{modelBadge}</Text> : null}
+            <Text> </Text>
+            <Text backgroundColor={colors.text.accent} color="#000000" bold>{branchBadge}</Text>
+            <Text color={lineColor}>{'\u2500\u256E'}</Text>
+          </Text>
+        );
+      })()}
+
+      {/* Input area with side borders — minimum 4 lines tall */}
+      {(() => {
+        const inputLines = renderTextWithCursor();
+        const minRows = 4;
+        const padRows = Math.max(0, minRows - inputLines.length);
+        const innerW = Math.max(0, terminal.width - 4); // 2 borders + 2 padding
+
+        return (
+          <Box flexDirection="column">
+            {/* Content rows */}
+            {inputLines.map((line, i) => (
+              <Box key={`row-${i}`}>
+                <Text color={lineColor}>{'\u2502'} </Text>
+                <Box flexGrow={1}>{line}</Box>
+                <Text color={lineColor}> {'\u2502'}</Text>
+              </Box>
+            ))}
+            {/* Empty padding rows to fill minimum height */}
+            {Array.from({ length: padRows }, (_, i) => (
+              <Text key={`pad-${i}`}>
+                <Text color={lineColor}>{'\u2502'}</Text>
+                <Text>{' '.repeat(innerW + 2)}</Text>
+                <Text color={lineColor}>{'\u2502'}</Text>
+              </Text>
+            ))}
+          </Box>
+        );
+      })()}
+
+      {/* Bottom border */}
+      <Text color={lineColor}>{'\u2570'}{'\u2500'.repeat(Math.max(0, terminal.width - 2))}{'\u256F'}</Text>
+
+      {/* -- Bottom line BELOW the box: context files left, credits right -- */}
       {renderBottomLine()}
     </Box>
   );

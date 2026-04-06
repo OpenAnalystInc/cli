@@ -113,13 +113,13 @@ export function ChatProvider({ children }) {
                 return [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
             });
         },
-        completeToolCall(toolId, status, output, durationMs) {
+        completeToolCall(toolId, status, output, durationMs, diff) {
             setMessages((prev) => {
                 const idx = prev.findIndex((m) => m.kind === 'tool_call' && m.toolId === toolId);
                 if (idx === -1)
                     return prev;
                 const msg = prev[idx];
-                const updated = { ...msg, status, output, durationMs };
+                const updated = { ...msg, status, output, durationMs, diff };
                 return [...prev.slice(0, idx), updated, ...prev.slice(idx + 1)];
             });
         },

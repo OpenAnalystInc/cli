@@ -171,9 +171,11 @@ export const defaultKeyBindings = new Map([
         ]],
     [Command.TOGGLE_SIDEBAR, [
             new KeyBinding('ctrl+\\'),
+            new KeyBinding('ctrl+e'),
         ]],
     [Command.FOCUS_SIDEBAR, [
             new KeyBinding('f2'),
+            new KeyBinding('ctrl+e'),
         ]],
     [Command.CLEAR_CHAT, [
             new KeyBinding('ctrl+l'),

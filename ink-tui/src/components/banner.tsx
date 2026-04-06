@@ -1,14 +1,16 @@
 /**
  * Banner -- startup banner rendered once at the top of the chat panel.
  *
- * Mirrors the Rust `crates/tui/src/banner.rs`:
- *   - Dual-column layout: left (welcome + OA logo + account info) + right (tips + recent activity)
+ * Matches Rust banner.rs structure exactly, with centered left-column text:
+ *   - Dual-column: left (centered welcome + OA logo + account info) + right (tips + activity)
  *   - Rounded-corner box-drawing border in OA brand blue
- *   - Large "OA" ASCII art logo in ORANGE
- *   - Adapts to terminal width
- *
- * This component is rendered once from the chat panel when the engine
- * sends a `banner` event. It stays pinned at the top of the scroll buffer.
+ *   - Large "OA" ASCII art logo in ORANGE — centered
+ *   - "Welcome back, ..." bright white bold — centered
+ *   - model · provider — centered (white)
+ *   - email — centered (dim)
+ *   - Credits: ... — centered (green)
+ *   - cwd — centered (dim)
+ *   - Right column: "Tips for getting started" header (green) + tip lines + Recent activity
  */
 
 import React, { useMemo } from 'react';
@@ -16,15 +18,15 @@ import { Box, Text } from 'ink';
 import { useTheme } from '../contexts/theme-context.js';
 
 // ---------------------------------------------------------------------------
-// OA ASCII art logo (matches Rust banner.rs)
+// OA ASCII art logo — trimmed for accurate centering
 // ---------------------------------------------------------------------------
 
 const OA_LOGO: readonly string[] = [
-  '   \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588   \u2588\u2588\u2588\u2588         ',
-  '   \u2588\u2588    \u2588\u2588  \u2588\u2588  \u2588\u2588        ',
-  '   \u2588\u2588    \u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588        ',
-  '   \u2588\u2588    \u2588\u2588  \u2588\u2588  \u2588\u2588        ',
-  '   \u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588  \u2588\u2588        ',
+  '\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588   \u2588\u2588\u2588\u2588',
+  '\u2588\u2588    \u2588\u2588  \u2588\u2588  \u2588\u2588',
+  '\u2588\u2588    \u2588\u2588  \u2588\u2588\u2588\u2588\u2588\u2588',
+  '\u2588\u2588    \u2588\u2588  \u2588\u2588  \u2588\u2588',
+  '\u2588\u2588\u2588\u2588\u2588\u2588\u2588\u2588  \u2588\u2588  \u2588\u2588',
 ];
 
 // ---------------------------------------------------------------------------
@@ -32,25 +34,15 @@ const OA_LOGO: readonly string[] = [
 // ---------------------------------------------------------------------------
 
 export interface BannerProps {
-  /** Application version string (e.g. "2.0.10"). */
   version: string;
-  /** User display name. */
   username: string;
-  /** User email (optional). */
   email?: string;
-  /** Organization name (optional). */
   org?: string;
-  /** Current working directory path. */
   workingDir: string;
-  /** Provider display name (e.g. "Anthropic"). */
   provider?: string;
-  /** Model display name (e.g. "claude-sonnet-4-20250514"). */
   modelDisplay?: string;
-  /** Credit balance (optional). */
   credits?: string;
-  /** Tips list for the right column. */
   tips: string[];
-  /** Available terminal width for sizing. Default: 80. */
   terminalWidth?: number;
 }
 
@@ -58,23 +50,27 @@ export interface BannerProps {
 // Helpers
 // ---------------------------------------------------------------------------
 
-/** Truncate a string with ellipsis if it exceeds maxLen. */
 function truncate(str: string, maxLen: number): string {
   if (str.length <= maxLen) return str;
   return str.slice(0, maxLen - 1) + '\u2026';
 }
 
-/** Truncate working directory from the left with ... prefix. */
 function truncateCwd(cwd: string, maxLen: number): string {
   if (cwd.length <= maxLen) return cwd;
   const keep = maxLen - 2;
   return '\u2026' + cwd.slice(cwd.length - keep);
 }
 
-/** Pad a string to exactly `len` characters (right-padded with spaces). */
 function padRight(str: string, len: number): string {
   if (str.length >= len) return str.slice(0, len);
   return str + ' '.repeat(len - str.length);
+}
+
+function centerPad(str: string, width: number): string {
+  if (str.length >= width) return str.slice(0, width);
+  const lp = Math.floor((width - str.length) / 2);
+  const rp = width - str.length - lp;
+  return ' '.repeat(lp) + str + ' '.repeat(rp);
 }
 
 // ---------------------------------------------------------------------------
@@ -95,11 +91,11 @@ export function Banner({
 }: BannerProps): React.ReactElement {
   const { colors } = useTheme();
 
-  // Compute column widths based on terminal width.
   const layout = useMemo(() => {
-    const rightW = Math.min(38, Math.max(24, Math.floor(terminalWidth * 0.35)));
-    // Total inner = terminalWidth - 3 (for border chars) - 1 (middle divider)
-    const totalInner = terminalWidth - 4;
+    // Cap banner width like Claude Code — compact, not full terminal width
+    const maxBannerWidth = Math.min(terminalWidth - 2, 100);
+    const totalInner = maxBannerWidth - 3; // 3 border chars: │ │ │
+    const rightW = Math.min(34, Math.max(18, Math.floor(totalInner * 0.35)));
     const leftW = totalInner - rightW;
     return { leftW, rightW };
   }, [terminalWidth]);
@@ -107,161 +103,194 @@ export function Banner({
   const { leftW, rightW } = layout;
   const brandColor = colors.text.accent;
   const dimColor = colors.text.secondary;
-  const headingColor = colors.text.heading;
   const doneColor = colors.status.done;
-  const logoColor = '#FF8C00'; // Orange for OA logo (matches Rust: Color::Rgb(255, 140, 0))
+  const logoColor = colors.text.slashCommand; // OA Orange — via semantic token
 
-  // Title text
-  const titleText = provider
+  // ── Top border: ╭─ OpenAnalyst CLI v2.0.12 ──┬──────────────╮ ──
+  const titleText = provider && provider !== 'OpenAnalyst Inc'
     ? `OpenAnalyst CLI v${version} \u00B7 ${provider}`
     : `OpenAnalyst CLI v${version}`;
 
-  // -- Build rows --
+  const verText = ` ${truncate(titleText, leftW - 4)} `;
+  const leftFill = Math.max(0, leftW - verText.length - 1);
+  const rightFill = Math.max(0, rightW);
 
-  // Helper: build a branded dual-column row
-  const buildRow = (
+  // ── Right column content (matches Rust banner.rs tip_lines) ──
+  const isOA = !provider || provider === 'OpenAnalyst Inc';
+  const tipLines: Array<{ text: string; color: string }> = [];
+
+  // Row 0: blank (paired with Welcome row)
+  tipLines.push({ text: '', color: dimColor });
+  // Row 1: blank spacer
+  tipLines.push({ text: '', color: dimColor });
+  // Rows 2-6: paired with logo rows
+  if (isOA) {
+    tipLines.push({ text: ' Run /init to create an', color: dimColor });
+    tipLines.push({ text: ' OPENANALYST.md file with', color: dimColor });
+    tipLines.push({ text: ' instructions for OpenAnalyst', color: dimColor });
+    tipLines.push({ text: ' Recent activity', color: doneColor });
+    tipLines.push({ text: ' No recent activity', color: dimColor });
+  } else {
+    tipLines.push({ text: ' Run /init to create a', color: dimColor });
+    tipLines.push({ text: ' project config file with', color: dimColor });
+    tipLines.push({ text: ' instructions for the agent', color: dimColor });
+    tipLines.push({ text: ' Recent activity', color: doneColor });
+    tipLines.push({ text: ' No recent activity', color: dimColor });
+  }
+
+  // ── Row builder: all pure <Text> ──
+  const row = (
     leftText: string,
     leftColor: string,
     leftBold: boolean,
     rightText: string,
     rightColor: string,
   ): React.ReactElement => {
-    const lPadded = padRight(leftText, leftW);
-    const rPadded = padRight(rightText, rightW);
+    const lPad = padRight(leftText, leftW);
+    const rPad = padRight(rightText, rightW);
     return (
       <Text>
         <Text color={brandColor}>{'\u2502'}</Text>
-        <Text color={leftColor} bold={leftBold}>{lPadded}</Text>
+        <Text color={leftColor} bold={leftBold}>{lPad}</Text>
         <Text color={brandColor}>{'\u2502'}</Text>
-        <Text color={rightColor}>{rPadded}</Text>
+        <Text color={rightColor}>{rPad}</Text>
         <Text color={brandColor}>{'\u2502'}</Text>
       </Text>
     );
   };
 
-  // Helper: build a row with the OA logo on the left (orange) and tip on the right
-  const buildLogoRow = (
-    logoLine: string,
-    rightText: string,
-    rightColor: string,
-  ): React.ReactElement => {
-    const lPadded = padRight(logoLine, leftW);
-    const rPadded = padRight(rightText, rightW);
-    return (
-      <Text>
-        <Text color={brandColor}>{'\u2502'}</Text>
-        <Text color={logoColor}>{lPadded}</Text>
-        <Text color={brandColor}>{'\u2502'}</Text>
-        <Text color={rightColor}>{rPadded}</Text>
-        <Text color={brandColor}>{'\u2502'}</Text>
-      </Text>
-    );
-  };
+  // ── Left column content — all centered ──
+  const welcomeText = `Welcome back, ${truncate(username, leftW - 20)}!`;
 
-  // -- Top border --
-  const verText = ` ${truncate(titleText, leftW - 2)} `;
-  const leftPad = Math.max(0, leftW - verText.length - 1);
-  const rightTitleText = ' Tips for getting started ';
-  const rightPad = Math.max(0, rightW - rightTitleText.length);
+  const modelLine = modelDisplay
+    ? (provider ? `${modelDisplay} \u00B7 ${provider}` : modelDisplay)
+    : '';
 
-  // -- Tip lines for right column (paired with logo rows) --
-  const isOA = !provider || provider === 'OpenAnalyst Inc';
-  const tipContent = isOA
-    ? [
-        ' Run /init to create an',
-        ' OPENANALYST.md file with',
-        ' instructions for OpenAnalyst',
-        ' Recent activity',
-        ' No recent activity',
-      ]
-    : [
-        ' Run /init to create a',
-        ' project config file with',
-        ' instructions for the agent',
-        ' Recent activity',
-        ' No recent activity',
-      ];
-
-  // -- Info lines for below the logo --
-  const infoLines: Array<{ text: string; color: string; bold: boolean }> = [];
-
-  // Model + provider
-  if (modelDisplay) {
-    const modelLine = provider
-      ? ` ${modelDisplay} \u00B7 ${provider}`
-      : ` ${modelDisplay}`;
-    infoLines.push({ text: truncate(modelLine, leftW), color: headingColor, bold: false });
-  }
-
-  // Email + org
+  let emailLine = '';
   if (email) {
-    let line = ` ${email}`;
-    if (org) line += ` \u00B7 ${org}`;
-    infoLines.push({ text: truncate(line, leftW), color: dimColor, bold: false });
+    emailLine = org ? `${email} \u00B7 ${org}` : email;
   }
 
-  // Credits
-  if (credits) {
-    infoLines.push({ text: ` Credits: ${credits}`, color: doneColor, bold: false });
-  }
+  const creditsLine = credits
+    ? `Credits: ${credits}`
+    : 'Credits: checking\u2026';
 
-  // Working directory
-  infoLines.push({
-    text: ` ${truncateCwd(workingDir, leftW - 2)}`,
-    color: dimColor,
-    bold: false,
-  });
+  const cwdLine = truncateCwd(workingDir, leftW - 4);
 
   return (
     <Box flexDirection="column">
-      {/* Top border with version on left and Tips header on right */}
+      {/* ── Top border ── */}
       <Text color={brandColor} bold>
-        {'\u256D\u2500'}{verText}{'\u2500'.repeat(leftPad)}{'\u252C\u2500'}{rightTitleText}{'\u2500'.repeat(rightPad)}{'\u256E'}
+        {'\u256D'}{'\u2500' + verText + '\u2500'.repeat(leftFill)}{'\u252C'}{'\u2500'.repeat(rightFill)}{'\u256E'}
       </Text>
 
-      {/* Welcome row */}
-      {buildRow(
-        `  Welcome back, ${truncate(username, leftW - 18)}!`,
-        headingColor,
-        true,
-        '',
-        dimColor,
+      {/* ── Welcome | Tips header ── */}
+      {row(
+        centerPad(welcomeText, leftW),
+        colors.text.strong, true,
+        ' Tips for getting started', doneColor,
       )}
 
-      {/* Blank spacer */}
-      {buildRow('', dimColor, false, '', dimColor)}
+      {/* ── Blank spacer ── */}
+      {row('', dimColor, false, '', dimColor)}
 
-      {/* OA logo rows (5 lines) paired with tip content on the right */}
+      {/* ── OA logo (5 rows) + tip content on right ── */}
       {OA_LOGO.map((logoLine, i) => {
-        const tipLine = tipContent[i] ?? '';
-        // "Recent activity" label is green, others are dim
-        const tipColor = i === 3 ? doneColor : dimColor;
+        const tip = tipLines[i + 2]; // offset by 2 (welcome + spacer)
+        const lPad = padRight(centerPad(logoLine, leftW), leftW);
+        const rPad = padRight(tip?.text ?? '', rightW);
         return (
-          <React.Fragment key={`logo-${i}`}>
-            {buildLogoRow(logoLine, tipLine, tipColor)}
-          </React.Fragment>
+          <Text key={`logo-${i}`}>
+            <Text color={brandColor}>{'\u2502'}</Text>
+            <Text color={logoColor}>{lPad}</Text>
+            <Text color={brandColor}>{'\u2502'}</Text>
+            <Text color={tip?.color ?? dimColor}>{rPad}</Text>
+            <Text color={brandColor}>{'\u2502'}</Text>
+          </Text>
         );
       })}
 
-      {/* Blank separator */}
-      {buildRow('', dimColor, false, '', dimColor)}
+      {/* ── Blank separator ── */}
+      {row('', dimColor, false, '', dimColor)}
 
-      {/* Info rows below the logo */}
-      {infoLines.map((info, i) => (
-        <React.Fragment key={`info-${i}`}>
-          {buildRow(info.text, info.color, info.bold, '', dimColor)}
-        </React.Fragment>
-      ))}
+      {/* ── Info section: 2-column labeled layout ── */}
+      {(() => {
+        // Build labeled info rows: "  Label:  value"
+        // Split into left-label and right-value within leftW
+        const infoRow = (
+          label: string,
+          value: string,
+          labelColor: string,
+          valueColor: string,
+          tip: string,
+          tipColor: string,
+        ): React.ReactElement => {
+          const labelStr = `  ${label}  `;
+          const valueStr = truncate(value, leftW - labelStr.length - 1);
+          const combined = labelStr + valueStr;
+          const lPad = padRight(combined, leftW);
+          const rPad = padRight(tip, rightW);
+          return (
+            <Text>
+              <Text color={brandColor}>{'\u2502'}</Text>
+              <Text color={labelColor} bold>{labelStr}</Text>
+              <Text color={valueColor}>{padRight(valueStr, leftW - labelStr.length)}</Text>
+              <Text color={brandColor}>{'\u2502'}</Text>
+              <Text color={tipColor}>{rPad}</Text>
+              <Text color={brandColor}>{'\u2502'}</Text>
+            </Text>
+          );
+        };
 
-      {/* Bottom border */}
+        const elements: React.ReactElement[] = [];
+
+        // Model
+        if (modelDisplay) {
+          elements.push(
+            <React.Fragment key="model">
+              {infoRow('Model:', modelDisplay, dimColor, colors.text.primary, '', dimColor)}
+            </React.Fragment>
+          );
+        }
+
+        // Provider
+        if (provider) {
+          elements.push(
+            <React.Fragment key="provider">
+              {infoRow('Provider:', provider, dimColor, colors.text.primary, '', dimColor)}
+            </React.Fragment>
+          );
+        }
+
+        // Credits — show balance or status clearly
+        const creditDisplay = !credits || credits === 'No API key configured'
+          ? 'Not configured'
+          : credits === 'Connected'
+            ? 'Active (usage-based)'
+            : credits;
+        const creditColor = credits && credits.startsWith('$') ? doneColor : dimColor;
+        elements.push(
+          <React.Fragment key="credits">
+            {infoRow('Credits:', creditDisplay, dimColor, creditColor, '', dimColor)}
+          </React.Fragment>
+        );
+
+        // Working directory
+        elements.push(
+          <React.Fragment key="cwd">
+            {infoRow('Dir:', cwdLine, dimColor, dimColor, '', dimColor)}
+          </React.Fragment>
+        );
+
+        return elements;
+      })()}
+
+      {/* ── Bottom border ── */}
       <Text color={brandColor} bold>
         {'\u2570'}{'\u2500'.repeat(leftW)}{'\u2534'}{'\u2500'.repeat(rightW)}{'\u256F'}
       </Text>
 
-      {/* Empty line */}
-      <Text>{' '}</Text>
-
-      {/* Hint line below the box */}
+      {/* Hint line (directly after border, no gap) */}
       <Text>
         <Text color={brandColor}>  /help</Text>
         <Text color={dimColor}> for commands {'\u00B7'} </Text>
@@ -270,9 +299,6 @@ export function Banner({
         <Text color={brandColor}>ctrl+c</Text>
         <Text color={dimColor}> to exit</Text>
       </Text>
-
-      {/* Empty line */}
-      <Text>{' '}</Text>
     </Box>
   );
 }

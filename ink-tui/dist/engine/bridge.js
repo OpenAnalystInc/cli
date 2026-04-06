@@ -14,6 +14,7 @@
 import { spawn } from 'node:child_process';
 import { createInterface } from 'node:readline';
 import { EventEmitter } from 'node:events';
+import { userInfo } from 'node:os';
 import { EngineEventSchema, } from '../types/messages.js';
 // ---------------------------------------------------------------------------
 // Timestamp helper
@@ -112,16 +113,20 @@ export class EngineBridge extends EventEmitter {
         this.sendAction('cancel_agent', { agentId });
     }
     resolvePermission(requestId, decision) {
-        this.sendAction('resolve_permission', { requestId, decision });
+        // Rust expects "permission_response" with { requestId, allow: boolean }
+        this.sendAction('permission_response', { requestId, allow: decision === 'allow' });
     }
     resolveAskUser(requestId, answer) {
-        this.sendAction('resolve_ask_user', { requestId, answer });
+        // Rust expects "ask_user_response" with { requestId, response }
+        this.sendAction('ask_user_response', { requestId, response: answer });
     }
     sendKbFeedback(queryId, rating, comment, correction) {
-        this.sendAction('kb_feedback', { queryId, rating, comment, correction });
+        // Rust expects "knowledge_feedback" with required comment/correction strings
+        this.sendAction('knowledge_feedback', { queryId, rating, comment: comment ?? '', correction: correction ?? '' });
     }
     changePermissionMode(mode) {
-        this.sendAction('change_permission_mode', { mode });
+        // Rust expects "update_permissions" (newtype variant -- may not deserialize correctly)
+        this.sendAction('update_permissions', { mode });
     }
     toggleContextFile(path, action) {
         this.sendAction('toggle_context_file', { path, action });
@@ -248,24 +253,94 @@ export class EngineBridge extends EventEmitter {
         const emitter = new EventEmitter();
         this.mockEmitter = emitter;
         this.setConnectionState('connected');
-        // Emit a banner on start
-        setTimeout(() => {
+        // Emit a banner on start — pull real user data from credentials + preferences
+        setTimeout(async () => {
             if (this.disposed)
                 return;
+            // Import dynamically to avoid circular deps
+            const { credentialManager, PROVIDER_CONFIG } = await import('../utils/credential-manager.js');
+            const { providerPreferences } = await import('../utils/provider-preferences.js');
+            const { fetchCredits } = await import('../utils/credit-checker.js');
+            // Get the user's default provider and credentials
+            const defaultProvider = providerPreferences.getDefaultProvider();
+            const models = providerPreferences.getModelsForProvider(defaultProvider || '');
+            // Intelligent model selection per tier
+            const fastModel = models.find(m => m.tier === 'fast') ?? null;
+            const balancedModel = models.find(m => m.tier === 'balanced') ?? null;
+            const capableModel = models.find(m => m.tier === 'capable') ?? null;
+            // Default model = balanced tier (the sweet spot of cost vs quality)
+            const defaultModel = balancedModel ?? capableModel ?? fastModel ?? null;
+            // Get the REAL provider display name from config
+            const providerConfig = defaultProvider ? PROVIDER_CONFIG[defaultProvider] : null;
+            const providerDisplayName = providerConfig?.displayName || 'Not configured';
+            // Fetch real credit balance
+            let creditStr = 'No API key configured';
+            try {
+                const creditInfo = await fetchCredits();
+                if (creditInfo.provider !== 'unknown') {
+                    creditStr = creditInfo.balance;
+                }
+            }
+            catch {
+                // Keep default
+            }
+            // Model display: human-readable name like "Sonnet 4", "GPT-4o", "Gemini 2.5 Pro"
+            const modelDisplay = defaultModel
+                ? defaultModel.name
+                : 'Run /login to configure';
+            // OS username
+            const displayName = process.env['USER'] || process.env['USERNAME'] || userInfo().username || 'User';
+            // Provider/org: actual company name
+            // OpenAI key → "OpenAI", Anthropic key → "Anthropic", Gemini → "Google"
+            // Only "OpenAnalyst Inc" when using the OpenAnalyst platform key
+            const orgName = defaultProvider === 'openanalyst'
+                ? 'OpenAnalyst Inc'
+                : providerDisplayName;
             this.emit('event', {
                 type: 'banner',
                 timestamp: now(),
-                version: '2.0.10-dev',
-                displayName: 'Developer',
-                email: 'dev@openanalyst.ai',
-                provider: 'OpenAnalyst Inc',
-                modelDisplay: 'oa-4-turbo (mock)',
+                version: '2.0.12',
+                displayName,
+                organization: orgName,
+                provider: orgName,
+                modelDisplay,
+                credits: creditStr,
                 workingDir: process.cwd(),
-                tips: [
-                    'This is mock mode -- no real engine is running',
-                    'Type a prompt to see simulated streaming',
-                    'Ctrl+P to cycle permission modes',
-                ],
+                tips: defaultProvider
+                    ? [
+                        `/model to switch AI models`,
+                        `Provider: ${providerDisplayName}`,
+                        'Ctrl+E to toggle sidebar',
+                    ]
+                    : [
+                        'Run /login <provider> <key>',
+                        'OpenAI, Anthropic, Gemini, xAI',
+                        'Run /help for all commands',
+                    ],
+            });
+            // Intelligent routing: right model for the right job
+            // Explore = fast (cheap, quick scans) — Haiku, GPT-4o-mini, Gemini Flash
+            // Research = balanced (reading, understanding) — Sonnet, GPT-4o, Gemini Pro
+            // Code = balanced (writing code) — Sonnet, GPT-4o, Gemini Pro
+            // Write = capable (complex reasoning, planning) — Opus, GPT-4.1, Gemini 2.5 Pro
+            this.emit('event', {
+                type: 'sidebar_update',
+                timestamp: now(),
+                agents: [],
+                files: [],
+                plans: [],
+                routing: {
+                    explore: { model: fastModel?.name || 'none', tier: 'fast' },
+                    research: { model: balancedModel?.name || 'none', tier: 'balanced' },
+                    code: { model: balancedModel?.name || 'none', tier: 'balanced' },
+                    write: { model: capableModel?.name || 'none', tier: 'capable' },
+                },
+                activity: {
+                    backgroundTasks: 0,
+                    toolCallCount: 0,
+                    mcpServers: 0,
+                    creditBalance: creditStr,
+                },
             });
         }, 100);
         // React to TUI actions in mock mode
@@ -291,14 +366,66 @@ export class EngineBridge extends EventEmitter {
                 dispatch({ type: 'system_message', timestamp: now(), content: 'Agent cancelled (mock)', level: 'info' });
                 dispatch({ type: 'status_update', timestamp: now(), phase: 'idle', elapsedMs: 0 });
                 break;
-            case 'resolve_permission':
-                dispatch({ type: 'system_message', timestamp: now(), content: `Permission ${action.decision}ed (mock)`, level: 'info' });
+            case 'permission_response':
+                dispatch({ type: 'system_message', timestamp: now(), content: `Permission ${action.allow ? 'allow' : 'deny'}ed (mock)`, level: 'info' });
                 break;
-            case 'resolve_ask_user':
-                dispatch({ type: 'system_message', timestamp: now(), content: `User responded: "${action.answer}" (mock)`, level: 'info' });
+            case 'ask_user_response':
+                dispatch({ type: 'system_message', timestamp: now(), content: `User responded: "${action.response}" (mock)`, level: 'info' });
                 break;
             case 'clear_chat':
                 dispatch({ type: 'system_message', timestamp: now(), content: 'Chat cleared (mock)', level: 'info' });
+                break;
+            case 'slash_command': {
+                const cmd = action.command || '';
+                dispatch({
+                    type: 'system_message',
+                    timestamp: now(),
+                    content: `[Mock] Command received: ${cmd}\nThis command requires the real engine to be running.`,
+                    level: 'info',
+                });
+                break;
+            }
+            case 'update_model': {
+                const model = action.model ?? 'unknown';
+                dispatch({ type: 'system_message', timestamp: now(), content: `[Mock] Model changed to: ${model}`, level: 'info' });
+                dispatch({ type: 'model_info', timestamp: now(), name: model, provider: 'mock' });
+                break;
+            }
+            case 'update_permissions': {
+                const mode = action.mode ?? 'prompt';
+                dispatch({ type: 'system_message', timestamp: now(), content: `[Mock] Permission mode set to: ${mode}`, level: 'info' });
+                break;
+            }
+            case 'toggle_context_file': {
+                const path = action.path ?? '';
+                const fileAction = action.action ?? 'add';
+                dispatch({ type: 'system_message', timestamp: now(), content: `[Mock] Context file ${fileAction}: ${path}`, level: 'info' });
+                break;
+            }
+            case 'change_routing': {
+                const category = action.category ?? '';
+                const tier = action.tier ?? '';
+                dispatch({ type: 'system_message', timestamp: now(), content: `[Mock] Routing changed: ${category} -> ${tier}`, level: 'info' });
+                break;
+            }
+            case 'moe_dispatch':
+                dispatch({ type: 'system_message', timestamp: now(), content: '[Mock] MoE dispatch received (requires real engine)', level: 'info' });
+                break;
+            case 'inject_skill':
+                dispatch({ type: 'system_message', timestamp: now(), content: `[Mock] Skill injected: ${action.command ?? ''}`, level: 'info' });
+                break;
+            case 'run_in_background':
+                dispatch({ type: 'system_message', timestamp: now(), content: `[Mock] Running in background: "${action.text ?? ''}"`, level: 'info' });
+                dispatch({ type: 'status_update', timestamp: now(), phase: 'idle', elapsedMs: 0 });
+                break;
+            case 'knowledge_feedback':
+                dispatch({ type: 'system_message', timestamp: now(), content: '[Mock] KB feedback recorded', level: 'info' });
+                break;
+            case 'voice_transcribed':
+                dispatch({ type: 'system_message', timestamp: now(), content: `[Mock] Voice transcribed: "${action.text ?? ''}"`, level: 'info' });
+                break;
+            case 'quit':
+                dispatch({ type: 'system_message', timestamp: now(), content: '[Mock] Quit requested', level: 'info' });
                 break;
             default:
                 break;
@@ -315,7 +442,7 @@ export class EngineBridge extends EventEmitter {
             if (this.disposed)
                 return;
             elapsed = 300;
-            dispatch({ type: 'tool_call_start', timestamp: now(), agentId, toolId: 'mock-tool-1', toolName: 'Read', inputPreview: 'src/index.ts' });
+            dispatch({ type: 'tool_call_start', timestamp: now(), agentId, callId: 'mock-tool-1', toolName: 'Read', inputPreview: 'src/index.ts' });
             dispatch({ type: 'status_update', timestamp: now(), phase: 'reading_file', label: 'index.ts', elapsedMs: elapsed });
         }, 300);
         // Complete tool call after 600ms
@@ -323,9 +450,102 @@ export class EngineBridge extends EventEmitter {
             if (this.disposed)
                 return;
             elapsed = 600;
-            dispatch({ type: 'tool_call_complete', timestamp: now(), agentId, toolId: 'mock-tool-1', status: 'completed', output: '// Entry point\nimport { App } from "./app";\n// ...', durationMs: 280 });
+            dispatch({ type: 'tool_call_end', timestamp: now(), agentId, callId: 'mock-tool-1', isError: false, output: '// Entry point\nimport { App } from "./app";\n// ...', duration: 280, diff: {
+                    filePath: 'src/index.ts',
+                    hunks: [{
+                            oldStart: 1,
+                            newStart: 1,
+                            lines: [
+                                { kind: 'context', text: 'import { App } from "./app";' },
+                                { kind: 'removed', text: '// old comment' },
+                                { kind: 'added', text: '// new comment' },
+                                { kind: 'added', text: '// another line' },
+                            ],
+                        }],
+                    added: 2,
+                    removed: 1,
+                } });
             dispatch({ type: 'status_update', timestamp: now(), phase: 'thinking', elapsedMs: elapsed });
         }, 600);
+        // Occasionally emit a permission request to test the dialog
+        if (Math.random() < 0.33) {
+            setTimeout(() => {
+                if (this.disposed)
+                    return;
+                dispatch({
+                    type: 'permission_request',
+                    timestamp: now(),
+                    requestId: `mock-perm-${Date.now()}`,
+                    agentId,
+                    toolName: 'Bash',
+                    input: 'npm install lodash',
+                    requiredMode: 'workspace-write',
+                });
+            }, 700);
+        }
+        // Simulate a KB result after 750ms (between tool call and streaming)
+        setTimeout(() => {
+            if (this.disposed)
+                return;
+            elapsed = 750;
+            dispatch({
+                type: 'knowledge_result',
+                timestamp: now(),
+                queryId: 1,
+                query: prompt,
+                intent: 'Strategic',
+                subQuestions: [
+                    {
+                        subQuestion: 'What is the project structure?',
+                        intent: 'explore',
+                        results: [
+                            {
+                                chunkId: 'chunk-001',
+                                text: 'The project uses a modular TypeScript architecture with React components.',
+                                snippet: 'Modular TypeScript architecture with React components...',
+                                score: 0.95,
+                                categoryLabel: 'Architecture',
+                                contentType: 'documentation',
+                                citationLabel: '[Doc §1]',
+                                hasTimestamps: false,
+                                graphExpanded: false,
+                            },
+                            {
+                                chunkId: 'chunk-002',
+                                text: 'Entry point initializes the Ink renderer and mounts the App component tree.',
+                                snippet: 'Entry point initializes Ink renderer, mounts App tree...',
+                                score: 0.87,
+                                categoryLabel: 'Setup',
+                                contentType: 'code-comment',
+                                citationLabel: '[Doc §2]',
+                                hasTimestamps: false,
+                                graphExpanded: true,
+                            },
+                        ],
+                    },
+                    {
+                        subQuestion: 'How does data flow work?',
+                        intent: 'research',
+                        results: [
+                            {
+                                chunkId: 'chunk-003',
+                                text: 'Data flows from engine events through the bridge to React contexts.',
+                                snippet: 'Engine events -> bridge -> React contexts...',
+                                score: 0.82,
+                                categoryLabel: 'Data Flow',
+                                contentType: 'documentation',
+                                citationLabel: '[Doc §3]',
+                                hasTimestamps: false,
+                                graphExpanded: false,
+                            },
+                        ],
+                    },
+                ],
+                answer: 'The project is a terminal UI built with Ink (React for CLI). Data flows from a Rust engine through JSON-RPC to the TypeScript bridge, which emits events consumed by React contexts.',
+                latencyMs: 230,
+                fromCache: false,
+            });
+        }, 750);
         // Stream response chunks starting at 800ms
         const responseText = `I've read the file. Here's what I found regarding "${prompt}":\n\nThe project is structured as a standard TypeScript application with React components rendered via Ink for terminal UI.\n\n**Key observations:**\n- Entry point initializes the Ink renderer\n- App component manages the layout tree\n- All communication with the engine happens through JSON-RPC over stdin/stdout`;
         const words = responseText.split(' ');
@@ -337,7 +557,7 @@ export class EngineBridge extends EventEmitter {
             }
             if (wordIndex >= words.length) {
                 clearInterval(streamInterval);
-                dispatch({ type: 'stream_delta', timestamp: now(), agentId, content: '', done: true });
+                dispatch({ type: 'stream_delta', timestamp: now(), agentId, text: '' });
                 dispatch({ type: 'stream_end', timestamp: now(), agentId });
                 dispatch({ type: 'status_update', timestamp: now(), phase: 'done', elapsedMs: elapsed });
                 dispatch({ type: 'usage_update', timestamp: now(), agentId, inputTokens: 1250, outputTokens: words.length * 2 });
@@ -350,7 +570,7 @@ export class EngineBridge extends EventEmitter {
             }
             const chunk = (wordIndex === 0 ? '' : ' ') + words[wordIndex];
             elapsed += 50;
-            dispatch({ type: 'stream_delta', timestamp: now(), agentId, content: chunk, done: false });
+            dispatch({ type: 'stream_delta', timestamp: now(), agentId, text: chunk });
             wordIndex++;
         }, 50);
     }

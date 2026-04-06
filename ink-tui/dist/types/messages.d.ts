@@ -453,31 +453,28 @@ export declare const SystemLevelSchema: z.ZodEnum<["info", "warning", "error"]>;
 export type SystemLevel = z.infer<typeof SystemLevelSchema>;
 export declare const StreamDeltaSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"stream_delta">;
     agentId: z.ZodString;
-    content: z.ZodString;
-    done: z.ZodBoolean;
+    text: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "stream_delta";
     timestamp: number;
+    text: string;
     agentId: string;
-    done: boolean;
-    content: string;
     id?: string | undefined;
 }, {
     type: "stream_delta";
-    timestamp: number;
+    text: string;
     agentId: string;
-    done: boolean;
-    content: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type StreamDelta = z.infer<typeof StreamDeltaSchema>;
 export declare const StreamEndSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"stream_end">;
     agentId: z.ZodString;
@@ -488,73 +485,73 @@ export declare const StreamEndSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "stream_end";
-    timestamp: number;
     agentId: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type StreamEnd = z.infer<typeof StreamEndSchema>;
 export declare const ToolCallStartSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"tool_call_start">;
     agentId: z.ZodString;
-    toolId: z.ZodString;
+    callId: z.ZodString;
     toolName: z.ZodString;
     inputPreview: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "tool_call_start";
     timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     toolName: string;
     inputPreview: string;
     id?: string | undefined;
 }, {
     type: "tool_call_start";
-    timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     toolName: string;
     inputPreview: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ToolCallStart = z.infer<typeof ToolCallStartSchema>;
 export declare const ToolCallUpdateSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"tool_call_update">;
     agentId: z.ZodString;
-    toolId: z.ZodString;
+    callId: z.ZodString;
     output: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "tool_call_update";
     timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
     id?: string | undefined;
 }, {
     type: "tool_call_update";
-    timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ToolCallUpdate = z.infer<typeof ToolCallUpdateSchema>;
-export declare const ToolCallCompleteSchema: z.ZodObject<{
+export declare const ToolCallEndSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"tool_call_complete">;
+    type: z.ZodLiteral<"tool_call_end">;
     agentId: z.ZodString;
-    toolId: z.ZodString;
-    status: z.ZodEnum<["completed", "failed"]>;
+    callId: z.ZodString;
     output: z.ZodString;
-    durationMs: z.ZodNumber;
-    diff: z.ZodOptional<z.ZodObject<{
+    isError: z.ZodBoolean;
+    duration: z.ZodNumber;
+    diff: z.ZodNullable<z.ZodOptional<z.ZodObject<{
         filePath: z.ZodString;
         added: z.ZodNumber;
         removed: z.ZodNumber;
@@ -652,15 +649,15 @@ export declare const ToolCallCompleteSchema: z.ZodObject<{
                 text: string;
             })[];
         }[];
-    }>>;
+    }>>>;
 }, "strip", z.ZodTypeAny, {
-    type: "tool_call_complete";
+    type: "tool_call_end";
     timestamp: number;
-    status: "completed" | "failed";
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
-    durationMs: number;
+    isError: boolean;
+    duration: number;
     id?: string | undefined;
     diff?: {
         added: number;
@@ -680,15 +677,154 @@ export declare const ToolCallCompleteSchema: z.ZodObject<{
                 text: string;
             })[];
         }[];
-    } | undefined;
+    } | null | undefined;
 }, {
-    type: "tool_call_complete";
-    timestamp: number;
-    status: "completed" | "failed";
+    type: "tool_call_end";
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
-    durationMs: number;
+    isError: boolean;
+    duration: number;
+    id?: string | undefined;
+    timestamp?: number | undefined;
+    diff?: {
+        added: number;
+        removed: number;
+        filePath: string;
+        hunks: {
+            oldStart: number;
+            newStart: number;
+            lines: ({
+                kind: "context";
+                text: string;
+            } | {
+                kind: "added";
+                text: string;
+            } | {
+                kind: "removed";
+                text: string;
+            })[];
+        }[];
+    } | null | undefined;
+}>;
+export type ToolCallEnd = z.infer<typeof ToolCallEndSchema>;
+export declare const ToolCallCompleteSchema: z.ZodObject<{
+    id: z.ZodOptional<z.ZodString>;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+} & {
+    type: z.ZodLiteral<"tool_call_end">;
+    agentId: z.ZodString;
+    callId: z.ZodString;
+    output: z.ZodString;
+    isError: z.ZodBoolean;
+    duration: z.ZodNumber;
+    diff: z.ZodNullable<z.ZodOptional<z.ZodObject<{
+        filePath: z.ZodString;
+        added: z.ZodNumber;
+        removed: z.ZodNumber;
+        hunks: z.ZodArray<z.ZodObject<{
+            oldStart: z.ZodNumber;
+            newStart: z.ZodNumber;
+            lines: z.ZodArray<z.ZodDiscriminatedUnion<"kind", [z.ZodObject<{
+                kind: z.ZodLiteral<"context">;
+                text: z.ZodString;
+            }, "strip", z.ZodTypeAny, {
+                kind: "context";
+                text: string;
+            }, {
+                kind: "context";
+                text: string;
+            }>, z.ZodObject<{
+                kind: z.ZodLiteral<"added">;
+                text: z.ZodString;
+            }, "strip", z.ZodTypeAny, {
+                kind: "added";
+                text: string;
+            }, {
+                kind: "added";
+                text: string;
+            }>, z.ZodObject<{
+                kind: z.ZodLiteral<"removed">;
+                text: z.ZodString;
+            }, "strip", z.ZodTypeAny, {
+                kind: "removed";
+                text: string;
+            }, {
+                kind: "removed";
+                text: string;
+            }>]>, "many">;
+        }, "strip", z.ZodTypeAny, {
+            oldStart: number;
+            newStart: number;
+            lines: ({
+                kind: "context";
+                text: string;
+            } | {
+                kind: "added";
+                text: string;
+            } | {
+                kind: "removed";
+                text: string;
+            })[];
+        }, {
+            oldStart: number;
+            newStart: number;
+            lines: ({
+                kind: "context";
+                text: string;
+            } | {
+                kind: "added";
+                text: string;
+            } | {
+                kind: "removed";
+                text: string;
+            })[];
+        }>, "many">;
+    }, "strip", z.ZodTypeAny, {
+        added: number;
+        removed: number;
+        filePath: string;
+        hunks: {
+            oldStart: number;
+            newStart: number;
+            lines: ({
+                kind: "context";
+                text: string;
+            } | {
+                kind: "added";
+                text: string;
+            } | {
+                kind: "removed";
+                text: string;
+            })[];
+        }[];
+    }, {
+        added: number;
+        removed: number;
+        filePath: string;
+        hunks: {
+            oldStart: number;
+            newStart: number;
+            lines: ({
+                kind: "context";
+                text: string;
+            } | {
+                kind: "added";
+                text: string;
+            } | {
+                kind: "removed";
+                text: string;
+            })[];
+        }[];
+    }>>>;
+}, "strip", z.ZodTypeAny, {
+    type: "tool_call_end";
+    timestamp: number;
+    agentId: string;
+    callId: string;
+    output: string;
+    isError: boolean;
+    duration: number;
     id?: string | undefined;
     diff?: {
         added: number;
@@ -708,81 +844,100 @@ export declare const ToolCallCompleteSchema: z.ZodObject<{
                 text: string;
             })[];
         }[];
-    } | undefined;
+    } | null | undefined;
+}, {
+    type: "tool_call_end";
+    agentId: string;
+    callId: string;
+    output: string;
+    isError: boolean;
+    duration: number;
+    id?: string | undefined;
+    timestamp?: number | undefined;
+    diff?: {
+        added: number;
+        removed: number;
+        filePath: string;
+        hunks: {
+            oldStart: number;
+            newStart: number;
+            lines: ({
+                kind: "context";
+                text: string;
+            } | {
+                kind: "added";
+                text: string;
+            } | {
+                kind: "removed";
+                text: string;
+            })[];
+        }[];
+    } | null | undefined;
 }>;
-export type ToolCallComplete = z.infer<typeof ToolCallCompleteSchema>;
+export type ToolCallComplete = ToolCallEnd;
 export declare const PermissionRequestSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"permission_request">;
     requestId: z.ZodString;
     agentId: z.ZodString;
     toolName: z.ZodString;
-    toolInput: z.ZodString;
-    requiredMode: z.ZodEnum<["prompt", "read-only", "workspace-write", "danger-full-access"]>;
-    filePath: z.ZodOptional<z.ZodString>;
-    description: z.ZodOptional<z.ZodString>;
+    input: z.ZodString;
+    requiredMode: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "permission_request";
     timestamp: number;
     agentId: string;
     toolName: string;
     requestId: string;
-    toolInput: string;
-    requiredMode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
+    input: string;
+    requiredMode: string;
     id?: string | undefined;
-    filePath?: string | undefined;
-    description?: string | undefined;
 }, {
     type: "permission_request";
-    timestamp: number;
     agentId: string;
     toolName: string;
     requestId: string;
-    toolInput: string;
-    requiredMode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
+    input: string;
+    requiredMode: string;
     id?: string | undefined;
-    filePath?: string | undefined;
-    description?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type PermissionRequest = z.infer<typeof PermissionRequestSchema>;
 export declare const AskUserRequestSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"ask_user_request">;
     requestId: z.ZodString;
     agentId: z.ZodString;
     question: z.ZodString;
-    options: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
-    defaultValue: z.ZodOptional<z.ZodString>;
-    allowFreeText: z.ZodBoolean;
+    options: z.ZodNullable<z.ZodOptional<z.ZodArray<z.ZodString, "many">>>;
+    default: z.ZodNullable<z.ZodOptional<z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
     type: "ask_user_request";
     timestamp: number;
     agentId: string;
     requestId: string;
     question: string;
-    allowFreeText: boolean;
+    default?: string | null | undefined;
     id?: string | undefined;
-    options?: string[] | undefined;
-    defaultValue?: string | undefined;
+    options?: string[] | null | undefined;
 }, {
     type: "ask_user_request";
-    timestamp: number;
     agentId: string;
     requestId: string;
     question: string;
-    allowFreeText: boolean;
+    default?: string | null | undefined;
     id?: string | undefined;
-    options?: string[] | undefined;
-    defaultValue?: string | undefined;
+    timestamp?: number | undefined;
+    options?: string[] | null | undefined;
 }>;
 export type AskUserRequest = z.infer<typeof AskUserRequestSchema>;
 export declare const StatusUpdateSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"status_update">;
     phase: z.ZodEnum<["idle", "thinking", "reading_file", "editing_file", "running_bash", "searching", "done", "error"]>;
@@ -799,17 +954,17 @@ export declare const StatusUpdateSchema: z.ZodObject<{
     tokensRemaining?: number | undefined;
 }, {
     type: "status_update";
-    timestamp: number;
     phase: "error" | "done" | "idle" | "thinking" | "reading_file" | "editing_file" | "running_bash" | "searching";
     elapsedMs: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
     label?: string | undefined;
     tokensRemaining?: number | undefined;
 }>;
 export type StatusUpdate = z.infer<typeof StatusUpdateSchema>;
 export declare const AgentSpawnedSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_spawned">;
     agentId: z.ZodString;
@@ -826,17 +981,17 @@ export declare const AgentSpawnedSchema: z.ZodObject<{
     parentId?: string | undefined;
 }, {
     type: "agent_spawned";
-    timestamp: number;
     agentId: string;
     agentType: "Primary" | "Explore" | "Plan" | "General";
     task: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
     parentId?: string | undefined;
 }>;
 export type AgentSpawned = z.infer<typeof AgentSpawnedSchema>;
 export declare const AgentStatusChangedSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_status_changed">;
     agentId: z.ZodString;
@@ -849,15 +1004,15 @@ export declare const AgentStatusChangedSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "agent_status_changed";
-    timestamp: number;
     status: "Pending" | "Running" | "Completed" | "Failed";
     agentId: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type AgentStatusChanged = z.infer<typeof AgentStatusChangedSchema>;
 export declare const AgentCompletedSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_completed">;
     agentId: z.ZodString;
@@ -870,15 +1025,15 @@ export declare const AgentCompletedSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "agent_completed";
-    timestamp: number;
     agentId: string;
     result: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type AgentCompleted = z.infer<typeof AgentCompletedSchema>;
 export declare const AgentFailedSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_failed">;
     agentId: z.ZodString;
@@ -892,14 +1047,14 @@ export declare const AgentFailedSchema: z.ZodObject<{
 }, {
     error: string;
     type: "agent_failed";
-    timestamp: number;
     agentId: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type AgentFailed = z.infer<typeof AgentFailedSchema>;
 export declare const UsageUpdateSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"usage_update">;
     agentId: z.ZodString;
@@ -914,18 +1069,18 @@ export declare const UsageUpdateSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "usage_update";
-    timestamp: number;
     agentId: string;
     inputTokens: number;
     outputTokens: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type UsageUpdate = z.infer<typeof UsageUpdateSchema>;
 export declare const KbResultSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"kb_result">;
+    type: z.ZodLiteral<"knowledge_result">;
     queryId: z.ZodNumber;
     query: z.ZodString;
     intent: z.ZodString;
@@ -996,7 +1151,7 @@ export declare const KbResultSchema: z.ZodObject<{
     latencyMs: z.ZodNumber;
     fromCache: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
-    type: "kb_result";
+    type: "knowledge_result";
     timestamp: number;
     intent: string;
     queryId: number;
@@ -1021,8 +1176,7 @@ export declare const KbResultSchema: z.ZodObject<{
     id?: string | undefined;
     answer?: string | undefined;
 }, {
-    type: "kb_result";
-    timestamp: number;
+    type: "knowledge_result";
     intent: string;
     queryId: number;
     query: string;
@@ -1044,12 +1198,13 @@ export declare const KbResultSchema: z.ZodObject<{
     latencyMs: number;
     fromCache: boolean;
     id?: string | undefined;
+    timestamp?: number | undefined;
     answer?: string | undefined;
 }>;
 export type KbResult = z.infer<typeof KbResultSchema>;
 export declare const SystemMessageSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"system_message">;
     content: z.ZodString;
@@ -1062,15 +1217,15 @@ export declare const SystemMessageSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "system_message";
-    timestamp: number;
     content: string;
     level: "error" | "info" | "warning";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type SystemMessage = z.infer<typeof SystemMessageSchema>;
 export declare const BannerSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"banner">;
     version: z.ZodString;
@@ -1097,7 +1252,6 @@ export declare const BannerSchema: z.ZodObject<{
     credits?: string | undefined;
 }, {
     type: "banner";
-    timestamp: number;
     version: string;
     displayName: string;
     provider: string;
@@ -1105,6 +1259,7 @@ export declare const BannerSchema: z.ZodObject<{
     workingDir: string;
     tips: string[];
     id?: string | undefined;
+    timestamp?: number | undefined;
     email?: string | undefined;
     organization?: string | undefined;
     credits?: string | undefined;
@@ -1112,7 +1267,7 @@ export declare const BannerSchema: z.ZodObject<{
 export type Banner = z.infer<typeof BannerSchema>;
 export declare const SidebarUpdateSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"sidebar_update">;
     agents: z.ZodArray<z.ZodObject<{
@@ -1287,7 +1442,6 @@ export declare const SidebarUpdateSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "sidebar_update";
-    timestamp: number;
     agents: {
         status: "Pending" | "Running" | "Completed" | "Failed";
         agentId: string;
@@ -1327,11 +1481,12 @@ export declare const SidebarUpdateSchema: z.ZodObject<{
         creditBalance?: string | undefined;
     };
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type SidebarUpdate = z.infer<typeof SidebarUpdateSchema>;
 export declare const ModelInfoSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"model_info">;
     name: z.ZodString;
@@ -1344,15 +1499,15 @@ export declare const ModelInfoSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "model_info";
-    timestamp: number;
     name: string;
     provider: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ModelInfo = z.infer<typeof ModelInfoSchema>;
 export declare const ContextFilesUpdateSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"context_files_update">;
     files: z.ZodArray<z.ZodObject<{
@@ -1375,39 +1530,36 @@ export declare const ContextFilesUpdateSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "context_files_update";
-    timestamp: number;
     files: {
         path: string;
         action: "added" | "removed";
     }[];
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ContextFilesUpdate = z.infer<typeof ContextFilesUpdateSchema>;
 export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"stream_delta">;
     agentId: z.ZodString;
-    content: z.ZodString;
-    done: z.ZodBoolean;
+    text: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "stream_delta";
     timestamp: number;
+    text: string;
     agentId: string;
-    done: boolean;
-    content: string;
     id?: string | undefined;
 }, {
     type: "stream_delta";
-    timestamp: number;
+    text: string;
     agentId: string;
-    done: boolean;
-    content: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"stream_end">;
     agentId: z.ZodString;
@@ -1418,67 +1570,67 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     id?: string | undefined;
 }, {
     type: "stream_end";
-    timestamp: number;
     agentId: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"tool_call_start">;
     agentId: z.ZodString;
-    toolId: z.ZodString;
+    callId: z.ZodString;
     toolName: z.ZodString;
     inputPreview: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "tool_call_start";
     timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     toolName: string;
     inputPreview: string;
     id?: string | undefined;
 }, {
     type: "tool_call_start";
-    timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     toolName: string;
     inputPreview: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"tool_call_update">;
     agentId: z.ZodString;
-    toolId: z.ZodString;
+    callId: z.ZodString;
     output: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "tool_call_update";
     timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
     id?: string | undefined;
 }, {
     type: "tool_call_update";
-    timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"tool_call_complete">;
+    type: z.ZodLiteral<"tool_call_end">;
     agentId: z.ZodString;
-    toolId: z.ZodString;
-    status: z.ZodEnum<["completed", "failed"]>;
+    callId: z.ZodString;
     output: z.ZodString;
-    durationMs: z.ZodNumber;
-    diff: z.ZodOptional<z.ZodObject<{
+    isError: z.ZodBoolean;
+    duration: z.ZodNumber;
+    diff: z.ZodNullable<z.ZodOptional<z.ZodObject<{
         filePath: z.ZodString;
         added: z.ZodNumber;
         removed: z.ZodNumber;
@@ -1576,15 +1728,15 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
                 text: string;
             })[];
         }[];
-    }>>;
+    }>>>;
 }, "strip", z.ZodTypeAny, {
-    type: "tool_call_complete";
+    type: "tool_call_end";
     timestamp: number;
-    status: "completed" | "failed";
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
-    durationMs: number;
+    isError: boolean;
+    duration: number;
     id?: string | undefined;
     diff?: {
         added: number;
@@ -1604,16 +1756,16 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
                 text: string;
             })[];
         }[];
-    } | undefined;
+    } | null | undefined;
 }, {
-    type: "tool_call_complete";
-    timestamp: number;
-    status: "completed" | "failed";
+    type: "tool_call_end";
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
-    durationMs: number;
+    isError: boolean;
+    duration: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
     diff?: {
         added: number;
         removed: number;
@@ -1632,75 +1784,66 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
                 text: string;
             })[];
         }[];
-    } | undefined;
+    } | null | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"permission_request">;
     requestId: z.ZodString;
     agentId: z.ZodString;
     toolName: z.ZodString;
-    toolInput: z.ZodString;
-    requiredMode: z.ZodEnum<["prompt", "read-only", "workspace-write", "danger-full-access"]>;
-    filePath: z.ZodOptional<z.ZodString>;
-    description: z.ZodOptional<z.ZodString>;
+    input: z.ZodString;
+    requiredMode: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "permission_request";
     timestamp: number;
     agentId: string;
     toolName: string;
     requestId: string;
-    toolInput: string;
-    requiredMode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
+    input: string;
+    requiredMode: string;
     id?: string | undefined;
-    filePath?: string | undefined;
-    description?: string | undefined;
 }, {
     type: "permission_request";
-    timestamp: number;
     agentId: string;
     toolName: string;
     requestId: string;
-    toolInput: string;
-    requiredMode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
+    input: string;
+    requiredMode: string;
     id?: string | undefined;
-    filePath?: string | undefined;
-    description?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"ask_user_request">;
     requestId: z.ZodString;
     agentId: z.ZodString;
     question: z.ZodString;
-    options: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
-    defaultValue: z.ZodOptional<z.ZodString>;
-    allowFreeText: z.ZodBoolean;
+    options: z.ZodNullable<z.ZodOptional<z.ZodArray<z.ZodString, "many">>>;
+    default: z.ZodNullable<z.ZodOptional<z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
     type: "ask_user_request";
     timestamp: number;
     agentId: string;
     requestId: string;
     question: string;
-    allowFreeText: boolean;
+    default?: string | null | undefined;
     id?: string | undefined;
-    options?: string[] | undefined;
-    defaultValue?: string | undefined;
+    options?: string[] | null | undefined;
 }, {
     type: "ask_user_request";
-    timestamp: number;
     agentId: string;
     requestId: string;
     question: string;
-    allowFreeText: boolean;
+    default?: string | null | undefined;
     id?: string | undefined;
-    options?: string[] | undefined;
-    defaultValue?: string | undefined;
+    timestamp?: number | undefined;
+    options?: string[] | null | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"status_update">;
     phase: z.ZodEnum<["idle", "thinking", "reading_file", "editing_file", "running_bash", "searching", "done", "error"]>;
@@ -1717,15 +1860,15 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     tokensRemaining?: number | undefined;
 }, {
     type: "status_update";
-    timestamp: number;
     phase: "error" | "done" | "idle" | "thinking" | "reading_file" | "editing_file" | "running_bash" | "searching";
     elapsedMs: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
     label?: string | undefined;
     tokensRemaining?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_spawned">;
     agentId: z.ZodString;
@@ -1742,15 +1885,15 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     parentId?: string | undefined;
 }, {
     type: "agent_spawned";
-    timestamp: number;
     agentId: string;
     agentType: "Primary" | "Explore" | "Plan" | "General";
     task: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
     parentId?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_status_changed">;
     agentId: z.ZodString;
@@ -1763,13 +1906,13 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     id?: string | undefined;
 }, {
     type: "agent_status_changed";
-    timestamp: number;
     status: "Pending" | "Running" | "Completed" | "Failed";
     agentId: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_completed">;
     agentId: z.ZodString;
@@ -1782,13 +1925,13 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     id?: string | undefined;
 }, {
     type: "agent_completed";
-    timestamp: number;
     agentId: string;
     result: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_failed">;
     agentId: z.ZodString;
@@ -1802,12 +1945,12 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
 }, {
     error: string;
     type: "agent_failed";
-    timestamp: number;
     agentId: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"usage_update">;
     agentId: z.ZodString;
@@ -1822,16 +1965,16 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     id?: string | undefined;
 }, {
     type: "usage_update";
-    timestamp: number;
     agentId: string;
     inputTokens: number;
     outputTokens: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"kb_result">;
+    type: z.ZodLiteral<"knowledge_result">;
     queryId: z.ZodNumber;
     query: z.ZodString;
     intent: z.ZodString;
@@ -1902,7 +2045,7 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     latencyMs: z.ZodNumber;
     fromCache: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
-    type: "kb_result";
+    type: "knowledge_result";
     timestamp: number;
     intent: string;
     queryId: number;
@@ -1927,8 +2070,7 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     id?: string | undefined;
     answer?: string | undefined;
 }, {
-    type: "kb_result";
-    timestamp: number;
+    type: "knowledge_result";
     intent: string;
     queryId: number;
     query: string;
@@ -1950,10 +2092,11 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     latencyMs: number;
     fromCache: boolean;
     id?: string | undefined;
+    timestamp?: number | undefined;
     answer?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"system_message">;
     content: z.ZodString;
@@ -1966,13 +2109,13 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     id?: string | undefined;
 }, {
     type: "system_message";
-    timestamp: number;
     content: string;
     level: "error" | "info" | "warning";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"banner">;
     version: z.ZodString;
@@ -1999,7 +2142,6 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     credits?: string | undefined;
 }, {
     type: "banner";
-    timestamp: number;
     version: string;
     displayName: string;
     provider: string;
@@ -2007,12 +2149,13 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     workingDir: string;
     tips: string[];
     id?: string | undefined;
+    timestamp?: number | undefined;
     email?: string | undefined;
     organization?: string | undefined;
     credits?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"sidebar_update">;
     agents: z.ZodArray<z.ZodObject<{
@@ -2187,7 +2330,6 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     id?: string | undefined;
 }, {
     type: "sidebar_update";
-    timestamp: number;
     agents: {
         status: "Pending" | "Running" | "Completed" | "Failed";
         agentId: string;
@@ -2227,9 +2369,10 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
         creditBalance?: string | undefined;
     };
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"model_info">;
     name: z.ZodString;
@@ -2242,13 +2385,13 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     id?: string | undefined;
 }, {
     type: "model_info";
-    timestamp: number;
     name: string;
     provider: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"context_files_update">;
     files: z.ZodArray<z.ZodObject<{
@@ -2271,17 +2414,17 @@ export declare const EngineEventSchema: z.ZodDiscriminatedUnion<"type", [z.ZodOb
     id?: string | undefined;
 }, {
     type: "context_files_update";
-    timestamp: number;
     files: {
         path: string;
         action: "added" | "removed";
     }[];
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>]>;
 export type EngineEvent = z.infer<typeof EngineEventSchema>;
 export declare const SubmitPromptSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"submit_prompt">;
     text: z.ZodString;
@@ -2296,16 +2439,16 @@ export declare const SubmitPromptSchema: z.ZodObject<{
     modelOverride?: string | undefined;
 }, {
     type: "submit_prompt";
-    timestamp: number;
     text: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
     effortBudget?: number | undefined;
     modelOverride?: string | undefined;
 }>;
 export type SubmitPrompt = z.infer<typeof SubmitPromptSchema>;
 export declare const RunInBackgroundSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"run_in_background">;
     text: z.ZodString;
@@ -2316,14 +2459,14 @@ export declare const RunInBackgroundSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "run_in_background";
-    timestamp: number;
     text: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type RunInBackground = z.infer<typeof RunInBackgroundSchema>;
 export declare const CancelAgentSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"cancel_agent">;
     agentId: z.ZodOptional<z.ZodString>;
@@ -2334,101 +2477,101 @@ export declare const CancelAgentSchema: z.ZodObject<{
     agentId?: string | undefined;
 }, {
     type: "cancel_agent";
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
     agentId?: string | undefined;
 }>;
 export type CancelAgent = z.infer<typeof CancelAgentSchema>;
 export declare const ResolvePermissionSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"resolve_permission">;
+    type: z.ZodLiteral<"permission_response">;
     requestId: z.ZodString;
-    decision: z.ZodEnum<["allow", "deny"]>;
+    allow: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
-    type: "resolve_permission";
+    type: "permission_response";
     timestamp: number;
     requestId: string;
-    decision: "allow" | "deny";
+    allow: boolean;
     id?: string | undefined;
 }, {
-    type: "resolve_permission";
-    timestamp: number;
+    type: "permission_response";
     requestId: string;
-    decision: "allow" | "deny";
+    allow: boolean;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ResolvePermission = z.infer<typeof ResolvePermissionSchema>;
 export declare const ResolveAskUserSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"resolve_ask_user">;
+    type: z.ZodLiteral<"ask_user_response">;
     requestId: z.ZodString;
-    answer: z.ZodString;
+    response: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "resolve_ask_user";
+    type: "ask_user_response";
     timestamp: number;
     requestId: string;
-    answer: string;
+    response: string;
     id?: string | undefined;
 }, {
-    type: "resolve_ask_user";
-    timestamp: number;
+    type: "ask_user_response";
     requestId: string;
-    answer: string;
+    response: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ResolveAskUser = z.infer<typeof ResolveAskUserSchema>;
 export declare const KbFeedbackSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"kb_feedback">;
+    type: z.ZodLiteral<"knowledge_feedback">;
     queryId: z.ZodNumber;
     rating: z.ZodEnum<["positive", "negative", "corrected"]>;
-    comment: z.ZodOptional<z.ZodString>;
-    correction: z.ZodOptional<z.ZodString>;
+    comment: z.ZodString;
+    correction: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "kb_feedback";
+    type: "knowledge_feedback";
     timestamp: number;
     queryId: number;
     rating: "positive" | "negative" | "corrected";
+    comment: string;
+    correction: string;
     id?: string | undefined;
-    comment?: string | undefined;
-    correction?: string | undefined;
 }, {
-    type: "kb_feedback";
-    timestamp: number;
+    type: "knowledge_feedback";
     queryId: number;
     rating: "positive" | "negative" | "corrected";
+    comment: string;
+    correction: string;
     id?: string | undefined;
-    comment?: string | undefined;
-    correction?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type KbFeedback = z.infer<typeof KbFeedbackSchema>;
 export declare const ChangePermissionModeSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"change_permission_mode">;
+    type: z.ZodLiteral<"update_permissions">;
     mode: z.ZodEnum<["prompt", "read-only", "workspace-write", "danger-full-access"]>;
 }, "strip", z.ZodTypeAny, {
-    type: "change_permission_mode";
+    type: "update_permissions";
     timestamp: number;
     mode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
     id?: string | undefined;
 }, {
-    type: "change_permission_mode";
-    timestamp: number;
+    type: "update_permissions";
     mode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ChangePermissionMode = z.infer<typeof ChangePermissionModeSchema>;
 export declare const ToggleContextFileSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"toggle_context_file">;
     path: z.ZodString;
@@ -2441,15 +2584,15 @@ export declare const ToggleContextFileSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "toggle_context_file";
-    timestamp: number;
     path: string;
     action: "add" | "remove";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ToggleContextFile = z.infer<typeof ToggleContextFileSchema>;
 export declare const ChangeRoutingSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"change_routing">;
     category: z.ZodEnum<["explore", "research", "code", "write"]>;
@@ -2462,15 +2605,15 @@ export declare const ChangeRoutingSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "change_routing";
-    timestamp: number;
     tier: "fast" | "balanced" | "capable";
     category: "code" | "explore" | "research" | "write";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ChangeRouting = z.infer<typeof ChangeRoutingSchema>;
 export declare const ClearChatSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"clear_chat">;
 }, "strip", z.ZodTypeAny, {
@@ -2479,13 +2622,13 @@ export declare const ClearChatSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "clear_chat";
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type ClearChat = z.infer<typeof ClearChatSchema>;
 export declare const SlashCommandSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"slash_command">;
     command: z.ZodString;
@@ -2496,14 +2639,14 @@ export declare const SlashCommandSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "slash_command";
-    timestamp: number;
     command: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type SlashCommand = z.infer<typeof SlashCommandSchema>;
 export declare const UpdateModelSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"update_model">;
     model: z.ZodString;
@@ -2514,14 +2657,14 @@ export declare const UpdateModelSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "update_model";
-    timestamp: number;
     model: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type UpdateModel = z.infer<typeof UpdateModelSchema>;
 export declare const MoeDispatchSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"moe_dispatch">;
     commands: z.ZodArray<z.ZodString, "many">;
@@ -2532,14 +2675,14 @@ export declare const MoeDispatchSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "moe_dispatch";
-    timestamp: number;
     commands: string[];
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type MoeDispatch = z.infer<typeof MoeDispatchSchema>;
 export declare const InjectSkillSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"inject_skill">;
     command: z.ZodString;
@@ -2550,14 +2693,32 @@ export declare const InjectSkillSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "inject_skill";
-    timestamp: number;
     command: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type InjectSkill = z.infer<typeof InjectSkillSchema>;
+export declare const VoiceTranscribedSchema: z.ZodObject<{
+    id: z.ZodOptional<z.ZodString>;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+} & {
+    type: z.ZodLiteral<"voice_transcribed">;
+    text: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "voice_transcribed";
+    timestamp: number;
+    text: string;
+    id?: string | undefined;
+}, {
+    type: "voice_transcribed";
+    text: string;
+    id?: string | undefined;
+    timestamp?: number | undefined;
+}>;
+export type VoiceTranscribed = z.infer<typeof VoiceTranscribedSchema>;
 export declare const QuitSchema: z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"quit">;
 }, "strip", z.ZodTypeAny, {
@@ -2566,13 +2727,13 @@ export declare const QuitSchema: z.ZodObject<{
     id?: string | undefined;
 }, {
     type: "quit";
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>;
 export type Quit = z.infer<typeof QuitSchema>;
 export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"submit_prompt">;
     text: z.ZodString;
@@ -2587,14 +2748,14 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     modelOverride?: string | undefined;
 }, {
     type: "submit_prompt";
-    timestamp: number;
     text: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
     effortBudget?: number | undefined;
     modelOverride?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"run_in_background">;
     text: z.ZodString;
@@ -2605,12 +2766,12 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     id?: string | undefined;
 }, {
     type: "run_in_background";
-    timestamp: number;
     text: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"cancel_agent">;
     agentId: z.ZodOptional<z.ZodString>;
@@ -2621,91 +2782,91 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     agentId?: string | undefined;
 }, {
     type: "cancel_agent";
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
     agentId?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"resolve_permission">;
+    type: z.ZodLiteral<"permission_response">;
     requestId: z.ZodString;
-    decision: z.ZodEnum<["allow", "deny"]>;
+    allow: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
-    type: "resolve_permission";
+    type: "permission_response";
     timestamp: number;
     requestId: string;
-    decision: "allow" | "deny";
+    allow: boolean;
     id?: string | undefined;
 }, {
-    type: "resolve_permission";
-    timestamp: number;
+    type: "permission_response";
     requestId: string;
-    decision: "allow" | "deny";
+    allow: boolean;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"resolve_ask_user">;
+    type: z.ZodLiteral<"ask_user_response">;
     requestId: z.ZodString;
-    answer: z.ZodString;
+    response: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "resolve_ask_user";
+    type: "ask_user_response";
     timestamp: number;
     requestId: string;
-    answer: string;
+    response: string;
     id?: string | undefined;
 }, {
-    type: "resolve_ask_user";
-    timestamp: number;
+    type: "ask_user_response";
     requestId: string;
-    answer: string;
+    response: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"kb_feedback">;
+    type: z.ZodLiteral<"knowledge_feedback">;
     queryId: z.ZodNumber;
     rating: z.ZodEnum<["positive", "negative", "corrected"]>;
-    comment: z.ZodOptional<z.ZodString>;
-    correction: z.ZodOptional<z.ZodString>;
+    comment: z.ZodString;
+    correction: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "kb_feedback";
+    type: "knowledge_feedback";
     timestamp: number;
     queryId: number;
     rating: "positive" | "negative" | "corrected";
+    comment: string;
+    correction: string;
     id?: string | undefined;
-    comment?: string | undefined;
-    correction?: string | undefined;
 }, {
-    type: "kb_feedback";
-    timestamp: number;
+    type: "knowledge_feedback";
     queryId: number;
     rating: "positive" | "negative" | "corrected";
+    comment: string;
+    correction: string;
     id?: string | undefined;
-    comment?: string | undefined;
-    correction?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"change_permission_mode">;
+    type: z.ZodLiteral<"update_permissions">;
     mode: z.ZodEnum<["prompt", "read-only", "workspace-write", "danger-full-access"]>;
 }, "strip", z.ZodTypeAny, {
-    type: "change_permission_mode";
+    type: "update_permissions";
     timestamp: number;
     mode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
     id?: string | undefined;
 }, {
-    type: "change_permission_mode";
-    timestamp: number;
+    type: "update_permissions";
     mode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"toggle_context_file">;
     path: z.ZodString;
@@ -2718,13 +2879,13 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     id?: string | undefined;
 }, {
     type: "toggle_context_file";
-    timestamp: number;
     path: string;
     action: "add" | "remove";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"change_routing">;
     category: z.ZodEnum<["explore", "research", "code", "write"]>;
@@ -2737,13 +2898,13 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     id?: string | undefined;
 }, {
     type: "change_routing";
-    timestamp: number;
     tier: "fast" | "balanced" | "capable";
     category: "code" | "explore" | "research" | "write";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"clear_chat">;
 }, "strip", z.ZodTypeAny, {
@@ -2752,11 +2913,11 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     id?: string | undefined;
 }, {
     type: "clear_chat";
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"slash_command">;
     command: z.ZodString;
@@ -2767,12 +2928,12 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     id?: string | undefined;
 }, {
     type: "slash_command";
-    timestamp: number;
     command: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"update_model">;
     model: z.ZodString;
@@ -2783,12 +2944,12 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     id?: string | undefined;
 }, {
     type: "update_model";
-    timestamp: number;
     model: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"moe_dispatch">;
     commands: z.ZodArray<z.ZodString, "many">;
@@ -2799,12 +2960,12 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     id?: string | undefined;
 }, {
     type: "moe_dispatch";
-    timestamp: number;
     commands: string[];
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"inject_skill">;
     command: z.ZodString;
@@ -2815,12 +2976,28 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     id?: string | undefined;
 }, {
     type: "inject_skill";
-    timestamp: number;
     command: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+} & {
+    type: z.ZodLiteral<"voice_transcribed">;
+    text: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "voice_transcribed";
+    timestamp: number;
+    text: string;
+    id?: string | undefined;
+}, {
+    type: "voice_transcribed";
+    text: string;
+    id?: string | undefined;
+    timestamp?: number | undefined;
+}>, z.ZodObject<{
+    id: z.ZodOptional<z.ZodString>;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"quit">;
 }, "strip", z.ZodTypeAny, {
@@ -2829,35 +3006,32 @@ export declare const TuiActionSchema: z.ZodDiscriminatedUnion<"type", [z.ZodObje
     id?: string | undefined;
 }, {
     type: "quit";
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>]>;
 export type TuiAction = z.infer<typeof TuiActionSchema>;
 export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"stream_delta">;
     agentId: z.ZodString;
-    content: z.ZodString;
-    done: z.ZodBoolean;
+    text: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "stream_delta";
     timestamp: number;
+    text: string;
     agentId: string;
-    done: boolean;
-    content: string;
     id?: string | undefined;
 }, {
     type: "stream_delta";
-    timestamp: number;
+    text: string;
     agentId: string;
-    done: boolean;
-    content: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"stream_end">;
     agentId: z.ZodString;
@@ -2868,67 +3042,67 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "stream_end";
-    timestamp: number;
     agentId: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"tool_call_start">;
     agentId: z.ZodString;
-    toolId: z.ZodString;
+    callId: z.ZodString;
     toolName: z.ZodString;
     inputPreview: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "tool_call_start";
     timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     toolName: string;
     inputPreview: string;
     id?: string | undefined;
 }, {
     type: "tool_call_start";
-    timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     toolName: string;
     inputPreview: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"tool_call_update">;
     agentId: z.ZodString;
-    toolId: z.ZodString;
+    callId: z.ZodString;
     output: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "tool_call_update";
     timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
     id?: string | undefined;
 }, {
     type: "tool_call_update";
-    timestamp: number;
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"tool_call_complete">;
+    type: z.ZodLiteral<"tool_call_end">;
     agentId: z.ZodString;
-    toolId: z.ZodString;
-    status: z.ZodEnum<["completed", "failed"]>;
+    callId: z.ZodString;
     output: z.ZodString;
-    durationMs: z.ZodNumber;
-    diff: z.ZodOptional<z.ZodObject<{
+    isError: z.ZodBoolean;
+    duration: z.ZodNumber;
+    diff: z.ZodNullable<z.ZodOptional<z.ZodObject<{
         filePath: z.ZodString;
         added: z.ZodNumber;
         removed: z.ZodNumber;
@@ -3026,15 +3200,15 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
                 text: string;
             })[];
         }[];
-    }>>;
+    }>>>;
 }, "strip", z.ZodTypeAny, {
-    type: "tool_call_complete";
+    type: "tool_call_end";
     timestamp: number;
-    status: "completed" | "failed";
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
-    durationMs: number;
+    isError: boolean;
+    duration: number;
     id?: string | undefined;
     diff?: {
         added: number;
@@ -3054,16 +3228,16 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
                 text: string;
             })[];
         }[];
-    } | undefined;
+    } | null | undefined;
 }, {
-    type: "tool_call_complete";
-    timestamp: number;
-    status: "completed" | "failed";
+    type: "tool_call_end";
     agentId: string;
-    toolId: string;
+    callId: string;
     output: string;
-    durationMs: number;
+    isError: boolean;
+    duration: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
     diff?: {
         added: number;
         removed: number;
@@ -3082,75 +3256,66 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
                 text: string;
             })[];
         }[];
-    } | undefined;
+    } | null | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"permission_request">;
     requestId: z.ZodString;
     agentId: z.ZodString;
     toolName: z.ZodString;
-    toolInput: z.ZodString;
-    requiredMode: z.ZodEnum<["prompt", "read-only", "workspace-write", "danger-full-access"]>;
-    filePath: z.ZodOptional<z.ZodString>;
-    description: z.ZodOptional<z.ZodString>;
+    input: z.ZodString;
+    requiredMode: z.ZodString;
 }, "strip", z.ZodTypeAny, {
     type: "permission_request";
     timestamp: number;
     agentId: string;
     toolName: string;
     requestId: string;
-    toolInput: string;
-    requiredMode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
+    input: string;
+    requiredMode: string;
     id?: string | undefined;
-    filePath?: string | undefined;
-    description?: string | undefined;
 }, {
     type: "permission_request";
-    timestamp: number;
     agentId: string;
     toolName: string;
     requestId: string;
-    toolInput: string;
-    requiredMode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
+    input: string;
+    requiredMode: string;
     id?: string | undefined;
-    filePath?: string | undefined;
-    description?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"ask_user_request">;
     requestId: z.ZodString;
     agentId: z.ZodString;
     question: z.ZodString;
-    options: z.ZodOptional<z.ZodArray<z.ZodString, "many">>;
-    defaultValue: z.ZodOptional<z.ZodString>;
-    allowFreeText: z.ZodBoolean;
+    options: z.ZodNullable<z.ZodOptional<z.ZodArray<z.ZodString, "many">>>;
+    default: z.ZodNullable<z.ZodOptional<z.ZodString>>;
 }, "strip", z.ZodTypeAny, {
     type: "ask_user_request";
     timestamp: number;
     agentId: string;
     requestId: string;
     question: string;
-    allowFreeText: boolean;
+    default?: string | null | undefined;
     id?: string | undefined;
-    options?: string[] | undefined;
-    defaultValue?: string | undefined;
+    options?: string[] | null | undefined;
 }, {
     type: "ask_user_request";
-    timestamp: number;
     agentId: string;
     requestId: string;
     question: string;
-    allowFreeText: boolean;
+    default?: string | null | undefined;
     id?: string | undefined;
-    options?: string[] | undefined;
-    defaultValue?: string | undefined;
+    timestamp?: number | undefined;
+    options?: string[] | null | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"status_update">;
     phase: z.ZodEnum<["idle", "thinking", "reading_file", "editing_file", "running_bash", "searching", "done", "error"]>;
@@ -3167,15 +3332,15 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     tokensRemaining?: number | undefined;
 }, {
     type: "status_update";
-    timestamp: number;
     phase: "error" | "done" | "idle" | "thinking" | "reading_file" | "editing_file" | "running_bash" | "searching";
     elapsedMs: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
     label?: string | undefined;
     tokensRemaining?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_spawned">;
     agentId: z.ZodString;
@@ -3192,15 +3357,15 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     parentId?: string | undefined;
 }, {
     type: "agent_spawned";
-    timestamp: number;
     agentId: string;
     agentType: "Primary" | "Explore" | "Plan" | "General";
     task: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
     parentId?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_status_changed">;
     agentId: z.ZodString;
@@ -3213,13 +3378,13 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "agent_status_changed";
-    timestamp: number;
     status: "Pending" | "Running" | "Completed" | "Failed";
     agentId: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_completed">;
     agentId: z.ZodString;
@@ -3232,13 +3397,13 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "agent_completed";
-    timestamp: number;
     agentId: string;
     result: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"agent_failed">;
     agentId: z.ZodString;
@@ -3252,12 +3417,12 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
 }, {
     error: string;
     type: "agent_failed";
-    timestamp: number;
     agentId: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"usage_update">;
     agentId: z.ZodString;
@@ -3272,16 +3437,16 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "usage_update";
-    timestamp: number;
     agentId: string;
     inputTokens: number;
     outputTokens: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"kb_result">;
+    type: z.ZodLiteral<"knowledge_result">;
     queryId: z.ZodNumber;
     query: z.ZodString;
     intent: z.ZodString;
@@ -3352,7 +3517,7 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     latencyMs: z.ZodNumber;
     fromCache: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
-    type: "kb_result";
+    type: "knowledge_result";
     timestamp: number;
     intent: string;
     queryId: number;
@@ -3377,8 +3542,7 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
     answer?: string | undefined;
 }, {
-    type: "kb_result";
-    timestamp: number;
+    type: "knowledge_result";
     intent: string;
     queryId: number;
     query: string;
@@ -3400,10 +3564,11 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     latencyMs: number;
     fromCache: boolean;
     id?: string | undefined;
+    timestamp?: number | undefined;
     answer?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"system_message">;
     content: z.ZodString;
@@ -3416,13 +3581,13 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "system_message";
-    timestamp: number;
     content: string;
     level: "error" | "info" | "warning";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"banner">;
     version: z.ZodString;
@@ -3449,7 +3614,6 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     credits?: string | undefined;
 }, {
     type: "banner";
-    timestamp: number;
     version: string;
     displayName: string;
     provider: string;
@@ -3457,12 +3621,13 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     workingDir: string;
     tips: string[];
     id?: string | undefined;
+    timestamp?: number | undefined;
     email?: string | undefined;
     organization?: string | undefined;
     credits?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"sidebar_update">;
     agents: z.ZodArray<z.ZodObject<{
@@ -3637,7 +3802,6 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "sidebar_update";
-    timestamp: number;
     agents: {
         status: "Pending" | "Running" | "Completed" | "Failed";
         agentId: string;
@@ -3677,9 +3841,10 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
         creditBalance?: string | undefined;
     };
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"model_info">;
     name: z.ZodString;
@@ -3692,13 +3857,13 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "model_info";
-    timestamp: number;
     name: string;
     provider: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"context_files_update">;
     files: z.ZodArray<z.ZodObject<{
@@ -3721,15 +3886,15 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "context_files_update";
-    timestamp: number;
     files: {
         path: string;
         action: "added" | "removed";
     }[];
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>]>, z.ZodDiscriminatedUnion<"type", [z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"submit_prompt">;
     text: z.ZodString;
@@ -3744,14 +3909,14 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     modelOverride?: string | undefined;
 }, {
     type: "submit_prompt";
-    timestamp: number;
     text: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
     effortBudget?: number | undefined;
     modelOverride?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"run_in_background">;
     text: z.ZodString;
@@ -3762,12 +3927,12 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "run_in_background";
-    timestamp: number;
     text: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"cancel_agent">;
     agentId: z.ZodOptional<z.ZodString>;
@@ -3778,91 +3943,91 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     agentId?: string | undefined;
 }, {
     type: "cancel_agent";
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
     agentId?: string | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"resolve_permission">;
+    type: z.ZodLiteral<"permission_response">;
     requestId: z.ZodString;
-    decision: z.ZodEnum<["allow", "deny"]>;
+    allow: z.ZodBoolean;
 }, "strip", z.ZodTypeAny, {
-    type: "resolve_permission";
+    type: "permission_response";
     timestamp: number;
     requestId: string;
-    decision: "allow" | "deny";
+    allow: boolean;
     id?: string | undefined;
 }, {
-    type: "resolve_permission";
-    timestamp: number;
+    type: "permission_response";
     requestId: string;
-    decision: "allow" | "deny";
+    allow: boolean;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"resolve_ask_user">;
+    type: z.ZodLiteral<"ask_user_response">;
     requestId: z.ZodString;
-    answer: z.ZodString;
+    response: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "resolve_ask_user";
+    type: "ask_user_response";
     timestamp: number;
     requestId: string;
-    answer: string;
+    response: string;
     id?: string | undefined;
 }, {
-    type: "resolve_ask_user";
-    timestamp: number;
+    type: "ask_user_response";
     requestId: string;
-    answer: string;
+    response: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"kb_feedback">;
+    type: z.ZodLiteral<"knowledge_feedback">;
     queryId: z.ZodNumber;
     rating: z.ZodEnum<["positive", "negative", "corrected"]>;
-    comment: z.ZodOptional<z.ZodString>;
-    correction: z.ZodOptional<z.ZodString>;
+    comment: z.ZodString;
+    correction: z.ZodString;
 }, "strip", z.ZodTypeAny, {
-    type: "kb_feedback";
+    type: "knowledge_feedback";
     timestamp: number;
     queryId: number;
     rating: "positive" | "negative" | "corrected";
+    comment: string;
+    correction: string;
     id?: string | undefined;
-    comment?: string | undefined;
-    correction?: string | undefined;
 }, {
-    type: "kb_feedback";
-    timestamp: number;
+    type: "knowledge_feedback";
     queryId: number;
     rating: "positive" | "negative" | "corrected";
+    comment: string;
+    correction: string;
     id?: string | undefined;
-    comment?: string | undefined;
-    correction?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
-    type: z.ZodLiteral<"change_permission_mode">;
+    type: z.ZodLiteral<"update_permissions">;
     mode: z.ZodEnum<["prompt", "read-only", "workspace-write", "danger-full-access"]>;
 }, "strip", z.ZodTypeAny, {
-    type: "change_permission_mode";
+    type: "update_permissions";
     timestamp: number;
     mode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
     id?: string | undefined;
 }, {
-    type: "change_permission_mode";
-    timestamp: number;
+    type: "update_permissions";
     mode: "prompt" | "read-only" | "workspace-write" | "danger-full-access";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"toggle_context_file">;
     path: z.ZodString;
@@ -3875,13 +4040,13 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "toggle_context_file";
-    timestamp: number;
     path: string;
     action: "add" | "remove";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"change_routing">;
     category: z.ZodEnum<["explore", "research", "code", "write"]>;
@@ -3894,13 +4059,13 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "change_routing";
-    timestamp: number;
     tier: "fast" | "balanced" | "capable";
     category: "code" | "explore" | "research" | "write";
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"clear_chat">;
 }, "strip", z.ZodTypeAny, {
@@ -3909,11 +4074,11 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "clear_chat";
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"slash_command">;
     command: z.ZodString;
@@ -3924,12 +4089,12 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "slash_command";
-    timestamp: number;
     command: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"update_model">;
     model: z.ZodString;
@@ -3940,12 +4105,12 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "update_model";
-    timestamp: number;
     model: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"moe_dispatch">;
     commands: z.ZodArray<z.ZodString, "many">;
@@ -3956,12 +4121,12 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "moe_dispatch";
-    timestamp: number;
     commands: string[];
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"inject_skill">;
     command: z.ZodString;
@@ -3972,12 +4137,28 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "inject_skill";
-    timestamp: number;
     command: string;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>, z.ZodObject<{
     id: z.ZodOptional<z.ZodString>;
-    timestamp: z.ZodNumber;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
+} & {
+    type: z.ZodLiteral<"voice_transcribed">;
+    text: z.ZodString;
+}, "strip", z.ZodTypeAny, {
+    type: "voice_transcribed";
+    timestamp: number;
+    text: string;
+    id?: string | undefined;
+}, {
+    type: "voice_transcribed";
+    text: string;
+    id?: string | undefined;
+    timestamp?: number | undefined;
+}>, z.ZodObject<{
+    id: z.ZodOptional<z.ZodString>;
+    timestamp: z.ZodDefault<z.ZodOptional<z.ZodNumber>>;
 } & {
     type: z.ZodLiteral<"quit">;
 }, "strip", z.ZodTypeAny, {
@@ -3986,7 +4167,7 @@ export declare const AnyMessageSchema: z.ZodUnion<[z.ZodDiscriminatedUnion<"type
     id?: string | undefined;
 }, {
     type: "quit";
-    timestamp: number;
     id?: string | undefined;
+    timestamp?: number | undefined;
 }>]>]>;
 export type AnyMessage = z.infer<typeof AnyMessageSchema>;

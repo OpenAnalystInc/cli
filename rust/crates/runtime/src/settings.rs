@@ -518,6 +518,7 @@ pub fn load_settings(project_dir: &Path) -> Settings {
 }
 
 /// Load user-level settings from `~/.openanalyst/settings.json`.
+/// Falls back to `~/.claude/settings.json` if the OpenAnalyst file does not exist.
 pub fn load_user_settings() -> Settings {
     let home = std::env::var("OPENANALYST_CONFIG_HOME")
         .ok()
@@ -530,13 +531,39 @@ pub fn load_user_settings() -> Settings {
     }
 
     let path = PathBuf::from(&home).join("settings.json");
-    load_settings_file(&path)
+    if path.exists() {
+        return load_settings_file(&path);
+    }
+
+    // Fallback: check ~/.claude/settings.json for Claude Code migration
+    let claude_home = std::env::var("HOME")
+        .or_else(|_| std::env::var("USERPROFILE"))
+        .ok()
+        .map(|h| PathBuf::from(h).join(".claude").join("settings.json"));
+    if let Some(claude_path) = claude_home {
+        if claude_path.exists() {
+            return load_settings_file(&claude_path);
+        }
+    }
+
+    Settings::default()
 }
 
 /// Load project-level settings from `.openanalyst/settings.json`.
+/// Falls back to `.claude/settings.json` if the OpenAnalyst file does not exist.
 pub fn load_project_settings(project_dir: &Path) -> Settings {
     let path = project_dir.join(".openanalyst").join("settings.json");
-    load_settings_file(&path)
+    if path.exists() {
+        return load_settings_file(&path);
+    }
+
+    // Fallback: check .claude/settings.json for Claude Code migration
+    let claude_path = project_dir.join(".claude").join("settings.json");
+    if claude_path.exists() {
+        return load_settings_file(&claude_path);
+    }
+
+    Settings::default()
 }
 
 fn load_settings_file(path: &Path) -> Settings {

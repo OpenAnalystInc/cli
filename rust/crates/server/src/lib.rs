@@ -139,6 +139,12 @@ pub struct SendMessageRequest {
 #[must_use]
 pub fn app(state: AppState) -> Router {
     Router::new()
+        // ── Simple one-shot query (no session needed) ──
+        .route("/v1/chat", post(simple_chat))
+        .route("/v1/query", post(simple_chat)) // alias
+        // ── Health check ──
+        .route("/health", get(health_check))
+        // ── Session-based endpoints ──
         .route("/sessions", post(create_session).get(list_sessions))
         .route("/sessions/{id}", get(get_session))
         .route("/sessions/{id}/events", get(stream_session_events))
@@ -267,6 +273,116 @@ fn unix_timestamp_millis() -> u64 {
         .expect("system time should be after epoch")
         .as_millis() as u64
 }
+
+// ---------------------------------------------------------------------------
+// Simple one-shot chat — send a query, get a response (no session management)
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimpleChatRequest {
+    /// The user's message/query.
+    pub message: String,
+    /// Optional model override (e.g. "sonnet-4", "gpt-4o").
+    pub model: Option<String>,
+    /// Optional system prompt override.
+    pub system: Option<String>,
+    /// Whether to include tool results inline. Default: true.
+    pub include_tools: Option<bool>,
+    /// Optional working directory for file operations.
+    pub cwd: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SimpleChatResponse {
+    /// The AI's response text.
+    pub response: String,
+    /// Model used for the response.
+    pub model: String,
+    /// Tool calls made during the response (if any).
+    pub tool_calls: Vec<ToolCallSummary>,
+    /// Token usage.
+    pub usage: UsageSummary,
+    /// Session ID (auto-created, can be used to continue the conversation).
+    pub session_id: SessionId,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ToolCallSummary {
+    pub tool: String,
+    pub input_preview: String,
+    pub output_preview: Option<String>,
+    pub status: String,
+    pub duration_ms: u64,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct UsageSummary {
+    pub input_tokens: u64,
+    pub output_tokens: u64,
+    pub total_tokens: u64,
+}
+
+async fn simple_chat(
+    State(state): State<AppState>,
+    Json(payload): Json<SimpleChatRequest>,
+) -> ApiResult<Json<SimpleChatResponse>> {
+    // Create a temporary session for this query
+    let session_id = state.allocate_session_id();
+    let session = Session::new(session_id.clone());
+
+    // Add the user message
+    let user_msg = ConversationMessage::user_text(payload.message.clone());
+    {
+        let mut sessions = state.sessions.write().await;
+        let mut s = session;
+        s.conversation.messages.push(user_msg);
+        sessions.insert(session_id.clone(), s);
+    }
+
+    // TODO: When the runtime integration is wired, this will:
+    // 1. Call the AI model with the user's message
+    // 2. Execute any tool calls the AI requests
+    // 3. Return the final response
+    //
+    // For now, return a placeholder that shows the endpoint is working.
+    // The actual AI call will be wired via:
+    //   runtime::Session::run_prompt(&payload.message, model, system_prompt)
+
+    let response = SimpleChatResponse {
+        response: format!(
+            "OpenAnalyst API received your query: \"{}\"\n\n\
+             This endpoint will return AI responses once the runtime is fully wired.\n\
+             For now, use the TUI (`openanalyst`) or the session-based API:\n\n\
+             1. POST /sessions → create session\n\
+             2. POST /sessions/{{id}}/message → send message\n\
+             3. GET /sessions/{{id}}/events → stream response (SSE)",
+            payload.message
+        ),
+        model: payload.model.unwrap_or_else(|| "default".to_string()),
+        tool_calls: vec![],
+        usage: UsageSummary {
+            input_tokens: 0,
+            output_tokens: 0,
+            total_tokens: 0,
+        },
+        session_id,
+    };
+
+    Ok(Json(response))
+}
+
+async fn health_check() -> Json<serde_json::Value> {
+    Json(serde_json::json!({
+        "status": "ok",
+        "version": env!("CARGO_PKG_VERSION"),
+        "uptime_seconds": SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .unwrap_or_default()
+            .as_secs(),
+    }))
+}
+
+// ---------------------------------------------------------------------------
 
 fn not_found(message: String) -> ApiError {
     (

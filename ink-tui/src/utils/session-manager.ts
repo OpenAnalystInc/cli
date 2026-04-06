@@ -63,19 +63,25 @@ const SESSION_SUB_DIR = 'sessions';
 // ---------------------------------------------------------------------------
 
 export class SessionManager {
+  /** Primary sessions dir (project-level preferred). */
   private readonly sessionsDir: string;
+  /** Global sessions dir — always ~/.openanalyst/sessions/ as backup. */
+  private readonly globalSessionsDir: string;
 
   constructor() {
+    this.globalSessionsDir = path.join(os.homedir(), SESSION_DIR_NAME, SESSION_SUB_DIR);
     this.sessionsDir = this.resolveSessionsDir();
     this.ensureDir();
   }
 
   // ── Public API ──────────────────────────────────────────────────────────
 
-  /** Save (or overwrite) a session to disk. */
+  /**
+   * Save session to BOTH project-level AND global.
+   * - Project copy: shared when project is pushed via git (team collaboration)
+   * - Global copy: user's personal backup across all projects
+   */
   save(data: SessionData): void {
-    const filePath = path.join(this.sessionsDir, `${data.metadata.id}.json`);
-
     // Cap messages to prevent oversized files
     const trimmedMessages =
       data.messages.length > MAX_MESSAGES_ON_SAVE
@@ -92,11 +98,26 @@ export class SessionManager {
       },
     };
 
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const fileName = `${data.metadata.id}.json`;
+
+    // Save to primary (project-level)
     try {
-      fs.writeFileSync(filePath, JSON.stringify(payload, null, 2), 'utf-8');
+      const projectPath = path.join(this.sessionsDir, fileName);
+      fs.writeFileSync(projectPath, jsonStr, 'utf-8');
     } catch (err) {
-      // Best-effort — don't crash the app on save failure
-      process.stderr.write(`[session] Failed to save ${filePath}: ${err}\n`);
+      process.stderr.write(`[session] Failed to save project session: ${err}\n`);
+    }
+
+    // Save to global (backup — always ~/.openanalyst/sessions/)
+    if (this.sessionsDir !== this.globalSessionsDir) {
+      try {
+        fs.mkdirSync(this.globalSessionsDir, { recursive: true });
+        const globalPath = path.join(this.globalSessionsDir, fileName);
+        fs.writeFileSync(globalPath, jsonStr, 'utf-8');
+      } catch {
+        // Best-effort — global backup is nice-to-have
+      }
     }
   }
 
@@ -204,10 +225,15 @@ export class SessionManager {
     }
   }
 
-  /** Ensure the sessions directory exists. */
+  /** Ensure both session directories exist. */
   private ensureDir(): void {
     try {
       fs.mkdirSync(this.sessionsDir, { recursive: true });
+    } catch {
+      // Best-effort
+    }
+    try {
+      fs.mkdirSync(this.globalSessionsDir, { recursive: true });
     } catch {
       // Best-effort
     }

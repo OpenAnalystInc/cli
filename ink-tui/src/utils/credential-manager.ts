@@ -250,12 +250,15 @@ function httpsRequest(
 class CredentialManager {
   private globalEnvPath: string;
   private credJsonPath: string;
+  /** Fallback path: ~/.claude/.env — for users migrating from Claude Code. */
+  private claudeEnvPath: string;
 
   constructor() {
     const configHome = process.env['OPENANALYST_CONFIG_HOME']
       ?? path.join(os.homedir(), '.openanalyst');
     this.globalEnvPath = path.join(configHome, '.env');
     this.credJsonPath = path.join(configHome, 'credentials.json');
+    this.claudeEnvPath = path.join(os.homedir(), '.claude', '.env');
   }
 
   // ── Save ────────────────────────────────────────────────────────────────
@@ -319,10 +322,16 @@ class CredentialManager {
       return { key: projectEnv[config.envVar]!, source: 'project' };
     }
 
-    // 2. Global .env
+    // 2. Global .env (~/.openanalyst/.env)
     const globalEnv = parseEnvFile(this.globalEnvPath);
     if (globalEnv[config.envVar]) {
       return { key: globalEnv[config.envVar]!, source: 'global' };
+    }
+
+    // 2.5. Claude Code fallback (~/.claude/.env) — for migration compatibility
+    const claudeEnv = parseEnvFile(this.claudeEnvPath);
+    if (claudeEnv[config.envVar]) {
+      return { key: claudeEnv[config.envVar]!, source: 'global' };
     }
 
     // 3. SQLite (sync check -- database was loaded asynchronously)

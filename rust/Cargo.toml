@@ -4,7 +4,7 @@ exclude = ["crates/tui-widgets"]  # Archived — ratatui widget library replaced
 resolver = "2"
 
 [workspace.package]
-version = "2.0.11"
+version = "2.0.12"
 edition = "2021"
 license = "MIT"
 publish = false

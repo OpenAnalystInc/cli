@@ -150,10 +150,17 @@ function printSuccessBox(binaryPath) {
   console.log(`${BLUE}${V}${RESET}  ${WHITE}${BOLD}Get started:${RESET}${" ".repeat(boxW - 14)}${BLUE}${V}${RESET}`);
   console.log(`${BLUE}${V}${RESET}    ${CYAN}$ openanalyst${RESET}${" ".repeat(boxW - 17)}${BLUE}${V}${RESET}`);
   console.log(`${BLUE}${V}${RESET}${" ".repeat(boxW)}${BLUE}${V}${RESET}`);
-  console.log(`${BLUE}${V}${RESET}  ${WHITE}${BOLD}Quick tips:${RESET}${" ".repeat(boxW - 13)}${BLUE}${V}${RESET}`);
-  console.log(`${BLUE}${V}${RESET}    ${GRAY}\u2022 Run ${CYAN}/init${GRAY} to set up your project${RESET}${" ".repeat(boxW - 38)}${BLUE}${V}${RESET}`);
-  console.log(`${BLUE}${V}${RESET}    ${GRAY}\u2022 Press ${CYAN}Ctrl+P${GRAY} to change permission mode${RESET}${" ".repeat(boxW - 44)}${BLUE}${V}${RESET}`);
-  console.log(`${BLUE}${V}${RESET}    ${GRAY}\u2022 Press ${CYAN}F2${GRAY} to toggle the sidebar${RESET}${" ".repeat(boxW - 37)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}  ${WHITE}${BOLD}First time? Login with any AI provider:${RESET}${" ".repeat(boxW - 41)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}    ${CYAN}/login openai sk-abc123...${RESET}${" ".repeat(boxW - 30)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}    ${CYAN}/login anthropic sk-ant-abc...${RESET}${" ".repeat(boxW - 34)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}    ${CYAN}/login gemini AIza...${RESET}${" ".repeat(boxW - 25)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}${" ".repeat(boxW)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}  ${WHITE}${BOLD}Or set keys in:${RESET} ${GRAY}~/.openanalyst/.env${RESET}${" ".repeat(boxW - 37)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}${" ".repeat(boxW)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}  ${WHITE}${BOLD}Shortcuts:${RESET}${" ".repeat(boxW - 12)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}    ${GRAY}\u2022 ${CYAN}Ctrl+E${GRAY} toggle sidebar${RESET}${" ".repeat(boxW - 27)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}    ${GRAY}\u2022 ${CYAN}Ctrl+P${GRAY} permission mode${RESET}${" ".repeat(boxW - 28)}${BLUE}${V}${RESET}`);
+  console.log(`${BLUE}${V}${RESET}    ${GRAY}\u2022 ${CYAN}/help${GRAY}  all commands${RESET}${" ".repeat(boxW - 25)}${BLUE}${V}${RESET}`);
   console.log(`${BLUE}${V}${RESET}${" ".repeat(boxW)}${BLUE}${V}${RESET}`);
   console.log(`${BLUE}${V}${RESET}  ${GRAY}Docs:    ${CYAN}https://openanalyst.com/docs${RESET}${" ".repeat(boxW - 39)}${BLUE}${V}${RESET}`);
   console.log(`${BLUE}${V}${RESET}  ${GRAY}Support: ${CYAN}support@openanalyst.com${RESET}${" ".repeat(boxW - 35)}${BLUE}${V}${RESET}`);
@@ -284,27 +291,172 @@ async function tryDownloadPrebuilt() {
 
 function setupConfigDir() {
   try {
+    // Create main config directory
     fs.mkdirSync(CONFIG_DIR, { recursive: true });
 
-    // Create default .env template if it doesn't exist
+    // Create subdirectories matching the Rust backend's expected structure.
+    // Each directory is actively scanned by the corresponding Rust module:
+    //   commands/      -> skills.rs:load_commands_from_dir()
+    //   skills/        -> skills.rs:load_skills_from_dir()
+    //   agents/        -> agents_config.rs:load_agents_from_dir()
+    //   rules/         -> rules.rs:load_rules_from_dir()
+    //   plugins/       -> plugins/lib.rs (PluginManager)
+    //   output-styles/ -> output_styles.rs:load_output_styles()
+    //   sessions/      -> session.rs (conversation persistence)
+    //   hooks/         -> convention for plugin hook scripts (hooks themselves are configured in settings.json)
+    const subdirs = [
+      "sessions",        // Chat session persistence
+      "credentials",     // Credential storage
+      "commands",        // User custom slash commands (*.md files)
+      "skills",          // Custom skills (SKILL.md directories)
+      "plugins",         // Installed plugins
+      "agents",          // Custom agent definitions
+      "rules",           // Global rules (*.md with optional paths frontmatter)
+      "hooks",           // Plugin hook scripts (hooks configured in settings.json)
+      "output-styles",   // Custom output formatting styles
+      "todos",           // Global task tracking (TodoWrite tool persists here)
+    ];
+    for (const sub of subdirs) {
+      fs.mkdirSync(path.join(CONFIG_DIR, sub), { recursive: true });
+    }
+
+    let created = false;
+
+    // Create OPENANALYST.md — global instructions file (mirrors ~/.claude/CLAUDE.md)
+    const oaMdFile = path.join(CONFIG_DIR, "OPENANALYST.md");
+    if (!fs.existsSync(oaMdFile)) {
+      const oaMdTemplate = [
+        "# Global Instructions for OpenAnalyst CLI",
+        "",
+        "This file provides instructions that apply to ALL projects when using",
+        "OpenAnalyst CLI. It mirrors Claude Code's ~/.claude/CLAUDE.md file.",
+        "",
+        "## How it works",
+        "",
+        "- This file is loaded at the start of every OpenAnalyst session.",
+        "- Project-level instructions (.openanalyst/OPENANALYST.md) take priority.",
+        "- You can add coding conventions, preferred tools, or personal preferences.",
+        "",
+        "## Example instructions",
+        "",
+        "```",
+        "- Always use TypeScript strict mode.",
+        "- Prefer functional components with hooks over class components.",
+        "- Use descriptive variable names; avoid abbreviations.",
+        "- Run tests before committing.",
+        "```",
+        "",
+        "## Tips",
+        "",
+        "- Keep this file concise — it is loaded into context every session.",
+        "- Put project-specific rules in the project's OPENANALYST.md instead.",
+        "- Custom slash commands go in ~/.openanalyst/commands/ as .md files.",
+        "- Custom rules go in ~/.openanalyst/rules/ as .md files.",
+        "",
+      ].join("\n");
+      fs.writeFileSync(oaMdFile, oaMdTemplate, "utf-8");
+      created = true;
+    }
+
+    // Create settings.json — global settings (mirrors ~/.claude/settings.json)
+    const settingsFile = path.join(CONFIG_DIR, "settings.json");
+    if (!fs.existsSync(settingsFile)) {
+      const settingsTemplate = {
+        "$schema": "https://openanalyst.com/schemas/settings.json",
+        "_comment": "Global settings for OpenAnalyst CLI. Project-level settings (.openanalyst/settings.json) override these.",
+        "model": null,
+        "effort": null,
+        "theme": null,
+        "defaultMode": null,
+        "autoCompact": true,
+        "includeCoAuthoredBy": true,
+        "autoMemoryEnabled": true,
+        "viModeEnabled": false,
+        "fastModeEnabled": false,
+        "permissionRules": {
+          "allow": [],
+          "ask": [],
+          "deny": []
+        },
+        "mcpServers": {},
+        "hooks": {},
+        "env": {}
+      };
+      fs.writeFileSync(settingsFile, JSON.stringify(settingsTemplate, null, 2) + "\n", "utf-8");
+      created = true;
+    }
+
+    // Create default .env template
     if (!fs.existsSync(ENV_FILE)) {
       const template = [
-        "# OpenAnalyst CLI Configuration",
-        "# Uncomment and set your API keys:",
+        "# ╔══════════════════════════════════════════════════════╗",
+        "# ║          OpenAnalyst CLI Configuration               ║",
+        "# ╚══════════════════════════════════════════════════════╝",
+        "#",
+        "# Add your API key for ANY ONE provider to get started.",
+        "# Use /login inside the CLI for easier setup.",
         "",
+        "# ── AI Providers (set at least one) ──",
         "# OPENAI_API_KEY=sk-your-key-here",
         "# ANTHROPIC_API_KEY=sk-ant-your-key-here",
         "# GEMINI_API_KEY=AIza-your-key-here",
+        "# XAI_API_KEY=xai-your-key-here",
         "# OPENROUTER_API_KEY=sk-or-your-key-here",
         "",
-        "# Default model (optional):",
+        "# ── OpenAnalyst Platform (optional) ──",
+        "# OPENANALYST_AUTH_TOKEN=sk-oa-your-key-here",
+        "",
+        "# ── Default Model (optional — auto-detected from provider) ──",
         "# OPENANALYST_MODEL=claude-sonnet-4-20250514",
+        "",
+        "# ── Sandbox Mode (recommended: true) ──",
+        "OPENANALYST_SANDBOX=true",
+        "",
+        "# ── Voice Input (requires OpenAI key for Whisper) ──",
+        "# OPENANALYST_VOICE_ENABLED=true",
         "",
       ].join("\n");
       fs.writeFileSync(ENV_FILE, template, "utf-8");
-      return { created: true };
+      created = true;
     }
-    return { created: false };
+
+    // Create credentials.json template
+    const credFile = path.join(CONFIG_DIR, "credentials.json");
+    if (!fs.existsSync(credFile)) {
+      fs.writeFileSync(credFile, JSON.stringify({
+        version: 1,
+        providers: {},
+        note: "Managed by OpenAnalyst CLI. Use /login to add credentials.",
+      }, null, 2), "utf-8");
+      created = true;
+    }
+
+    // Create preferences.json template
+    const prefsFile = path.join(CONFIG_DIR, "preferences.json");
+    if (!fs.existsSync(prefsFile)) {
+      fs.writeFileSync(prefsFile, JSON.stringify({
+        defaultProvider: null,
+        defaultSetAt: null,
+        routing: {},
+        theme: "dark",
+        vimMode: false,
+        sidebarVisible: false,
+      }, null, 2), "utf-8");
+      created = true;
+    }
+
+    // Create trusted_folders.json (sandbox allowlist)
+    // Must match the filename used by folder_trust.rs in the Rust backend.
+    const trustFile = path.join(CONFIG_DIR, "trusted_folders.json");
+    if (!fs.existsSync(trustFile)) {
+      fs.writeFileSync(trustFile, JSON.stringify(
+        [],
+        null, 2
+      ) + "\n", "utf-8");
+      created = true;
+    }
+
+    return { created };
   } catch (err) {
     return { error: err.message };
   }
@@ -328,15 +480,27 @@ async function main() {
   // Print branded logo
   printLogo();
 
-  // Step 1: Setup config directory
+  // Step 1: Setup config directory + skeleton files
   startSpinner("Setting up config directory...");
   const configResult = setupConfigDir();
   if (configResult.error) {
     stopSpinner(false, `Config setup failed: ${configResult.error}`);
   } else if (configResult.created) {
-    stopSpinner(true, `Created ${GRAY}~/.openanalyst/.env${RESET} ${GRAY}(add your API keys here)${RESET}`);
+    stopSpinner(true, `Created ${CYAN}~/.openanalyst/${RESET} ${GRAY}with OPENANALYST.md, settings.json, .env, credentials.json${RESET}`);
   } else {
     stopSpinner(true, `Config directory exists ${GRAY}~/.openanalyst/${RESET}`);
+  }
+
+  // Step 1.5: Install Playwright browser (for web tools)
+  startSpinner("Setting up Playwright browser...");
+  try {
+    execSync("npx playwright install chromium --with-deps 2>&1", {
+      timeout: 120000,
+      stdio: "pipe",
+    });
+    stopSpinner(true, "Playwright Chromium installed (web browsing tools ready)");
+  } catch {
+    stopSpinner(false, "Playwright install skipped (optional — web tools won't be available)");
   }
 
   // Step 2: Download prebuilt binary

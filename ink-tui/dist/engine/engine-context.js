@@ -34,47 +34,52 @@ export function EngineProvider({ config, children }) {
             switch (event.type) {
                 // -- Streaming --
                 case 'stream_delta':
-                    if (!event.done) {
-                        chat.pushDelta(event.agentId, event.content);
-                    }
+                    // Rust sends "text" (not "content"), and no "done" field.
+                    // Stream completion is signaled by stream_end event.
+                    chat.pushDelta(event.agentId, event.text);
                     break;
                 case 'stream_end':
                     chat.finishAssistant(event.agentId);
                     break;
                 // -- Tool calls --
                 case 'tool_call_start':
-                    chat.pushToolCallStart(event.agentId, event.toolId, event.toolName, event.inputPreview);
+                    // Rust sends "callId" not "toolId"
+                    chat.pushToolCallStart(event.agentId, event.callId, event.toolName, event.inputPreview);
                     break;
                 case 'tool_call_update':
-                    chat.updateToolCall(event.toolId, event.output);
+                    // NOTE: This event does not exist in Rust yet. Kept for future use.
+                    chat.updateToolCall(event.callId, event.output);
                     break;
-                case 'tool_call_complete':
-                    chat.completeToolCall(event.toolId, event.status, event.output, event.durationMs);
+                case 'tool_call_end':
+                    // Rust sends "tool_call_end" with "callId", "isError", "duration" (not "durationMs")
+                    chat.completeToolCall(event.callId, event.isError ? 'failed' : 'completed', event.output, event.duration, event.diff ?? undefined);
                     break;
                 // -- Dialogs --
                 case 'permission_request':
+                    // Rust sends "input" (not "toolInput"), "requiredMode" as free string.
+                    // No "filePath" or "description" from Rust.
                     ui.showPermissionDialog({
                         requestId: event.requestId,
                         agentId: event.agentId,
                         toolName: event.toolName,
-                        toolInput: event.toolInput,
+                        toolInput: event.input,
                         requiredMode: event.requiredMode,
-                        filePath: event.filePath,
-                        description: event.description,
                         selectedButton: 'allow',
                     });
                     break;
                 case 'ask_user_request':
+                    // Rust sends "default" (not "defaultValue"), and no "allowFreeText" field.
+                    // Default allowFreeText to true when no options provided.
                     ui.showAskUserDialog({
                         requestId: event.requestId,
                         agentId: event.agentId,
                         question: event.question,
-                        options: event.options,
-                        defaultValue: event.defaultValue,
-                        allowFreeText: event.allowFreeText,
+                        options: event.options ?? undefined,
+                        defaultValue: event.default ?? undefined,
+                        allowFreeText: !event.options || event.options.length === 0,
                         selectedIndex: 0,
                         typingMode: false,
-                        typedText: event.defaultValue ?? '',
+                        typedText: event.default ?? '',
                     });
                     break;
                 // -- Status --
@@ -90,6 +95,8 @@ export function EngineProvider({ config, children }) {
                     }
                     else {
                         ui.setInputMode('agent_running', event.label);
+                        // Auto-hide sidebar when task starts (user can reopen with F2)
+                        ui.hideSidebar();
                     }
                     break;
                 // -- Agent lifecycle --
@@ -98,7 +105,7 @@ export function EngineProvider({ config, children }) {
                     chat.pushSystem(`Agent spawned: ${event.agentType} -- ${event.task}`, 'info');
                     break;
                 case 'agent_status_changed':
-                    // Could update a sidebar agent list -- for now, system message
+                    ui.updateAgentStatus(event.agentId, event.status);
                     break;
                 case 'agent_completed':
                     ui.setActiveAgent(null);
@@ -109,14 +116,15 @@ export function EngineProvider({ config, children }) {
                     break;
                 // -- Usage --
                 case 'usage_update':
-                    // Could display token counts in status bar or sidebar
+                    ui.addUsage(event.inputTokens, event.outputTokens, event.model);
                     break;
                 // -- KB results --
-                case 'kb_result':
+                case 'knowledge_result':
                     chat.pushKBResult({
                         queryId: event.queryId,
                         query: event.query,
                         intent: event.intent,
+                        subQuestions: event.subQuestions,
                         answer: event.answer,
                         latencyMs: event.latencyMs,
                         fromCache: event.fromCache,
@@ -143,8 +151,11 @@ export function EngineProvider({ config, children }) {
                     break;
                 // -- Sidebar data --
                 case 'sidebar_update':
-                    // Sidebar data handled by sidebar component reading from a store,
-                    // but we update a few UI state fields from it
+                    ui.setSidebarAgents([...event.agents]);
+                    ui.setSidebarFiles([...event.files]);
+                    ui.setSidebarPlans([...event.plans]);
+                    ui.setSidebarRouting(event.routing);
+                    ui.setSidebarActivity(event.activity);
                     if (event.activity.creditBalance) {
                         ui.setCreditBalance(event.activity.creditBalance);
                     }

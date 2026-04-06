@@ -7,6 +7,7 @@
  */
 
 import { execSync } from 'node:child_process';
+import { createRequire } from 'node:module';
 
 export interface PlaywrightCheckResult {
   /** Whether Playwright browsers are available. */
@@ -23,7 +24,9 @@ export interface PlaywrightCheckResult {
  */
 export function checkPlaywrightInstalled(): PlaywrightCheckResult {
   try {
-    // Try to resolve the @playwright/mcp package
+    // Use createRequire for ESM compatibility — require.resolve is not
+    // available natively in ESM modules (package.json "type": "module").
+    const require = createRequire(import.meta.url);
     require.resolve('@playwright/mcp');
   } catch {
     return {

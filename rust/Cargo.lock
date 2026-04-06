@@ -46,7 +46,7 @@ checksum = "7f202df86484c868dbad7eaa557ef785d5c66295e41b460ef922eca0723b842c"
 
 [[package]]
 name = "api"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "reqwest",
  "runtime",
@@ -261,7 +261,7 @@ dependencies = [
 
 [[package]]
 name = "commands"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "plugins",
  "runtime",
@@ -270,7 +270,7 @@ dependencies = [
 
 [[package]]
 name = "compat-harness"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "commands",
  "runtime",
@@ -396,7 +396,7 @@ checksum = "dea2df4cf52843e0452895c455a1a2cfbb842a1e7329671acf418fdc53ed4c59"
 
 [[package]]
 name = "events"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "serde",
  "serde_json",
@@ -969,7 +969,7 @@ checksum = "112b39cec0b298b6c1999fee3e31427f74f676e4cb9879ed1a121b43661a4154"
 
 [[package]]
 name = "lsp"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "lsp-types",
  "serde",
@@ -1107,7 +1107,7 @@ dependencies = [
 
 [[package]]
 name = "openanalyst-agent"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "api",
  "plugins",
@@ -1119,7 +1119,7 @@ dependencies = [
 
 [[package]]
 name = "openanalyst-cli"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "api",
  "base64",
@@ -1145,7 +1145,7 @@ dependencies = [
 
 [[package]]
 name = "orchestrator"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "api",
  "chrono",
@@ -1215,7 +1215,7 @@ dependencies = [
 
 [[package]]
 name = "plugins"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "serde",
  "serde_json",
@@ -1488,7 +1488,7 @@ dependencies = [
 
 [[package]]
 name = "runtime"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "getrandom 0.2.17",
  "glob",
@@ -1730,7 +1730,7 @@ dependencies = [
 
 [[package]]
 name = "server"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "async-stream",
  "axum",
@@ -2071,7 +2071,7 @@ checksum = "5d99f8c9a7727884afe522e9bd5edbfc91a3312b36a77b5fb8926e4c31a41801"
 
 [[package]]
 name = "tools"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "api",
  "plugins",
@@ -2156,7 +2156,7 @@ checksum = "e421abadd41a4225275504ea4d6566923418b7f05506fbc9c0fe86ba7396114b"
 
 [[package]]
 name = "tui"
-version = "2.0.11"
+version = "2.0.12"
 dependencies = [
  "anyhow",
  "events",

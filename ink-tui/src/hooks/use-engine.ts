@@ -24,7 +24,7 @@ import {
   type StreamEnd,
   type ToolCallStart,
   type ToolCallUpdate,
-  type ToolCallComplete,
+  type ToolCallEnd,
   type PermissionRequest,
   type AskUserRequest,
   type StatusUpdate,
@@ -55,7 +55,7 @@ export interface EngineEventHandlers {
   onStreamEnd?: (event: StreamEnd) => void;
   onToolCallStart?: (event: ToolCallStart) => void;
   onToolCallUpdate?: (event: ToolCallUpdate) => void;
-  onToolCallComplete?: (event: ToolCallComplete) => void;
+  onToolCallComplete?: (event: ToolCallEnd) => void;
   onPermissionRequest?: (event: PermissionRequest) => void;
   onAskUserRequest?: (event: AskUserRequest) => void;
   onStatusUpdate?: (event: StatusUpdate) => void;
@@ -196,7 +196,7 @@ export function useEngine(
       case 'stream_end': return h.onStreamEnd?.(event);
       case 'tool_call_start': return h.onToolCallStart?.(event);
       case 'tool_call_update': return h.onToolCallUpdate?.(event);
-      case 'tool_call_complete': return h.onToolCallComplete?.(event);
+      case 'tool_call_end': return h.onToolCallComplete?.(event);
       case 'permission_request': return h.onPermissionRequest?.(event);
       case 'ask_user_request': return h.onAskUserRequest?.(event);
       case 'status_update': return h.onStatusUpdate?.(event);
@@ -205,7 +205,7 @@ export function useEngine(
       case 'agent_completed': return h.onAgentCompleted?.(event);
       case 'agent_failed': return h.onAgentFailed?.(event);
       case 'usage_update': return h.onUsageUpdate?.(event);
-      case 'kb_result': return h.onKbResult?.(event);
+      case 'knowledge_result': return h.onKbResult?.(event);
       case 'system_message': return h.onSystemMessage?.(event);
       case 'banner': return h.onBanner?.(event);
       case 'sidebar_update': return h.onSidebarUpdate?.(event);
@@ -350,7 +350,7 @@ export function useEngine(
       dispatchEvent({
         type: 'banner',
         timestamp: now(),
-        version: '2.0.10-dev',
+        version: '2.0.12',
         displayName: 'Developer',
         email: 'dev@openanalyst.ai',
         provider: 'OpenAnalyst Inc',
@@ -420,24 +420,24 @@ export function useEngine(
 
   const resolvePermission = useCallback(
     (requestId: string, decision: 'allow' | 'deny') =>
-      send(buildAction('resolve_permission', { requestId, decision })),
+      send(buildAction('permission_response', { requestId, allow: decision === 'allow' })),
     [send],
   );
 
   const resolveAskUser = useCallback(
     (requestId: string, answer: string) =>
-      send(buildAction('resolve_ask_user', { requestId, answer })),
+      send(buildAction('ask_user_response', { requestId, response: answer })),
     [send],
   );
 
   const sendKbFeedback = useCallback(
     (queryId: number, rating: 'positive' | 'negative' | 'corrected', comment?: string, correction?: string) =>
-      send(buildAction('kb_feedback', { queryId, rating, comment, correction })),
+      send(buildAction('knowledge_feedback', { queryId, rating, comment: comment ?? '', correction: correction ?? '' })),
     [send],
   );
 
   const changePermissionMode = useCallback(
-    (mode: PermissionMode) => send(buildAction('change_permission_mode', { mode })),
+    (mode: PermissionMode) => send(buildAction('update_permissions', { mode })),
     [send],
   );
 
@@ -549,21 +549,20 @@ function handleMockAction(action: Record<string, unknown>, dispatch: DispatchFn)
       });
       break;
     }
-    case 'resolve_permission': {
-      const decision = action.decision as string;
+    case 'permission_response': {
       dispatch({
         type: 'system_message',
         timestamp: now(),
-        content: `Permission ${decision}ed (mock)`,
+        content: `Permission ${action.allow ? 'allow' : 'deny'}ed (mock)`,
         level: 'info',
       });
       break;
     }
-    case 'resolve_ask_user': {
+    case 'ask_user_response': {
       dispatch({
         type: 'system_message',
         timestamp: now(),
-        content: `User responded: "${action.answer}" (mock)`,
+        content: `User responded: "${action.response}" (mock)`,
         level: 'info',
       });
       break;
@@ -604,7 +603,7 @@ function simulateResponse(prompt: string, dispatch: DispatchFn): void {
       type: 'tool_call_start',
       timestamp: now(),
       agentId,
-      toolId: 'mock-tool-1',
+      callId: 'mock-tool-1',
       toolName: 'Read',
       inputPreview: 'src/index.ts',
     });
@@ -621,13 +620,13 @@ function simulateResponse(prompt: string, dispatch: DispatchFn): void {
   setTimeout(() => {
     elapsed = 600;
     dispatch({
-      type: 'tool_call_complete',
+      type: 'tool_call_end',
       timestamp: now(),
       agentId,
-      toolId: 'mock-tool-1',
-      status: 'completed',
+      callId: 'mock-tool-1',
+      isError: false,
       output: '// Entry point\nimport { App } from "./app";\n// ...',
-      durationMs: 280,
+      duration: 280,
     });
     dispatch({
       type: 'status_update',
@@ -651,8 +650,7 @@ function simulateResponse(prompt: string, dispatch: DispatchFn): void {
         type: 'stream_delta',
         timestamp: now(),
         agentId,
-        content: '',
-        done: true,
+        text: '',
       });
       dispatch({
         type: 'stream_end',
@@ -691,8 +689,7 @@ function simulateResponse(prompt: string, dispatch: DispatchFn): void {
       type: 'stream_delta',
       timestamp: now(),
       agentId,
-      content: chunk,
-      done: false,
+      text: chunk,
     });
     wordIndex++;
   }, 50);
@@ -737,7 +734,7 @@ export function createMockEngine(): MockEngine {
     dispatch({
       type: 'banner',
       timestamp: now(),
-      version: '2.0.10-mock',
+      version: '2.0.12',
       displayName: 'Mock User',
       email: 'mock@openanalyst.ai',
       provider: 'OpenAnalyst Inc',
