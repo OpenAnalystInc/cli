@@ -67,7 +67,6 @@
         <div class="tab-buttons">
           <button class="tab-btn active" data-tab="tab-mac">macOS / Linux</button>
           <button class="tab-btn" data-tab="tab-win">Windows</button>
-          <button class="tab-btn" data-tab="tab-source">From Source</button>
         </div>
 
         <div id="tab-mac" class="tab-content active">
@@ -88,15 +87,15 @@
         </div>
 
         <div id="tab-source" class="tab-content">
-          <p>Build from source:</p>
+          <p>Clone and build from source:</p>
           <pre><code>git clone https://github.com/OpenAnalystInc/openanalyst-cli.git
 cd openanalyst-cli
-# Build instructions available for licensed users</code></pre>
-          <p>The compiled binary is at <code>target/release/openanalyst</code> (or <code>.exe</code> on Windows).</p>
+# Build instructions available in the repository README</code></pre>
+          <p>The compiled binary is placed in your PATH automatically.</p>
 
           <div class="callout callout-info">
             <div class="callout-title">Info</div>
-            The workspace has 14 crates. A full release build takes 2&ndash;4 minutes depending on your hardware.
+            A full release build takes 2&ndash;4 minutes depending on your hardware.
           </div>
         </div>
       </div>

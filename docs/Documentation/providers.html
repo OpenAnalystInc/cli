@@ -47,7 +47,7 @@
       <div class="page-header">
         <span class="badge">Core Concepts</span>
         <h1>LLM Providers</h1>
-        <p class="subtitle">Seven first-class providers with live model discovery, streaming, and full tool support. Switch mid-conversation without losing context.</p>
+        <p class="subtitle">Eight first-class providers with live model discovery, streaming, and full tool support. Switch mid-conversation without losing context.</p>
       </div>
 
       <h2 id="supported">Supported Providers</h2>
@@ -60,28 +60,33 @@
         </div>
         <div class="card">
           <h3>Anthropic / Claude <span class="badge-sm badge-green">OAuth</span></h3>
-          <p>Claude Opus, Sonnet, Haiku with extended thinking support.</p>
+          <p>Claude Opus 4.6, Sonnet 4.6, Haiku with extended thinking support.</p>
           <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>ANTHROPIC_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>OpenAI / Codex <span class="badge-sm badge-green">OAuth</span></h3>
-          <p>GPT-4o, o3, Codex Mini via direct OpenAI API.</p>
+          <p>GPT-5.4, o3, Codex Mini via direct OpenAI API.</p>
           <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>OPENAI_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>Google Gemini <span class="badge-sm badge-green">OAuth</span></h3>
-          <p>Gemini 2.5 Pro, Gemini 2.5 Flash with live model discovery.</p>
+          <p>Gemini 3.1 Pro, Gemini 3.1 Flash with live model discovery.</p>
           <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>GEMINI_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>xAI / Grok</h3>
-          <p>Grok-3, Grok Mini with streaming tool support.</p>
+          <p>Grok 4, Grok Mini with streaming tool support.</p>
           <p style="margin-top:8px"><code>XAI_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>OpenRouter</h3>
           <p>350+ models from any provider through a single gateway.</p>
           <p style="margin-top:8px"><code>OPENROUTER_API_KEY</code></p>
+        </div>
+        <div class="card">
+          <h3>Stability AI</h3>
+          <p>Stable Diffusion and image generation models.</p>
+          <p style="margin-top:8px"><code>STABILITY_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>Amazon Bedrock</h3>
@@ -102,7 +107,7 @@ openanalyst --model opus
 &gt; now refactor the auth module
 
 <span class="token-comment"># Switch to Gemini for review</span>
-/model gemini-2.5-pro
+/model gemini-3.1-pro
 &gt; review the changes for security issues</code></pre>
 
       <div class="callout callout-info">
@@ -119,13 +124,16 @@ openanalyst --model opus
           <tr><td><code>opus</code></td><td>claude-opus-4-6</td><td>Anthropic</td></tr>
           <tr><td><code>sonnet</code></td><td>claude-sonnet-4-6</td><td>Anthropic</td></tr>
           <tr><td><code>haiku</code></td><td>claude-haiku-4-5</td><td>Anthropic</td></tr>
+          <tr><td><code>gpt-5</code></td><td>gpt-5.4</td><td>OpenAI</td></tr>
           <tr><td><code>gpt-4o</code></td><td>gpt-4o</td><td>OpenAI</td></tr>
           <tr><td><code>o3</code></td><td>o3</td><td>OpenAI</td></tr>
           <tr><td><code>codex-mini</code></td><td>codex-mini-latest</td><td>OpenAI</td></tr>
-          <tr><td><code>gemini-2.5-pro</code></td><td>gemini-2.5-pro-preview</td><td>Google</td></tr>
-          <tr><td><code>gemini-2.5-flash</code></td><td>gemini-2.5-flash-preview</td><td>Google</td></tr>
-          <tr><td><code>grok</code></td><td>grok-3</td><td>xAI</td></tr>
-          <tr><td><code>grok-mini</code></td><td>grok-3-mini</td><td>xAI</td></tr>
+          <tr><td><code>gemini-pro</code></td><td>gemini-3.1-pro</td><td>Google</td></tr>
+          <tr><td><code>gemini-flash</code></td><td>gemini-3.1-flash</td><td>Google</td></tr>
+          <tr><td><code>grok</code></td><td>grok-4</td><td>xAI</td></tr>
+          <tr><td><code>grok-mini</code></td><td>grok-4-mini</td><td>xAI</td></tr>
+          <tr><td><code>deepseek</code></td><td>deepseek-v4</td><td>OpenRouter</td></tr>
+          <tr><td><code>llama</code></td><td>llama-4-maverick</td><td>OpenRouter</td></tr>
         </tbody>
       </table>
 
@@ -140,13 +148,14 @@ openanalyst models --provider openai</code></pre>
 
       <h2 id="features">Provider Feature Matrix</h2>
       <table>
-        <thead><tr><th>Feature</th><th>OpenAnalyst</th><th>Anthropic</th><th>OpenAI</th><th>Gemini</th><th>xAI</th><th>OpenRouter</th><th>Bedrock</th></tr></thead>
+        <thead><tr><th>Feature</th><th>OpenAnalyst</th><th>Anthropic</th><th>OpenAI</th><th>Gemini</th><th>xAI</th><th>Stability</th><th>OpenRouter</th><th>Bedrock</th></tr></thead>
         <tbody>
-          <tr><td>Streaming</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
-          <tr><td>Tool calling</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
-          <tr><td>Live discovery</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
-          <tr><td>Extended thinking</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>Varies</td><td>&mdash;</td></tr>
-          <tr><td>OAuth login</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+          <tr><td>Streaming</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&#10003;</td><td>&#10003;</td></tr>
+          <tr><td>Tool calling</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&#10003;</td><td>&#10003;</td></tr>
+          <tr><td>Live discovery</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
+          <tr><td>Extended thinking</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>Varies</td><td>&mdash;</td></tr>
+          <tr><td>Image generation</td><td>&mdash;</td><td>&mdash;</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&#10003;</td><td>Varies</td><td>&mdash;</td></tr>
+          <tr><td>OAuth login</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
         </tbody>
       </table>
 
