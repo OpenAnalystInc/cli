@@ -2741,18 +2741,29 @@ fn run_tui(
     allowed_tools: Option<AllowedToolSet>,
     permission_mode: PermissionMode,
 ) -> Result<(), Box<dyn std::error::Error>> {
-    // The ratatui TUI has been archived. Redirect to headless mode which
-    // communicates with the Ink TUI via JSON-RPC over stdio.
-    eprintln!();
-    eprintln!("  \x1b[33mThe built-in ratatui TUI has been replaced by the Ink TUI.\x1b[0m");
-    eprintln!("  Launching in \x1b[1m--headless\x1b[0m mode (JSON-RPC bridge for Ink TUI).");
-    eprintln!();
-    eprintln!("  To use the new TUI, run: \x1b[1mnpx openanalyst\x1b[0m");
-    eprintln!("  The Ink TUI will automatically spawn the Rust engine in headless mode.");
-    eprintln!();
+    // Launch the TUI via the npm package (npx runs the Ink TUI which
+    // spawns this binary in --headless mode for the engine bridge).
+    let npx_result = std::process::Command::new(if cfg!(windows) { "npx.cmd" } else { "npx" })
+        .args(["@openanalystinc/openanalyst-cli"])
+        .status();
 
-    // Fall through to headless mode so the engine is still functional
-    run_headless(model, allowed_tools, permission_mode)
+    match npx_result {
+        Ok(status) if status.success() => Ok(()),
+        Ok(_) => {
+            // npx failed — fall back to headless mode
+            run_headless(model, allowed_tools, permission_mode)
+        }
+        Err(_) => {
+            // npx not found — fall back to headless mode
+            eprintln!();
+            eprintln!("  \x1b[33mNode.js is required for the terminal UI.\x1b[0m");
+            eprintln!("  Install it from: \x1b[1mhttps://nodejs.org\x1b[0m");
+            eprintln!();
+            eprintln!("  Or install the TUI: \x1b[1mnpm install -g @openanalystinc/openanalyst-cli\x1b[0m");
+            eprintln!();
+            run_headless(model, allowed_tools, permission_mode)
+        }
+    }
 }
 
 /// Run in headless JSON-RPC mode for the Ink TUI bridge.
