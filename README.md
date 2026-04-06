@@ -6,19 +6,19 @@ Connect to any major LLM provider through a single, unified terminal interface. 
 
 ## Install
 
+**npm (all platforms):**
+```bash
+npm install -g @openanalystinc/openanalyst-cli
+```
+
 **Windows (PowerShell):**
 ```powershell
-irm https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/master/install.ps1 | iex
+irm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex
 ```
 
 **macOS / Linux:**
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/openanalyst-cli/master/install.sh | bash
-```
-
-**npm:**
-```bash
-npm install -g @openanalystinc/openanalyst-cli
+curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh | bash
 ```
 
 ## Quick Start
