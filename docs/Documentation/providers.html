@@ -12,7 +12,7 @@
 
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <a href="../Index.html">
+        <a href="../index.html">
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
@@ -55,17 +55,17 @@
       <div class="card-grid">
         <div class="card">
           <h3>OpenAnalyst <span class="badge-sm badge-blue">Default</span></h3>
-          <p>OpenAnalyst's own API with models fetched live.</p>
-          <p><code>OPENANALYST_AUTH_TOKEN</code></p>
+          <p>OpenAnalyst's live routed catalog with OpenAnalyst, GPT, Claude, Gemini, DeepSeek, Qwen, and free models fetched live.</p>
+          <p><code>OPENANALYST_API_KEY</code></p>
         </div>
         <div class="card">
-          <h3>Anthropic / Claude <span class="badge-sm badge-green">OAuth</span></h3>
+          <h3>Anthropic / Claude</h3>
           <p>Claude Opus 4.6, Sonnet 4.6, Haiku with extended thinking support.</p>
           <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>ANTHROPIC_API_KEY</code></p>
         </div>
         <div class="card">
-          <h3>OpenAI / Codex <span class="badge-sm badge-green">OAuth</span></h3>
-          <p>GPT-5.4, o3, Codex Mini via direct OpenAI API.</p>
+          <h3>OpenAI / Codex</h3>
+          <p>GPT-5.4, GPT-4.1, GPT-4o, o3, o4 Mini, and Codex via direct OpenAI API.</p>
           <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>OPENAI_API_KEY</code></p>
         </div>
         <div class="card">
@@ -138,7 +138,7 @@ openanalyst --model opus
       </table>
 
       <h2 id="discovery">Live Model Discovery</h2>
-      <p>All providers support <strong>live model discovery</strong> &mdash; available models are fetched from the provider's API at runtime, so you always have access to the latest models without updating the CLI.</p>
+      <p>All providers support <strong>live model discovery</strong> &mdash; available models are fetched from the provider's API or OpenAnalyst routing layer at runtime, so you always have access to the latest models without updating the CLI.</p>
 
       <pre><code><span class="token-comment"># List available models for current provider</span>
 /model
@@ -155,7 +155,7 @@ openanalyst models --provider openai</code></pre>
           <tr><td>Live discovery</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
           <tr><td>Extended thinking</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>Varies</td><td>&mdash;</td></tr>
           <tr><td>Image generation</td><td>&mdash;</td><td>&mdash;</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&#10003;</td><td>Varies</td><td>&mdash;</td></tr>
-          <tr><td>OAuth login</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td><td>&mdash;</td></tr>
+          <tr><td>Interactive login</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td><td>&#10003;</td></tr>
         </tbody>
       </table>
 

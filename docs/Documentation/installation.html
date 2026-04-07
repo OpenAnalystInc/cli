@@ -12,7 +12,7 @@
 
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <a href="../Index.html">
+        <a href="../index.html">
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
@@ -87,15 +87,15 @@
         </div>
 
         <div id="tab-source" class="tab-content">
-          <p>Clone and build from source:</p>
-          <pre><code>git clone https://github.com/OpenAnalystInc/openanalyst-cli.git
-cd openanalyst-cli
-# Build instructions available in the repository README</code></pre>
-          <p>The compiled binary is placed in your PATH automatically.</p>
+          <p>Backend-only deployment:</p>
+          <pre><code>npm install -g @openanalystinc/openanalyst-cli
+openanalyst --notui
+openanalyst --serve 8080</code></pre>
+          <p>Use this when you want the hosted session API on a server without launching the TUI.</p>
 
           <div class="callout callout-info">
             <div class="callout-title">Info</div>
-            A full release build takes 2&ndash;4 minutes depending on your hardware.
+            This is the recommended server deployment path when you want a hosted OpenAnalyst backend with no interactive TUI attached.
           </div>
         </div>
       </div>
@@ -103,10 +103,15 @@ cd openanalyst-cli
       <h2 id="verify">Verify Installation</h2>
       <pre><code><span class="token-comment"># Check the version</span>
 openanalyst --version
-<span class="token-comment"># Output: openanalyst-cli <span class="oa-version">2.0.3</span></span>
+<span class="token-comment"># Output: OpenAnalyst CLI v<span class="oa-version">2.0.3</span></span>
 
 <span class="token-comment"># Check logged-in providers</span>
 openanalyst whoami</code></pre>
+
+      <div class="callout callout-info">
+        <div class="callout-title">Default Launch Modes</div>
+        <p><code>openanalyst</code> starts the full TUI by default. Use <code>openanalyst --notui</code> for backend-only CLI usage or <code>openanalyst --serve</code> to expose hosted HTTP session endpoints from a server.</p>
+      </div>
 
       <h2 id="update">Updating</h2>
       <p>Re-run the same install script to update to the latest version. Your configuration and sessions are preserved.</p>

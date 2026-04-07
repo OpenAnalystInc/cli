@@ -71,22 +71,23 @@
       <div class="code-title">OPENANALYST.md</div>
       <pre><code># Project: My App
 
-## Architecture
-This is a React + Node.js monorepo with:
-- /frontend — React SPA (Vite)
-- /backend — Express API server
-- /shared — Shared types and utilities
+## What This Project Does
+This project guidance file should describe the product and workflow, not your internal implementation details.
+- Internal analytics dashboard for operations teams
+- Main workflows: ingestion, review, and reporting
+- Production data is sensitive; prefer read-first exploration
 
-## Guidelines
-- Use TypeScript strict mode
-- Prefer functional components with hooks
-- All API routes must have error handling middleware
-- Tests use Vitest for frontend, Jest for backend
+## Working Agreement
+- Explain risky changes before making them
+- Keep edits small and easy to review
+- Preserve existing CLI conventions and test commands
+- Prefer project-local scripts over ad-hoc shell commands when available
 
 ## Common Tasks
-- Run dev: `npm run dev` (starts both frontend and backend)
+- Run dev: `npm run dev`
 - Run tests: `npm test`
-- Deploy: `npm run deploy` (requires AWS credentials)</code></pre>
+- Run lint: `npm run lint`
+- Build: `npm run build`</code></pre>
 
       <div class="callout callout-tip">
         <div class="callout-title">Tip</div>
@@ -201,7 +202,8 @@ openanalyst --permission-mode workspace-write
       <table>
         <thead><tr><th>Variable</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>OPENANALYST_AUTH_TOKEN</code></td><td>OpenAnalyst API key</td></tr>
+          <tr><td><code>OPENANALYST_API_KEY</code></td><td>OpenAnalyst API key</td></tr>
+          <tr><td><code>OPENANALYST_AUTH_TOKEN</code></td><td>Legacy compatibility alias for OpenAnalyst auth</td></tr>
           <tr><td><code>OPENANALYST_BASE_URL</code></td><td>OpenAnalyst API base URL</td></tr>
           <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Anthropic Claude API key</td></tr>
           <tr><td><code>OPENAI_API_KEY</code></td><td>OpenAI API key</td></tr>

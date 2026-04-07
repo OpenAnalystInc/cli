@@ -566,6 +566,22 @@ kbd {
 
 .page-footer a:hover { color: var(--oa-primary-light); text-decoration: none; }
 
+.docs-site-footer {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid rgba(255,255,255,0.06);
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: var(--oa-text-muted);
+  font-size: 12px;
+}
+
+.docs-site-footer strong {
+  color: var(--oa-text-heading);
+}
+
 /* ---------- On-this-page ---------- */
 .toc {
   position: fixed;

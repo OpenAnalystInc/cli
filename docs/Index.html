@@ -133,7 +133,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   <div class="hero-status"><span class="dot"></span><span id="status-text">Ready</span></div>
   <div class="cta-row">
     <a href="#install" class="btn btn-primary">Get Started</a>
-    <a href="https://github.com/OpenAnalystInc/openanalyst-cli" class="btn btn-outline" target="_blank">View on GitHub</a>
+    <a href="https://github.com/OpenAnalystInc/cli" class="btn btn-outline" target="_blank">View on GitHub</a>
   </div>
 </div>
 
@@ -168,7 +168,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   Select your LLM provider to authenticate:
 
-  <span class="c-g">&gt;</span> <span class="c-c">OpenAnalyst</span>         gpt-oss-120b free model or API key with credits
+  <span class="c-g">&gt;</span> <span class="c-c">OpenAnalyst</span>         OpenAnalyst, GPT, Claude, Gemini, DeepSeek, Qwen, free models
     Anthropic / Claude  opus, sonnet, haiku &mdash; API key
     OpenAI / Codex      gpt-4o, o3, codex-mini &mdash; API key
     Google Gemini       gemini-2.5-pro, flash &mdash; API key
@@ -179,8 +179,8 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   How would you like to authenticate?
 
-  <span class="c-g">&gt;</span> <span class="c-c">Use free model</span>  gpt-oss-120b &mdash; no credits needed
-    Use API key       OpenAnalyst API with credits
+  <span class="c-g">&gt;</span> <span class="c-c">Use free model</span>  OpenAnalyst-routed free models
+    Use API key       OpenAnalyst catalog with credits
 
   <span class="c-d">Step 1</span>  Connecting to OpenAnalyst... <span class="c-g">&#10003; Connected</span>
 
@@ -193,8 +193,8 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
   <div style="margin-top:16px;padding:16px 20px;background:rgba(255,107,0,0.06);border:1px solid rgba(255,107,0,0.15);border-radius:12px">
     <p style="margin:0;font-size:14px;color:var(--text);line-height:1.7">
-      <strong style="color:var(--accent)">Direct Provider Login</strong> &mdash;
-      For <strong>Claude</strong>, <strong>Codex</strong>, and <strong>Gemini</strong> you can login directly through your provider account via browser OAuth. No API key needed &mdash; just sign in with your existing Anthropic, OpenAI, or Google account. Credentials are stored securely with PKCE and auto-refresh.
+      <strong style="color:var(--accent)">Current Auth Flow</strong> &mdash;
+      Most providers use the interactive API-key login flow. <strong>Google Gemini</strong> also supports browser OAuth, while <strong>OpenAnalyst</strong> can be used in free-model mode or with your own API key.
     </p>
   </div>
 </div>
@@ -208,9 +208,9 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   <div class="section-sub">Switch models mid-conversation. Session persists across providers. Login via browser API key. No other CLI does this.</div>
 
   <div class="pgrid">
-    <div class="pcard df"><div class="pcard-name">OpenAnalyst <span class="pcard-badge">DEFAULT</span></div><div class="pcard-env">OPENANALYST_AUTH_TOKEN</div><div class="pcard-desc">gpt-oss-120b free model or API credits</div></div>
-    <div class="pcard"><div class="pcard-name">Anthropic / Claude <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,0.15);color:var(--green);margin-left:4px">OAuth</span></div><div class="pcard-desc" style="margin:6px 0 8px">Opus 4.6, Sonnet 4.6, Haiku</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">ANTHROPIC_API_KEY</span></div></div>
-    <div class="pcard"><div class="pcard-name">OpenAI / Codex <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,0.15);color:var(--green);margin-left:4px">OAuth</span></div><div class="pcard-desc" style="margin:6px 0 8px">GPT-5.4, o3, codex-mini</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">OPENAI_API_KEY</span></div></div>
+    <div class="pcard df"><div class="pcard-name">OpenAnalyst <span class="pcard-badge">DEFAULT</span></div><div class="pcard-env">OPENANALYST_API_KEY</div><div class="pcard-desc">Live OpenAnalyst catalog: OpenAnalyst, GPT, Claude, Gemini, DeepSeek, Qwen, plus free routed models</div></div>
+    <div class="pcard"><div class="pcard-name">Anthropic / Claude</div><div class="pcard-desc" style="margin:6px 0 8px">Opus 4.6, Sonnet 4.6, Haiku</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">ANTHROPIC_API_KEY</span></div></div>
+    <div class="pcard"><div class="pcard-name">OpenAI / Codex</div><div class="pcard-desc" style="margin:6px 0 8px">GPT-5.4, o3, codex-mini</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">OPENAI_API_KEY</span></div></div>
     <div class="pcard"><div class="pcard-name">Google Gemini <span style="font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(16,185,129,0.15);color:var(--green);margin-left:4px">OAuth</span></div><div class="pcard-desc" style="margin:6px 0 8px">Gemini 3.1 Pro, Flash</div><div style="display:flex;gap:6px;flex-wrap:wrap"><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(16,185,129,0.1);color:var(--green);border:1px solid rgba(16,185,129,0.2)">openanalyst login</span><span style="font-size:10px;color:var(--dim);line-height:24px">or</span><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">GEMINI_API_KEY</span></div></div>
     <div class="pcard"><div class="pcard-name">xAI / Grok</div><div class="pcard-desc" style="margin:6px 0 8px">Grok 4, Grok Mini</div><div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">XAI_API_KEY</span></div></div>
     <div class="pcard"><div class="pcard-name">Stability AI</div><div class="pcard-desc" style="margin:6px 0 8px">Stable Diffusion, image generation</div><div><span style="font-family:'JetBrains Mono',monospace;font-size:10px;padding:3px 8px;border-radius:4px;background:rgba(139,92,246,0.1);color:var(--purple);border:1px solid rgba(139,92,246,0.2)">STABILITY_API_KEY</span></div></div>
@@ -589,9 +589,9 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 <!-- ═══ 11. FOOTER ═══ -->
 <div class="footer" style="padding:40px 24px">
-  <p><strong>OpenAnalyst CLI <span class="oa-version-full">v2.0.17</span></strong></p>
+  <p><strong>OpenAnalyst CLI <span class="oa-version-full">v2.0.20</span></strong></p>
   <p style="margin-top:6px">An independent, open-source AI agent for the terminal</p>
-  <p style="margin-top:12px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a> &middot; <a href="https://github.com/OpenAnalystInc/openanalyst-cli" target="_blank">GitHub</a></p>
+  <p style="margin-top:12px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a> &middot; <a href="https://github.com/OpenAnalystInc/cli" target="_blank">GitHub</a></p>
 </div>
 
 <!-- ═══ SCRIPTS ═══ -->
