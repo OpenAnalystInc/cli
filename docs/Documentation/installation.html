@@ -65,14 +65,42 @@
 
       <div class="tabs">
         <div class="tab-buttons">
-          <button class="tab-btn active" data-tab="tab-mac">macOS / Linux</button>
+          <button class="tab-btn active" data-tab="tab-mac">macOS</button>
+          <button class="tab-btn" data-tab="tab-linux">Linux</button>
           <button class="tab-btn" data-tab="tab-win">Windows</button>
+          <button class="tab-btn" data-tab="tab-npm">npm / Server</button>
         </div>
 
         <div id="tab-mac" class="tab-content active">
-          <p>Run the install script:</p>
+          <p>Install via the public script:</p>
           <pre><code>curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh | bash</code></pre>
-          <p>This downloads the latest release binary and places it in <code>/usr/local/bin/openanalyst</code>.</p>
+          <p>Or download a native macOS binary directly from the public release assets:</p>
+          <pre><code><span class="token-comment"># Apple Silicon</span>
+curl -L https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-aarch64-apple-darwin -o openanalyst
+chmod +x openanalyst
+sudo mv openanalyst /usr/local/bin/openanalyst
+
+<span class="token-comment"># Intel</span>
+curl -L https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-apple-darwin -o openanalyst
+chmod +x openanalyst
+sudo mv openanalyst /usr/local/bin/openanalyst</code></pre>
+          <p>The full OpenAnalyst CLI with TUI is published in the public repo releases at <a href="https://github.com/OpenAnalystInc/cli/releases/latest" target="_blank" rel="noreferrer">OpenAnalystInc/cli/releases/latest</a>.</p>
+        </div>
+
+        <div id="tab-linux" class="tab-content">
+          <p>Install via the public script:</p>
+          <pre><code>curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh | bash</code></pre>
+          <p>Or download a native Linux binary directly:</p>
+          <pre><code><span class="token-comment"># x86_64</span>
+curl -L https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-unknown-linux-gnu -o openanalyst
+chmod +x openanalyst
+sudo mv openanalyst /usr/local/bin/openanalyst
+
+<span class="token-comment"># ARM64</span>
+curl -L https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-aarch64-unknown-linux-gnu -o openanalyst
+chmod +x openanalyst
+sudo mv openanalyst /usr/local/bin/openanalyst</code></pre>
+          <p>All Linux binaries are published from the public repo release page: <a href="https://github.com/OpenAnalystInc/cli/releases/latest" target="_blank" rel="noreferrer">OpenAnalystInc/cli/releases/latest</a>.</p>
 
           <div class="callout callout-tip">
             <div class="callout-title">Tip</div>
@@ -83,10 +111,16 @@
         <div id="tab-win" class="tab-content">
           <p>Open PowerShell as Administrator:</p>
           <pre><code>irm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex</code></pre>
-          <p>The binary is placed in your user PATH automatically.</p>
+          <p>Or download a native Windows binary directly:</p>
+          <pre><code><span class="token-comment"># x64</span>
+New-Item -ItemType Directory -Force "$HOME\.openanalyst\bin" | Out-Null
+Invoke-WebRequest -Uri "https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-pc-windows-msvc.exe" -OutFile "$HOME\.openanalyst\bin\openanalyst.exe"</code></pre>
+          <p>The Windows install script is served from the public repo, and the matching native binaries are published at <a href="https://github.com/OpenAnalystInc/cli/releases/latest" target="_blank" rel="noreferrer">OpenAnalystInc/cli/releases/latest</a>.</p>
         </div>
 
-        <div id="tab-source" class="tab-content">
+        <div id="tab-npm" class="tab-content">
+          <p>Install from npm:</p>
+          <pre><code>npm install -g @openanalystinc/openanalyst-cli</code></pre>
           <p>Backend-only deployment:</p>
           <pre><code>npm install -g @openanalystinc/openanalyst-cli
 openanalyst --notui
@@ -98,6 +132,11 @@ openanalyst --serve 8080</code></pre>
             This is the recommended server deployment path when you want a hosted OpenAnalyst backend with no interactive TUI attached.
           </div>
         </div>
+      </div>
+
+      <div class="callout callout-info">
+        <div class="callout-title">Public Binary Source</div>
+        <p>The live docs, install scripts, and downloadable binaries are all published from the public repository: <a href="https://github.com/OpenAnalystInc/cli" target="_blank" rel="noreferrer">OpenAnalystInc/cli</a>. For the full OpenAnalyst CLI with TUI, use the latest release assets or the install scripts above.</p>
       </div>
 
       <h2 id="verify">Verify Installation</h2>

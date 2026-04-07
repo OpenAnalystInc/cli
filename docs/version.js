@@ -62,7 +62,7 @@
     footer.setAttribute('data-site-footer', 'openanalyst');
     footer.innerHTML =
       '<span><strong>OpenAnalyst CLI</strong> <span class="oa-version-full">' + version + '</span></span>' +
-      '<span>Public docs and release assets are served from <a href="https://github.com/OpenAnalystInc/cli" target="_blank" rel="noreferrer">OpenAnalystInc/cli</a></span>';
+      '<span>Public docs, install scripts, and release binaries are served from <a href="https://github.com/OpenAnalystInc/cli" target="_blank" rel="noreferrer">OpenAnalystInc/cli</a> and <a href="https://github.com/OpenAnalystInc/cli/releases/latest" target="_blank" rel="noreferrer">latest releases</a></span>';
     main.appendChild(footer);
   }
 
