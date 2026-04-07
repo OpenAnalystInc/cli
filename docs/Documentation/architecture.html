@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Architecture - OpenAnalyst CLI Docs</title>
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <a href="../index.html">
+          <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
+          <h2>OpenAnalyst CLI</h2>
+        </a>
+        <span data-version-prefix="Documentation v">Documentation v2.0.7</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Documentation</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link active">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+      <div class="page-header">
+        <span class="badge">Advanced</span>
+        <h1>Runtime Architecture</h1>
+        <p class="subtitle">A high-level view of how sessions, tools, streaming, persistence, and hosted execution fit together.</p>
+      </div>
+
+      <h2 id="runtime">Runtime Shape</h2>
+      <p>OpenAnalyst is built around one shared agent runtime. The default local TUI, backend-only CLI mode, and hosted session API all drive that same core conversation loop so prompts, tool calls, and session state stay consistent.</p>
+
+      <div class="code-title">High-level flow</div>
+      <pre><code>User input
+  -&gt; Session runtime
+  -&gt; Model response / tool planning
+  -&gt; Tool execution
+  -&gt; Streaming events
+  -&gt; Persistent session state</code></pre>
+
+      <h2 id="sessions">Sessions</h2>
+      <p>Each conversation runs inside a persistent session. A session carries the conversation history, working context, selected model, permission state, and runtime metadata needed to continue later without losing continuity.</p>
+
+      <table>
+        <thead><tr><th>Field</th><th>Purpose</th></tr></thead>
+        <tbody>
+          <tr><td><code>user_id</code></td><td>Identifies the owning user or tenant</td></tr>
+          <tr><td><code>session_id</code></td><td>Stable handle for the running agent session</td></tr>
+          <tr><td><code>conversation_id</code></td><td>Tracks the conversation thread across turns and resume events</td></tr>
+          <tr><td><code>timestamps</code></td><td>Creation, update, and resume timing for persistence and auditing</td></tr>
+        </tbody>
+      </table>
+
+      <h2 id="streaming">Streaming Events</h2>
+      <p>The hosted API streams the same kind of runtime information the TUI uses locally: assistant text deltas, tool calls, tool results, usage updates, and state transitions.</p>
+
+      <pre><code>POST /sessions
+POST /sessions/{id}/message
+GET  /sessions/{id}/events</code></pre>
+
+      <div class="callout callout-info">
+        <div class="callout-title">Hosted Sessions</div>
+        The canonical remote contract is session-based, not stateless chat-completions only. That keeps tool calls, resume behavior, and conversation persistence aligned with the local CLI experience.
+      </div>
+
+      <h2 id="tools">Tool Execution</h2>
+      <p>OpenAnalyst can expose different tool surfaces depending on where it runs. Local interactive sessions can use the full workstation-aware toolset. Hosted backend sessions can be restricted to advisory or hosted-safe tools so remote callers do not gain unintended host-machine access.</p>
+
+      <h2 id="persistence">Persistence</h2>
+      <p>Conversation state is stored so users can resume work later, switch between local and hosted usage, and keep isolated histories per user and session. In hosted deployments, the database is the source of truth for session metadata and conversation continuity.</p>
+
+      <h2 id="deployment">Deployment Modes</h2>
+      <table>
+        <thead><tr><th>Mode</th><th>Behavior</th></tr></thead>
+        <tbody>
+          <tr><td><code>openanalyst</code></td><td>Starts the default interactive TUI</td></tr>
+          <tr><td><code>openanalyst --notui</code></td><td>Runs backend-only CLI behavior without the interactive UI</td></tr>
+          <tr><td><code>openanalyst --serve</code></td><td>Exposes hosted session endpoints for remote users</td></tr>
+        </tbody>
+      </table>
+
+      <div class="page-footer">
+        <a href="mcp.html">&larr; MCP Integration</a>
+        <span></span>
+      </div>
+    </main>
+  </div>
+<script src="../version.js"></script>
+</body>
+</html>

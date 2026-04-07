@@ -12,7 +12,7 @@
 
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <a href="../Index.html">
+        <a href="../index.html">
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
@@ -56,8 +56,8 @@
       <pre><code><span class="token-comment"># Launch TUI (default)</span>
 openanalyst
 
-<span class="token-comment"># Disable TUI for classic REPL</span>
-openanalyst --no-tui</code></pre>
+<span class="token-comment"># Disable TUI for backend-only CLI</span>
+openanalyst --notui</code></pre>
 
       <h2 id="layout">Layout</h2>
       <p>The TUI is organized into distinct panels:</p>
@@ -222,7 +222,7 @@ openanalyst --no-tui</code></pre>
 
       <h2 id="fallback">REPL Fallback</h2>
       <p>If your terminal doesn't support the full TUI, or you prefer a simpler interface:</p>
-      <pre><code>openanalyst --no-tui</code></pre>
+      <pre><code>openanalyst --notui</code></pre>
       <p>This gives you a classic line-by-line REPL with streaming markdown output, ANSI colors, and all the same slash commands.</p>
 
       <div class="page-footer">

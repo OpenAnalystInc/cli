@@ -13,7 +13,7 @@
     <!-- Sidebar -->
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <a href="../Index.html">
+        <a href="../index.html">
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
@@ -41,6 +41,7 @@
         <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
         <a href="configuration.html" class="sidebar-link">Configuration</a>
         <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
       </div>
     </nav>
 
@@ -51,7 +52,7 @@
         <span class="badge">Getting Started</span>
         <h1>OpenAnalyst CLI</h1>
         <p class="subtitle">
-          The Universal AI Agent for Your Terminal. One CLI, every LLM provider, persistent conversations across models.
+          The Universal AI Agent for Your Terminal. Default TUI, backend-only CLI, and hosted session APIs in one release flow.
         </p>
       </div>
 
@@ -64,13 +65,13 @@
         </a>
         <a href="providers.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#127760;</div>
-          <h3>7 Providers</h3>
-          <p>Claude, GPT, Gemini, Grok, OpenRouter, Bedrock &mdash; switch mid-conversation.</p>
+          <h3>8 Providers</h3>
+          <p>OpenAnalyst, Claude, GPT, Gemini, Grok, OpenRouter, Bedrock, and Stability in one interface.</p>
         </a>
         <a href="tui.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#128421;</div>
           <h3>Full Terminal UI</h3>
-          <p>Full-screen TUI with scrollable chat, sidebar, vim-mode, and modal dialogs.</p>
+          <p>Full-screen TUI with scrollable chat, sidebar, vim-mode, and inline interactive prompts.</p>
         </a>
         <a href="agents.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#129302;</div>
@@ -81,7 +82,7 @@
 
       <h2 id="overview">Overview</h2>
       <p>
-        OpenAnalyst CLI is an <strong>independent, open-source AI coding agent</strong> that connects to every major LLM provider through a single, unified terminal interface. It features a full full-screen terminal UI, multi-provider streaming, multi-agent orchestration, 51+ slash commands, 19 built-in tools, and MCP protocol support.
+        OpenAnalyst CLI is an <strong>independent AI agent runtime</strong> that connects to major LLM providers through one interface. It ships with a default full-screen TUI, backend-only <code>--notui</code> mode, hosted session APIs, multi-provider streaming, tool execution, and session persistence across local and remote usage.
       </p>
 
       <h2 id="why">Why OpenAnalyst?</h2>
@@ -97,7 +98,7 @@
         <tbody>
           <tr>
             <td><strong>Providers</strong></td>
-            <td>7 first-class (OpenAnalyst, Anthropic, OpenAI, xAI, Gemini, OpenRouter, Bedrock)</td>
+            <td>8 first-class (OpenAnalyst, Anthropic, OpenAI, Gemini, xAI, OpenRouter, Bedrock, Stability)</td>
             <td>Typically 1&ndash;2</td>
           </tr>
           <tr>
@@ -122,7 +123,7 @@
           </tr>
           <tr>
             <td><strong>Slash commands</strong></td>
-            <td>51+</td>
+            <td>65+</td>
             <td>5&ndash;15 typical</td>
           </tr>
           <tr>
@@ -162,7 +163,7 @@
       <div class="feature-card">
         <div class="icon">&#128295;</div>
         <div class="content">
-          <h4>51+ Slash Commands &amp; 19 Tools</h4>
+          <h4>65+ Slash Commands &amp; 22 Tools</h4>
           <p>Git operations, multimedia generation, web scraping, planning, analysis, Playwright browser control, and more &mdash; all from your terminal.</p>
         </div>
       </div>
@@ -171,7 +172,7 @@
         <div class="icon">&#128274;</div>
         <div class="content">
           <h4>Permission System &amp; Sandboxing</h4>
-          <p>Three permission modes (read-only, workspace-write, full-access) with modal approval dialogs and filesystem sandboxing.</p>
+          <p>Three permission modes (read-only, workspace-write, full-access) with inline approvals and filesystem sandboxing.</p>
         </div>
       </div>
 
@@ -190,7 +191,7 @@
         <a href="installation.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#9889;</div>
           <h3>Installation &rarr;</h3>
-          <p>Install on macOS, Linux, or Windows. Build from source.</p>
+          <p>Install on macOS, Linux, or Windows. Launch the TUI by default or run backend-only with <code>--notui</code>.</p>
         </a>
         <a href="quickstart.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#128640;</div>
@@ -200,7 +201,7 @@
         <a href="authentication.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#128273;</div>
           <h3>Authentication &rarr;</h3>
-          <p>OAuth login, API keys, credentials file, and provider resolution.</p>
+          <p>Interactive login, API keys, credentials file, and provider resolution.</p>
         </a>
       </div>
 
@@ -209,7 +210,7 @@
         <a href="providers.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#127760;</div>
           <h3>LLM Providers &rarr;</h3>
-          <p>7 first-class providers, model aliases, mid-conversation switching, feature matrix.</p>
+          <p>8 providers, live model catalogs, model aliases, mid-conversation switching, and feature matrix.</p>
         </a>
         <a href="tui.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#128421;</div>
@@ -219,12 +220,12 @@
         <a href="commands.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#9000;</div>
           <h3>Slash Commands &rarr;</h3>
-          <p>51+ commands for session, git, multimedia, web scraping, analysis, and agents.</p>
+          <p>65+ commands for session, git, multimedia, web scraping, analysis, and agents.</p>
         </a>
         <a href="tools.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#128295;</div>
           <h3>Built-in Tools &rarr;</h3>
-          <p>19 tools: file ops, search, web, bash, PowerShell, notebooks, and more.</p>
+          <p>22 tools: file ops, search, web, bash, PowerShell, notebooks, and more.</p>
         </a>
       </div>
 
@@ -245,8 +246,10 @@
           <h3>MCP Integration &rarr;</h3>
           <p>Model Context Protocol: transports, server config, tool discovery, popular servers.</p>
         </a>
+        <a href="architecture.html" class="card" style="text-decoration:none">
           <div class="card-icon">&#127959;</div>
-          <p>Internal architecture and module organization.</p>
+          <h3>Runtime Architecture &rarr;</h3>
+          <p>Sessions, streaming events, tools, persistence, and hosted deployment at a high level.</p>
         </a>
       </div>
 

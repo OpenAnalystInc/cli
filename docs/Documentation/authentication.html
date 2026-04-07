@@ -12,7 +12,7 @@
 
     <nav class="sidebar">
       <div class="sidebar-logo">
-        <a href="../Index.html">
+        <a href="../index.html">
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
@@ -47,7 +47,7 @@
       <div class="page-header">
         <span class="badge">Getting Started</span>
         <h1>Authentication</h1>
-        <p class="subtitle">Connect to any LLM provider using OAuth, API keys, or environment variables.</p>
+        <p class="subtitle">Connect to any LLM provider using interactive login, API keys, or environment variables.</p>
       </div>
 
       <h2 id="methods">Authentication Methods</h2>
@@ -55,8 +55,8 @@
       <div class="card-grid">
         <div class="card">
           <div class="card-icon">&#128273;</div>
-          <h3>API Key (All Providers)</h3>
-          <p>Browser-based login with PKCE security. Tokens refresh automatically.</p>
+          <h3>Interactive Login</h3>
+          <p>Use the built-in picker flow to choose a provider, paste a key, and optionally set a default model.</p>
         </div>
         <div class="card">
           <div class="card-icon">&#128272;</div>
@@ -70,12 +70,12 @@
         </div>
       </div>
 
-      <h2 id="oauth">OAuth Login</h2>
-      <p>The recommended way to authenticate. Supports all providers with automatic token refresh.</p>
+      <h2 id="oauth">Interactive Login</h2>
+      <p>The recommended way to authenticate. OpenAnalyst, Anthropic, OpenAI, xAI, OpenRouter, Bedrock, and Stability use interactive API-key login. Google Gemini supports either browser OAuth or API key login.</p>
 
       <div class="callout callout-tip">
-        <div class="callout-title">Direct Provider Login</div>
-        All providers authenticate via API key. Get your key from the provider dashboard and paste it during login. Gemini also supports OAuth browser login.
+        <div class="callout-title">Current Login Options</div>
+        Most providers use interactive API-key login. Gemini also offers browser OAuth for users who prefer signing in with Google.
       </div>
 
       <pre><code><span class="token-comment"># Interactive provider picker</span>
@@ -87,18 +87,18 @@ openanalyst login --provider anthropic
 <span class="token-comment"># Check logged-in providers</span>
 openanalyst whoami</code></pre>
 
-      <h3>How OAuth Works</h3>
+      <h3>How Interactive Login Works</h3>
       <ol>
         <li>You run <code>openanalyst login</code> and pick a provider</li>
-        <li>A browser window opens for the provider's consent page</li>
-        <li>After authorization, the CLI receives a callback on <code>localhost:8080</code></li>
-        <li>Tokens are stored encrypted in <code>~/.openanalyst/credentials.json</code></li>
-        <li>Tokens auto-refresh when expired &mdash; no re-login needed</li>
+        <li>The CLI opens the right interactive flow for that provider</li>
+        <li>For Gemini, you can choose browser OAuth or paste a <code>GEMINI_API_KEY</code></li>
+        <li>For other providers, you paste the provider key directly into the picker flow</li>
+        <li>Credentials are stored in <code>~/.openanalyst/credentials.json</code> and mirrored into <code>~/.openanalyst/.env</code></li>
       </ol>
 
       <div class="callout callout-info">
         <div class="callout-title">Security</div>
-        OAuth uses <strong>PKCE</strong> (Proof Key for Code Exchange) with SHA-256 challenge. No client secret is stored on disk.
+        Gemini browser OAuth uses <strong>PKCE</strong> (Proof Key for Code Exchange). API-key providers stay local to your OpenAnalyst config files unless you explicitly export them elsewhere.
       </div>
 
       <h2 id="api-keys">API Key Authentication</h2>
@@ -106,7 +106,7 @@ openanalyst whoami</code></pre>
 
       <div class="code-title">~/.openanalyst/.env</div>
       <pre><code><span class="token-comment"># OpenAnalyst (default provider)</span>
-OPENANALYST_AUTH_TOKEN=your-openanalyst-key
+OPENANALYST_API_KEY=your-openanalyst-key
 OPENANALYST_BASE_URL=https://api.openanalyst.com/api
 
 <span class="token-comment"># Anthropic / Claude</span>
@@ -133,7 +133,7 @@ BEDROCK_API_KEY=your-bedrock-key</code></pre>
       <table>
         <thead><tr><th>Model</th><th>Provider</th><th>Auth Variable</th><th>Fallback</th></tr></thead>
         <tbody>
-          <tr><td><code>openanalyst-beta</code></td><td>OpenAnalyst</td><td><code>OPENANALYST_AUTH_TOKEN</code></td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+          <tr><td><code>openanalyst-beta</code></td><td>OpenAnalyst</td><td><code>OPENANALYST_API_KEY</code></td><td><code>OPENANALYST_AUTH_TOKEN</code> (legacy alias)</td></tr>
           <tr><td><code>opus</code>, <code>sonnet</code>, <code>haiku</code></td><td>Anthropic</td><td><code>ANTHROPIC_API_KEY</code></td><td>&mdash;</td></tr>
           <tr><td><code>gpt-4o</code>, <code>o3</code>, <code>codex-mini</code></td><td>OpenAI</td><td><code>OPENAI_API_KEY</code></td><td>&mdash;</td></tr>
           <tr><td><code>gemini-2.5-pro</code></td><td>Google</td><td><code>GEMINI_API_KEY</code></td><td>&mdash;</td></tr>
@@ -144,9 +144,9 @@ BEDROCK_API_KEY=your-bedrock-key</code></pre>
       </table>
 
       <h2 id="credentials-file">Credentials File</h2>
-      <p>After <code>openanalyst login</code>, tokens are saved to:</p>
+      <p>After <code>openanalyst login</code>, credentials are saved to:</p>
       <pre><code>~/.openanalyst/credentials.json</code></pre>
-      <p>This file contains OAuth access tokens, refresh tokens, and expiry timestamps. It is automatically managed &mdash; you should not edit it manually.</p>
+      <p>This file can contain provider API keys, auth tokens, and provider metadata. It is automatically managed &mdash; you should not edit it manually.</p>
 
       <div class="callout callout-warning">
         <div class="callout-title">Warning</div>
