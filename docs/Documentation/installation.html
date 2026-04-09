@@ -16,7 +16,7 @@
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
-        <span data-version-prefix="Documentation v">Documentation v2.0.3</span>
+        <span data-version-prefix="Documentation v">Documentation v2.0.23</span>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Documentation</div>
@@ -65,30 +65,45 @@
 
       <div class="tabs">
         <div class="tab-buttons">
-          <button class="tab-btn active" data-tab="tab-mac">macOS / Linux</button>
+          <button class="tab-btn active" data-tab="tab-mac">macOS</button>
+          <button class="tab-btn" data-tab="tab-linux">Linux</button>
           <button class="tab-btn" data-tab="tab-win">Windows</button>
+          <button class="tab-btn" data-tab="tab-source">npm / Server</button>
         </div>
 
         <div id="tab-mac" class="tab-content active">
-          <p>Run the install script:</p>
-          <pre><code>curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh | bash</code></pre>
-          <p>This downloads the latest release binary and places it in <code>/usr/local/bin/openanalyst</code>.</p>
+          <p>Direct install for Apple Silicon:</p>
+          <pre><code>curl -L https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-aarch64-apple-darwin -o openanalyst
+chmod +x openanalyst
+sudo mv openanalyst /usr/local/bin/openanalyst</code></pre>
+          <p>Intel macOS binary: <a href="https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-apple-darwin" target="_blank" rel="noreferrer">openanalyst-x86_64-apple-darwin</a></p>
 
           <div class="callout callout-tip">
             <div class="callout-title">Tip</div>
-            After installation, run <code>openanalyst --version</code> to verify.
+            The <a href="https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh" target="_blank" rel="noreferrer">install.sh</a> helper downloads the same latest public release binary for your detected macOS architecture.
           </div>
         </div>
 
+        <div id="tab-linux" class="tab-content">
+          <p>Direct install for Linux x86_64:</p>
+          <pre><code>curl -L https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-unknown-linux-gnu -o openanalyst
+chmod +x openanalyst
+sudo mv openanalyst /usr/local/bin/openanalyst</code></pre>
+          <p>ARM64 Linux binary: <a href="https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-aarch64-unknown-linux-gnu" target="_blank" rel="noreferrer">openanalyst-aarch64-unknown-linux-gnu</a></p>
+        </div>
+
         <div id="tab-win" class="tab-content">
-          <p>Open PowerShell as Administrator:</p>
-          <pre><code>irm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex</code></pre>
-          <p>The binary is placed in your user PATH automatically.</p>
+          <p>Direct install for Windows x86_64:</p>
+          <pre><code>$dest = "$env:USERPROFILE\.openanalyst\bin\openanalyst.exe"
+New-Item -ItemType Directory -Force -Path (Split-Path $dest) | Out-Null
+Invoke-WebRequest https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-pc-windows-msvc.exe -OutFile $dest</code></pre>
+          <p>The <a href="https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1" target="_blank" rel="noreferrer">install.ps1</a> helper wraps the same public binary flow and updates your PATH automatically.</p>
         </div>
 
         <div id="tab-source" class="tab-content">
-          <p>Backend-only deployment:</p>
+          <p>Install from npm when you want the package-managed CLI or a backend-only deployment:</p>
           <pre><code>npm install -g @openanalystinc/openanalyst-cli
+openanalyst
 openanalyst --notui
 openanalyst --serve 8080</code></pre>
           <p>Use this when you want the hosted session API on a server without launching the TUI.</p>
@@ -100,10 +115,22 @@ openanalyst --serve 8080</code></pre>
         </div>
       </div>
 
+      <h3 id="binaries">Direct Public Release Binaries</h3>
+      <table>
+        <thead><tr><th>Platform</th><th>Asset</th><th>Download</th></tr></thead>
+        <tbody>
+          <tr><td>macOS (Apple Silicon)</td><td><code>openanalyst-aarch64-apple-darwin</code></td><td><a href="https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-aarch64-apple-darwin" target="_blank" rel="noreferrer">Download binary</a></td></tr>
+          <tr><td>macOS (Intel)</td><td><code>openanalyst-x86_64-apple-darwin</code></td><td><a href="https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-apple-darwin" target="_blank" rel="noreferrer">Download binary</a></td></tr>
+          <tr><td>Linux (x86_64)</td><td><code>openanalyst-x86_64-unknown-linux-gnu</code></td><td><a href="https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-unknown-linux-gnu" target="_blank" rel="noreferrer">Download binary</a></td></tr>
+          <tr><td>Linux (ARM64)</td><td><code>openanalyst-aarch64-unknown-linux-gnu</code></td><td><a href="https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-aarch64-unknown-linux-gnu" target="_blank" rel="noreferrer">Download binary</a></td></tr>
+          <tr><td>Windows (x86_64)</td><td><code>openanalyst-x86_64-pc-windows-msvc.exe</code></td><td><a href="https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-pc-windows-msvc.exe" target="_blank" rel="noreferrer">Download binary</a></td></tr>
+        </tbody>
+      </table>
+
       <h2 id="verify">Verify Installation</h2>
       <pre><code><span class="token-comment"># Check the version</span>
 openanalyst --version
-<span class="token-comment"># Output: OpenAnalyst CLI v<span class="oa-version">2.0.3</span></span>
+<span class="token-comment"># Output: OpenAnalyst CLI v<span class="oa-version">2.0.23</span></span>
 
 <span class="token-comment"># Check logged-in providers</span>
 openanalyst whoami</code></pre>
