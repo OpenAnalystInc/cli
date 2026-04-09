@@ -1,35 +1,36 @@
 /**
- * Auto-version: fetches latest release tag from GitHub and updates all
- * elements with class "oa-version" or data-version-prefix attributes.
+ * Auto-version: fetches the latest release tag from GitHub and updates
+ * all elements with class "oa-version" or data-version-prefix attributes.
  *
  * Usage in HTML:
- *   <span class="oa-version">2.0.23</span>           → replaced with latest tag (no "v")
- *   <span class="oa-version-full">v2.0.23</span>     → replaced with "v2.0.23"
- *   <span data-version-prefix="Documentation v">Documentation v2.0.23</span>
+ *   <span class="oa-version">2.0.24</span>          -> replaced with latest tag (no "v")
+ *   <span class="oa-version-full">v2.0.24</span>    -> replaced with "v2.0.24"
+ *   <span data-version-prefix="Documentation v">Documentation v2.0.24</span>
  *
  * Falls back to the hardcoded text if fetch fails (offline, rate-limited).
  */
 (function () {
   var REPO = 'OpenAnalystInc/cli';
-  var DEFAULT_VERSION = 'v2.0.23';
+  var DEFAULT_VERSION = 'v2.0.24';
   var CACHE_KEY = 'oa_cli_version';
   var CACHE_TTL = 300000;
   var ICON_URL = 'https://openanalyst.com/images/new-logo.png';
 
   function apply(version) {
     var bare = version.replace(/^v/, '');
-    // .oa-version → bare number
+
     document.querySelectorAll('.oa-version').forEach(function (el) {
       el.textContent = bare;
     });
-    // .oa-version-full → with "v" prefix
+
     document.querySelectorAll('.oa-version-full').forEach(function (el) {
       el.textContent = version;
     });
-    // [data-version-prefix] → prefix + bare
+
     document.querySelectorAll('[data-version-prefix]').forEach(function (el) {
       el.textContent = el.getAttribute('data-version-prefix') + bare;
     });
+
     ensureIcons();
     ensureDocsFooter(version);
   }
@@ -89,6 +90,6 @@
       }
     })
     .catch(function () {
-      // Offline or rate-limited — keep hardcoded fallback text
+      // Offline or rate-limited: keep the hardcoded fallback text.
     });
 })();

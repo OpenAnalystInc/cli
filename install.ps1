@@ -1,57 +1,53 @@
-# OpenAnalyst CLI Installer - Windows PowerShell
+# OpenAnalyst CLI Installer — Windows PowerShell
 # Usage: irm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex
 
-$ErrorActionPreference = "Stop"
+$ErrorActionPreference = "Continue"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
-
-$repo = "OpenAnalystInc/cli"
-$asset = "openanalyst-x86_64-pc-windows-msvc.exe"
-$downloadUrl = "https://github.com/$repo/releases/latest/download/$asset"
-$installDir = if ($env:OPENANALYST_INSTALL_DIR) { $env:OPENANALYST_INSTALL_DIR } else { Join-Path $env:USERPROFILE ".openanalyst\bin" }
-$installPath = Join-Path $installDir "openanalyst.exe"
 
 Write-Host ""
 Write-Host "   OpenAnalyst CLI" -ForegroundColor DarkCyan
 Write-Host "   The Universal AI Agent for Your Terminal" -ForegroundColor DarkGray
 Write-Host ""
 
-if (-not (Test-Path $installDir)) {
-    New-Item -ItemType Directory -Force -Path $installDir | Out-Null
+# Check for Node.js
+$NodeVersion = $null
+try { $NodeVersion = (node --version 2>$null) } catch {}
+
+if (-not $NodeVersion) {
+    Write-Host "   Node.js is required but not found." -ForegroundColor Red
+    Write-Host "   Install from: https://nodejs.org/" -ForegroundColor DarkGray
+    Write-Host ""
+    exit 1
 }
 
-Write-Host "   Downloading $asset" -ForegroundColor DarkGray
-Invoke-WebRequest -Uri $downloadUrl -OutFile $installPath
+Write-Host "   Node.js $NodeVersion detected" -ForegroundColor DarkGray
 
-$userPath = [Environment]::GetEnvironmentVariable("Path", "User")
-$pathEntries = @()
-if ($userPath) {
-    $pathEntries = $userPath.Split(';') | Where-Object { $_ }
-}
-
-if ($pathEntries -notcontains $installDir) {
-    $newPath = if ($userPath) { "$userPath;$installDir" } else { $installDir }
-    [Environment]::SetEnvironmentVariable("Path", $newPath, "User")
-    $env:Path = "$env:Path;$installDir"
-    Write-Host "   Added $installDir to your user PATH" -ForegroundColor DarkGray
-} else {
-    $env:Path = "$env:Path;$installDir"
-}
-
+# Install via npm
 Write-Host ""
-Write-Host "   Installed to $installPath" -ForegroundColor Green
+Write-Host "   Installing..." -ForegroundColor White -NoNewline
 
-Write-Host ""
 try {
-    $version = & $installPath --version
-    Write-Host "   OK  $version" -ForegroundColor Green
+    npm install -g @openanalystinc/openanalyst-cli@latest 2>&1 | Out-Null
+    Write-Host " done" -ForegroundColor Green
 } catch {
-    Write-Host "   Installed, but version check did not complete." -ForegroundColor Yellow
+    Write-Host " failed" -ForegroundColor Red
+    Write-Host "   Try manually: npm install -g @openanalystinc/openanalyst-cli" -ForegroundColor DarkGray
+    exit 1
+}
+
+# Verify
+$Version = $null
+try { $Version = (openanalyst --version 2>$null) } catch {}
+
+Write-Host ""
+if ($Version) {
+    Write-Host "   $([char]0x2713) $Version" -ForegroundColor Green
+} else {
+    Write-Host "   $([char]0x2713) Installed" -ForegroundColor Green
 }
 
 Write-Host ""
 Write-Host "   To get started:" -ForegroundColor White
 Write-Host ""
 Write-Host "     openanalyst" -ForegroundColor Cyan
-Write-Host "     openanalyst --notui" -ForegroundColor Cyan
-Write-Host "     openanalyst --serve 8080" -ForegroundColor Cyan
 Write-Host ""
