@@ -1,62 +1,43 @@
-# OpenAnalyst CLI Installer - Windows PowerShell
+# OpenAnalyst CLI Installer — Windows PowerShell
 # Usage: irm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex
 
 $ErrorActionPreference = "Continue"
 try { [Console]::OutputEncoding = [System.Text.Encoding]::UTF8 } catch {}
-
-$Repo = "OpenAnalystInc/cli"
-$BaseUrl = "https://github.com/$Repo/releases/latest/download"
 
 Write-Host ""
 Write-Host "   OpenAnalyst CLI" -ForegroundColor DarkCyan
 Write-Host "   The Universal AI Agent for Your Terminal" -ForegroundColor DarkGray
 Write-Host ""
 
-$Arch = switch ([System.Runtime.InteropServices.RuntimeInformation]::OSArchitecture.ToString()) {
-    "X64" { "x86_64" }
-    "Arm64" { "aarch64" }
-    default { $null }
-}
+# Check for Node.js
+$NodeVersion = $null
+try { $NodeVersion = (node --version 2>$null) } catch {}
 
-if (-not $Arch) {
-    Write-Host "   Unsupported architecture for automatic install." -ForegroundColor Red
-    Write-Host "   Download a release manually: https://github.com/$Repo/releases/latest" -ForegroundColor DarkGray
+if (-not $NodeVersion) {
+    Write-Host "   Node.js is required but not found." -ForegroundColor Red
+    Write-Host "   Install from: https://nodejs.org/" -ForegroundColor DarkGray
     Write-Host ""
     exit 1
 }
 
-$Asset = "openanalyst-$Arch-pc-windows-msvc.exe"
-$DownloadUrl = "$BaseUrl/$Asset"
-$InstallDir = Join-Path $env:USERPROFILE ".openanalyst\bin"
-$InstallPath = Join-Path $InstallDir "openanalyst.exe"
+Write-Host "   Node.js $NodeVersion detected" -ForegroundColor DarkGray
 
-New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
-
-Write-Host "   Download target: $Asset" -ForegroundColor DarkGray
+# Install via npm
 Write-Host ""
-Write-Host "   Downloading..." -ForegroundColor White -NoNewline
+Write-Host "   Installing..." -ForegroundColor White -NoNewline
+
 try {
-    Invoke-WebRequest -Uri $DownloadUrl -OutFile $InstallPath -UseBasicParsing
+    npm install -g @openanalystinc/openanalyst-cli@latest 2>&1 | Out-Null
     Write-Host " done" -ForegroundColor Green
 } catch {
     Write-Host " failed" -ForegroundColor Red
-    Write-Host "   Download a release manually: https://github.com/$Repo/releases/latest" -ForegroundColor DarkGray
+    Write-Host "   Try manually: npm install -g @openanalystinc/openanalyst-cli" -ForegroundColor DarkGray
     exit 1
 }
 
-$UserPath = [Environment]::GetEnvironmentVariable("Path", "User")
-$PathParts = @()
-if ($UserPath) {
-    $PathParts = $UserPath -split ';' | Where-Object { $_ }
-}
-if ($PathParts -notcontains $InstallDir) {
-    $NewPath = if ($UserPath) { "$UserPath;$InstallDir" } else { $InstallDir }
-    [Environment]::SetEnvironmentVariable("Path", $NewPath, "User")
-    $env:Path = "$env:Path;$InstallDir"
-}
-
+# Verify
 $Version = $null
-try { $Version = (& $InstallPath --version 2>$null) } catch {}
+try { $Version = (openanalyst --version 2>$null) } catch {}
 
 Write-Host ""
 if ($Version) {
@@ -65,8 +46,6 @@ if ($Version) {
     Write-Host "   $([char]0x2713) Installed" -ForegroundColor Green
 }
 
-Write-Host ""
-Write-Host "   Installed to: $InstallPath" -ForegroundColor DarkGray
 Write-Host ""
 Write-Host "   To get started:" -ForegroundColor White
 Write-Host ""
