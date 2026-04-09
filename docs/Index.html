@@ -145,21 +145,42 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   <div class="section-sub">One command. Native binary. No runtime dependencies.</div>
 
   <div class="tabs">
-    <button class="tab on" onclick="sw(event,'ins-1')">macOS / Linux</button>
-    <button class="tab" onclick="sw(event,'ins-2')">Windows</button>
+    <button class="tab on" onclick="sw(event,'ins-1')">macOS</button>
+    <button class="tab" onclick="sw(event,'ins-2')">Linux</button>
+    <button class="tab" onclick="sw(event,'ins-3')">Windows</button>
+    <button class="tab" onclick="sw(event,'ins-4')">npm / Server</button>
   </div>
   <div id="ins-1" class="tc on">
     <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Terminal</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
-<pre class="code"><span class="c-g">curl</span> <span class="c-c">-fsSL</span> https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh | <span class="c-g">bash</span></pre></div>
+<pre class="code"><span class="c-g">curl</span> <span class="c-c">-L</span> https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-aarch64-apple-darwin <span class="c-c">-o</span> openanalyst
+<span class="c-g">chmod</span> <span class="c-c">+x</span> openanalyst
+<span class="c-g">sudo</span> <span class="c-g">mv</span> openanalyst /usr/local/bin/openanalyst</pre></div>
+    <p style="font-size:12px;color:var(--dim);margin-top:8px">Intel Mac binary: <a href="https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-apple-darwin" target="_blank" rel="noreferrer">openanalyst-x86_64-apple-darwin</a>.</p>
   </div>
   <div id="ins-2" class="tc">
-    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">PowerShell</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
-<pre class="code"><span class="c-g">irm</span> https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | <span class="c-g">iex</span></pre></div>
+    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Terminal</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
+<pre class="code"><span class="c-g">curl</span> <span class="c-c">-L</span> https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-unknown-linux-gnu <span class="c-c">-o</span> openanalyst
+<span class="c-g">chmod</span> <span class="c-c">+x</span> openanalyst
+<span class="c-g">sudo</span> <span class="c-g">mv</span> openanalyst /usr/local/bin/openanalyst</pre></div>
+    <p style="font-size:12px;color:var(--dim);margin-top:8px">ARM64 Linux binary: <a href="https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-aarch64-unknown-linux-gnu" target="_blank" rel="noreferrer">openanalyst-aarch64-unknown-linux-gnu</a>.</p>
   </div>
-  <div style="margin-top:16px">
-    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Or install via npm</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
-<pre class="code"><span class="c-g">npm</span> install -g <span class="c-c">@openanalystinc/openanalyst-cli</span></pre></div>
-    <p style="font-size:12px;color:var(--dim);margin-top:8px">Auto-updates built in &mdash; the CLI checks for new versions and updates itself.</p>
+  <div id="ins-3" class="tc">
+    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">PowerShell</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
+<pre class="code"><span class="c-g">$dest</span> = <span class="c-c">"$env:USERPROFILE\\.openanalyst\\bin\\openanalyst.exe"</span>
+<span class="c-g">New-Item</span> <span class="c-c">-ItemType</span> Directory <span class="c-c">-Force</span> <span class="c-c">-Path</span> (<span class="c-g">Split-Path</span> <span class="c-g">$dest</span>) | <span class="c-g">Out-Null</span>
+<span class="c-g">Invoke-WebRequest</span> https://github.com/OpenAnalystInc/cli/releases/latest/download/openanalyst-x86_64-pc-windows-msvc.exe <span class="c-c">-OutFile</span> <span class="c-g">$dest</span></pre></div>
+    <p style="font-size:12px;color:var(--dim);margin-top:8px">If you prefer the guided installer, <a href="https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1" target="_blank" rel="noreferrer">install.ps1</a> downloads the same public binary and updates your PATH.</p>
+  </div>
+  <div id="ins-4" class="tc">
+    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">npm / Hosted Backend</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
+<pre class="code"><span class="c-g">npm</span> install -g <span class="c-c">@openanalystinc/openanalyst-cli</span>
+openanalyst
+openanalyst <span class="c-c">--notui</span>
+openanalyst <span class="c-c">--serve</span> 8080</pre></div>
+    <p style="font-size:12px;color:var(--dim);margin-top:8px">TUI installs by default. Use `--notui` or `--serve` for backend-only and hosted session API deployments.</p>
+  </div>
+  <div style="margin-top:16px;padding:16px 20px;background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px">
+    <p style="margin:0;font-size:13px;color:var(--muted);line-height:1.8">The raw installers <a href="https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh" target="_blank" rel="noreferrer">install.sh</a> and <a href="https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1" target="_blank" rel="noreferrer">install.ps1</a> both resolve to the latest public binaries from <a href="https://github.com/OpenAnalystInc/cli/releases/latest" target="_blank" rel="noreferrer">OpenAnalystInc/cli releases</a>.</p>
   </div>
 
   <div style="margin-top:24px">
@@ -589,7 +610,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 <!-- ═══ 11. FOOTER ═══ -->
 <div class="footer" style="padding:40px 24px">
-  <p><strong>OpenAnalyst CLI <span class="oa-version-full">v2.0.20</span></strong></p>
+  <p><strong>OpenAnalyst CLI <span class="oa-version-full">v2.0.23</span></strong></p>
   <p style="margin-top:6px">An independent, open-source AI agent for the terminal</p>
   <p style="margin-top:12px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a> &middot; <a href="https://github.com/OpenAnalystInc/cli" target="_blank">GitHub</a></p>
 </div>
