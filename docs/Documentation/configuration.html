@@ -17,7 +17,7 @@
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
-        <span data-version-prefix="Documentation v">Documentation v2.0.24</span>
+        <span data-version-prefix="Documentation v">Documentation v2.0.26</span>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Documentation</div>
@@ -230,32 +230,32 @@ openanalyst --permission-mode workspace-write
 
       <h3>Project-Level (created via <code>/init</code>)</h3>
       <pre><code>project/
-├── OPENANALYST.md                    <span class="token-comment"># Project-specific AI instructions</span>
-├── OPENANALYST.local.md              <span class="token-comment"># Personal project instructions (gitignored)</span>
-├── .openanalyst.json                 <span class="token-comment"># Shared project defaults</span>
-├── .openanalyst/
-│   ├── settings.json                 <span class="token-comment"># Project-level settings</span>
-│   ├── settings.local.json           <span class="token-comment"># Machine-local overrides (gitignored)</span>
-│   ├── .env                          <span class="token-comment"># Provider API keys (gitignored)</span>
-│   ├── .mcp.json                     <span class="token-comment"># MCP server configuration</span>
-│   ├── sessions/                     <span class="token-comment"># Saved conversation sessions</span>
-│   ├── skills/                       <span class="token-comment"># Multi-file SKILL.md definitions</span>
-│   ├── commands/                     <span class="token-comment"># Simple slash commands</span>
-│   ├── rules/                        <span class="token-comment"># Path-specific instruction files</span>
-│   ├── agents/                       <span class="token-comment"># Custom subagent definitions</span>
-│   ├── hooks/                        <span class="token-comment"># Reusable hook scripts</span>
-│   └── output-styles/                <span class="token-comment"># Custom output formatting</span></code></pre>
+â”œâ”€â”€ OPENANALYST.md                    <span class="token-comment"># Project-specific AI instructions</span>
+â”œâ”€â”€ OPENANALYST.local.md              <span class="token-comment"># Personal project instructions (gitignored)</span>
+â”œâ”€â”€ .openanalyst.json                 <span class="token-comment"># Shared project defaults</span>
+â”œâ”€â”€ .openanalyst/
+â”‚   â”œâ”€â”€ settings.json                 <span class="token-comment"># Project-level settings</span>
+â”‚   â”œâ”€â”€ settings.local.json           <span class="token-comment"># Machine-local overrides (gitignored)</span>
+â”‚   â”œâ”€â”€ .env                          <span class="token-comment"># Provider API keys (gitignored)</span>
+â”‚   â”œâ”€â”€ .mcp.json                     <span class="token-comment"># MCP server configuration</span>
+â”‚   â”œâ”€â”€ sessions/                     <span class="token-comment"># Saved conversation sessions</span>
+â”‚   â”œâ”€â”€ skills/                       <span class="token-comment"># Multi-file SKILL.md definitions</span>
+â”‚   â”œâ”€â”€ commands/                     <span class="token-comment"># Simple slash commands</span>
+â”‚   â”œâ”€â”€ rules/                        <span class="token-comment"># Path-specific instruction files</span>
+â”‚   â”œâ”€â”€ agents/                       <span class="token-comment"># Custom subagent definitions</span>
+â”‚   â”œâ”€â”€ hooks/                        <span class="token-comment"># Reusable hook scripts</span>
+â”‚   â””â”€â”€ output-styles/                <span class="token-comment"># Custom output formatting</span></code></pre>
 
       <h3>User-Level (all projects)</h3>
       <pre><code>~/.openanalyst/
-├── settings.json                     <span class="token-comment"># User-wide settings</span>
-├── .env                              <span class="token-comment"># Global API keys</span>
-├── credentials.json                  <span class="token-comment"># Saved provider credentials</span>
-├── skills/                           <span class="token-comment"># User skills (available everywhere)</span>
-├── commands/                         <span class="token-comment"># User slash commands</span>
-├── rules/                            <span class="token-comment"># User rules</span>
-├── agents/                           <span class="token-comment"># User agents</span>
-└── output-styles/                    <span class="token-comment"># User output styles</span></code></pre>
+â”œâ”€â”€ settings.json                     <span class="token-comment"># User-wide settings</span>
+â”œâ”€â”€ .env                              <span class="token-comment"># Global API keys</span>
+â”œâ”€â”€ credentials.json                  <span class="token-comment"># Saved provider credentials</span>
+â”œâ”€â”€ skills/                           <span class="token-comment"># User skills (available everywhere)</span>
+â”œâ”€â”€ commands/                         <span class="token-comment"># User slash commands</span>
+â”œâ”€â”€ rules/                            <span class="token-comment"># User rules</span>
+â”œâ”€â”€ agents/                           <span class="token-comment"># User agents</span>
+â””â”€â”€ output-styles/                    <span class="token-comment"># User output styles</span></code></pre>
 
       <h3>3-Level Config Hierarchy</h3>
       <p>All configuration (rules, skills, agents, output-styles) loads from three levels, with later levels overriding earlier ones:</p>

@@ -3,15 +3,15 @@
  * all elements with class "oa-version" or data-version-prefix attributes.
  *
  * Usage in HTML:
- *   <span class="oa-version">2.0.24</span>          -> replaced with latest tag (no "v")
- *   <span class="oa-version-full">v2.0.24</span>    -> replaced with "v2.0.24"
- *   <span data-version-prefix="Documentation v">Documentation v2.0.24</span>
+ *   <span class="oa-version">2.0.26</span>          -> replaced with latest tag (no "v")
+ *   <span class="oa-version-full">v2.0.26</span>    -> replaced with "v2.0.26"
+ *   <span data-version-prefix="Documentation v">Documentation v2.0.26</span>
  *
  * Falls back to the hardcoded text if fetch fails (offline, rate-limited).
  */
 (function () {
   var REPO = 'OpenAnalystInc/cli';
-  var DEFAULT_VERSION = 'v2.0.24';
+  var DEFAULT_VERSION = 'v2.0.26';
   var CACHE_KEY = 'oa_cli_version';
   var CACHE_TTL = 300000;
   var ICON_URL = 'https://openanalyst.com/images/new-logo.png';
