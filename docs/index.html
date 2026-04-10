@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenAnalyst CLI — The Universal AI Agent for Your Terminal</title>
+<title>OpenAnalyst CLI â€” The Universal AI Agent for Your Terminal</title>
 <link rel="icon" type="image/png" href="https://openanalyst.com/images/new-logo.png">
 <link rel="apple-touch-icon" href="https://openanalyst.com/images/new-logo.png">
 <style>
@@ -13,7 +13,7 @@
 html{scroll-behavior:smooth;scroll-padding-top:72px}
 body{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.65;-webkit-font-smoothing:antialiased}
 
-/* ── Navbar ── */
+/* â”€â”€ Navbar â”€â”€ */
 .nav{position:relative;z-index:100;background:transparent;padding:0 24px;height:56px;display:flex;align-items:center;justify-content:space-between;max-width:1200px;margin:0 auto}
 .nav-logo{display:flex;align-items:center;gap:8px;text-decoration:none}
 .nav-logo img{width:28px;height:28px;filter:drop-shadow(0 0 8px rgba(255,107,0,0.3))}
@@ -21,14 +21,14 @@ body{font-family:'Plus Jakarta Sans','Inter',system-ui,sans-serif;background:var
 .nav-links{display:flex;gap:24px;list-style:none}.nav-links a{color:var(--dim);text-decoration:none;font-size:13px;font-weight:500;transition:color .2s}.nav-links a:hover{color:var(--accent)}
 @media(max-width:640px){.nav-links{display:none}}
 
-/* ── Sections ── */
+/* â”€â”€ Sections â”€â”€ */
 .wrap{max-width:960px;margin:0 auto;padding:0 24px}
 section{padding:64px 0}
 .section-label{font-size:11px;font-weight:700;letter-spacing:2px;text-transform:uppercase;color:var(--accent);margin-bottom:8px}
 .section-title{font-size:28px;font-weight:700;margin-bottom:12px;color:var(--text)}
 .section-sub{color:var(--muted);font-size:15px;margin-bottom:32px;max-width:640px}
 
-/* ── Hero ── */
+/* â”€â”€ Hero â”€â”€ */
 .hero{text-align:center;padding:120px 24px 100px;position:relative;overflow:hidden}
 .hero::before{content:'';position:absolute;inset:0;background:radial-gradient(ellipse at 50% -10%,rgba(255,107,0,0.1),transparent 55%),radial-gradient(ellipse at 80% 100%,rgba(139,92,246,0.05),transparent 50%);pointer-events:none}
 .hero-logo{width:80px;height:80px;margin-bottom:28px;filter:drop-shadow(0 0 20px rgba(255,107,0,0.3));position:relative}
@@ -46,10 +46,10 @@ section{padding:64px 0}
 .btn-primary{background:var(--accent);color:#fff;box-shadow:0 0 24px var(--glow)}.btn-primary:hover{background:var(--accent2);box-shadow:0 0 32px rgba(255,107,0,0.25)}
 .btn-outline{background:transparent;color:var(--accent);border:1.5px solid rgba(255,107,0,0.4)}.btn-outline:hover{border-color:var(--accent);background:var(--glow)}
 
-/* ── Cards ── */
+/* â”€â”€ Cards â”€â”€ */
 .card{background:var(--card);border:1px solid var(--border);border-radius:20px;padding:32px;position:relative;overflow:hidden;transition:border-color .3s}.card:hover{border-color:rgba(255,107,0,0.25)}
 
-/* ── Code blocks ── */
+/* â”€â”€ Code blocks â”€â”€ */
 .cb{background:var(--code);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin:12px 0}
 .cb-header{display:flex;align-items:center;justify-content:space-between;padding:10px 16px;border-bottom:1px solid var(--border);background:rgba(255,255,255,0.02)}
 .cb-dots{display:flex;gap:6px}.cb-dot{width:10px;height:10px;border-radius:50%}.d1{background:#ef4444}.d2{background:#eab308}.d3{background:#22c55e}
@@ -58,16 +58,16 @@ section{padding:64px 0}
 pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-size:13.5px;line-height:1.9;overflow-x:auto;white-space:pre;color:var(--text)}
 .c-g{color:var(--green)}.c-c{color:var(--cyan)}.c-p{color:var(--purple)}.c-y{color:var(--yellow)}.c-d{color:var(--dim)}.c-k{color:var(--pink)}.c-o{color:var(--orange)}
 
-/* ── Tabs ── */
+/* â”€â”€ Tabs â”€â”€ */
 .tabs{display:flex;gap:0;margin-bottom:0}.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--dim);background:transparent;border:1px solid var(--border);border-bottom:0;border-radius:10px 10px 0 0;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.tab.on{background:var(--code);color:var(--accent);border-color:var(--border)}.tc{display:none}.tc.on{display:block}.tc .cb{border-top-left-radius:0;margin-top:0}
 
-/* ── Provider grid ── */
+/* â”€â”€ Provider grid â”€â”€ */
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:20px}
 .pcard{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:14px;padding:18px;transition:.2s}.pcard:hover{border-color:rgba(255,107,0,0.3)}.pcard.df{border-color:rgba(255,107,0,0.35);background:var(--glow2)}
 .pcard-name{font-weight:600;font-size:15px;margin-bottom:4px;display:flex;align-items:center;gap:8px}.pcard-badge{font-size:10px;font-weight:600;padding:2px 7px;border-radius:4px;background:rgba(14,165,233,0.2);color:var(--accent)}
 .pcard-env{font-family:'JetBrains Mono',monospace;font-size:11.5px;color:var(--purple);margin:5px 0}.pcard-desc{font-size:12px;color:var(--dim)}
 
-/* ── Accordion ── */
+/* â”€â”€ Accordion â”€â”€ */
 .acc{border:1px solid var(--border);border-radius:14px;margin-bottom:10px;overflow:hidden;transition:border-color .2s}.acc:hover{border-color:rgba(255,107,0,0.2)}
 .acc-header{display:flex;align-items:center;gap:12px;padding:16px 20px;cursor:pointer;background:rgba(255,255,255,0.01);transition:background .2s;user-select:none}
 .acc-header:hover{background:rgba(255,255,255,0.03)}
@@ -77,12 +77,12 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 .acc-body{max-height:0;overflow:hidden;transition:max-height .3s ease}.acc.open .acc-body{max-height:600px}
 .acc-content{padding:0 20px 20px;color:var(--muted);font-size:14px;line-height:1.7}
 
-/* ── Tool grid ── */
+/* â”€â”€ Tool grid â”€â”€ */
 .tgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:10px}
 .tcard{background:rgba(255,255,255,0.02);border:1px solid var(--border);border-radius:12px;padding:14px;transition:.2s}.tcard:hover{border-color:rgba(255,107,0,0.3)}
 .tcard-name{font-weight:600;font-size:14px;margin-bottom:3px}.tcard-desc{font-size:12px;color:var(--dim);line-height:1.5}
 
-/* ── Command table ── */
+/* â”€â”€ Command table â”€â”€ */
 .cmd-table{width:100%;border-collapse:collapse;margin-top:8px}
 .cmd-table th{text-align:left;font-size:11px;font-weight:600;color:var(--dim);text-transform:uppercase;letter-spacing:1px;padding:8px 0;border-bottom:1px solid var(--border)}
 .cmd-table td{padding:8px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.03);vertical-align:top}
@@ -92,23 +92,23 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 .tag{display:inline-block;font-size:9px;padding:1px 6px;border-radius:4px;margin-left:6px;font-weight:600;letter-spacing:0.5px}
 .tag-n{background:rgba(234,179,8,0.12);color:var(--yellow);border:1px solid rgba(234,179,8,0.2)}
 
-/* ── Config table ── */
+/* â”€â”€ Config table â”€â”€ */
 .cfg-table{width:100%;border-collapse:collapse}.cfg-table td{padding:10px 0;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04);vertical-align:top}.cfg-table td:first-child{font-family:'JetBrains Mono',monospace;color:var(--green);padding-right:16px;white-space:nowrap}.cfg-table td:last-child{color:var(--dim)}
 
-/* ── Footer ── */
+/* â”€â”€ Footer â”€â”€ */
 .footer{border-top:1px solid var(--border);padding:40px 0;text-align:center;color:var(--dim);font-size:13px}
 .footer strong{color:var(--text)}.footer a{color:var(--accent);text-decoration:none}.footer a:hover{text-decoration:underline}
 
-/* ── Credits card ── */
+/* â”€â”€ Credits card â”€â”€ */
 .credits{background:rgba(255,255,255,0.01);border:1px solid var(--border);border-radius:12px;padding:24px;margin-bottom:32px}
 
-/* ── Responsive ── */
+/* â”€â”€ Responsive â”€â”€ */
 @media(max-width:640px){section{padding:40px 0}.hero{padding:80px 16px 60px}.hero-logo{width:64px;height:64px}.hero h1{font-size:42px;letter-spacing:-2px}.hero-sub{font-size:18px}.hero-cycle-wrap{font-size:28px;height:38px}.pgrid,.tgrid{grid-template-columns:1fr}.cta-row{flex-direction:column;align-items:center}.card{padding:20px}.nav-logo span{display:none}}
 </style>
 </head>
 <body>
 
-<!-- ═══ 1. NAVBAR ═══ -->
+<!-- â•â•â• 1. NAVBAR â•â•â• -->
 <nav style="position:sticky;top:0;z-index:100;background:rgba(10,10,15,0.9);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06)">
 <div class="nav">
   <a href="#" class="nav-logo"><img src="https://openanalyst.com/images/new-logo.png" alt="OA"><span>OpenAnalyst</span></a>
@@ -124,7 +124,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 </nav>
 
-<!-- ═══ 2. HERO ═══ -->
+<!-- â•â•â• 2. HERO â•â•â• -->
 <div class="hero">
   <img src="https://openanalyst.com/images/new-logo.png" alt="OpenAnalyst" class="hero-logo">
   <h1>OpenAnalyst CLI</h1>
@@ -137,7 +137,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   </div>
 </div>
 
-<!-- ═══ 3. INSTALL ═══ -->
+<!-- â•â•â• 3. INSTALL â•â•â• -->
 <section id="install">
 <div class="wrap">
   <div class="section-label">Get Started</div>
@@ -200,7 +200,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 </section>
 
-<!-- ═══ 4. PROVIDERS ═══ -->
+<!-- â•â•â• 4. PROVIDERS â•â•â• -->
 <section id="providers" style="background:var(--bg2)">
 <div class="wrap">
   <div class="section-label">Multi-Provider</div>
@@ -236,7 +236,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 </section>
 
-<!-- ═══ 5. FEATURES — ACCORDION ═══ -->
+<!-- â•â•â• 5. FEATURES â€” ACCORDION â•â•â• -->
 <section id="features">
 <div class="wrap">
   <div class="section-label">Capabilities</div>
@@ -318,7 +318,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 </section>
 
-<!-- ═══ 6. COMMAND REFERENCE — TABBED ═══ -->
+<!-- â•â•â• 6. COMMAND REFERENCE â€” TABBED â•â•â• -->
 <section id="commands" style="background:var(--bg2)">
 <div class="wrap">
   <div class="section-label">Reference</div>
@@ -458,7 +458,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 </section>
 
-<!-- ═══ 7. BUILT-IN TOOLS ═══ -->
+<!-- â•â•â• 7. BUILT-IN TOOLS â•â•â• -->
 <section id="tools">
 <div class="wrap">
   <div class="section-label">Tools</div>
@@ -492,7 +492,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 </section>
 
-<!-- ═══ 8. MORE FEATURES ═══ -->
+<!-- â•â•â• 8. MORE FEATURES â•â•â• -->
 <section id="more-features" style="background:var(--bg2)">
 <div class="wrap">
   <div class="section-label">More</div>
@@ -544,7 +544,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 </section>
 
-<!-- ═══ 9. CONFIGURATION ═══ -->
+<!-- â•â•â• 9. CONFIGURATION â•â•â• -->
 <section>
 <div class="wrap">
   <div class="section-label">Config</div>
@@ -563,7 +563,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 </section>
 
-<!-- ═══ 10. CREDITS ═══ -->
+<!-- â•â•â• 10. CREDITS â•â•â• -->
 <section id="credits" style="background:var(--bg2)">
 <div class="wrap">
   <div class="section-label">Legal</div>
@@ -587,14 +587,14 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 </section>
 
-<!-- ═══ 11. FOOTER ═══ -->
+<!-- â•â•â• 11. FOOTER â•â•â• -->
 <div class="footer" style="padding:40px 24px">
-  <p><strong>OpenAnalyst CLI <span class="oa-version-full">v2.0.24</span></strong></p>
+  <p><strong>OpenAnalyst CLI <span class="oa-version-full">v2.0.26</span></strong></p>
   <p style="margin-top:6px">An independent, open-source AI agent for the terminal</p>
   <p style="margin-top:12px">Built by <strong style="color:var(--accent)">OpenAnalyst Inc</strong> &middot; <a href="mailto:anit@openanalyst.com">anit@openanalyst.com</a> &middot; <a href="https://github.com/OpenAnalystInc/cli" target="_blank">GitHub</a></p>
 </div>
 
-<!-- ═══ SCRIPTS ═══ -->
+<!-- â•â•â• SCRIPTS â•â•â• -->
 <script>
 // Tab switcher
 function sw(e,id){const p=e.target.closest('section')||e.target.closest('.card');p.querySelectorAll('.tab').forEach(t=>t.classList.remove('on'));p.querySelectorAll('.tc').forEach(c=>c.classList.remove('on'));e.target.classList.add('on');document.getElementById(id).classList.add('on')}
@@ -605,7 +605,7 @@ function cc(b){const c=b.closest('.cb').querySelector('.code').innerText;navigat
 // Accordion toggle
 function toggleAcc(el){el.classList.toggle('open')}
 
-// Hero typewriter — letter-by-letter typing + deleting
+// Hero typewriter â€” letter-by-letter typing + deleting
 (function(){
   const el=document.getElementById('cycle');
   const phrases=["for your terminal","Local AI","65+ Commands","22 Tools","Multi-Agent","8 Providers","for developers","for every LLM","for teams","for code review","for debugging","for startups","for enterprise"];
