@@ -3,9 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>OpenAnalyst CLI â€” The Universal AI Agent for Your Terminal</title>
-<link rel="icon" type="image/png" href="https://openanalyst.com/images/new-logo.png">
-<link rel="apple-touch-icon" href="https://openanalyst.com/images/new-logo.png">
+<title>OpenAnalyst CLI</title>
+<link rel="icon" type="image/png" href="openanalyst-icon.png">
+<link rel="apple-touch-icon" href="openanalyst-icon.png">
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap');
 :root{--bg:#0a0a0f;--bg2:#0f0f16;--card:#141419;--code:#0d0d14;--border:#1e1e2a;--border2:#2d2d3d;--text:#e8e6e0;--dim:#6b6966;--muted:#9a9590;--accent:#FF6B00;--accent2:#FF8C33;--accent3:#FFB366;--glow:rgba(255,107,0,0.12);--glow2:rgba(255,107,0,0.06);--green:#10B981;--yellow:#f59e0b;--purple:#8B5CF6;--cyan:#22d3ee;--pink:#f472b6;--orange:#FF6B00;--red:#ef4444;--blue:#3B82F6}
@@ -393,6 +393,214 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
     transform: none;
   }
 }
+
+/* ===================================================================
+   PER-SECTION ANIMATION FLAVORS (v2.0.32+)
+   Each major section gets a distinct entry animation so the scroll
+   doesn't feel monotonous. All flavors layer on top of the base
+   `.is-revealed` reveal - they only customize the FROM-state's
+   transform/timing.
+   =================================================================== */
+
+/* Install section: slide in from the left. */
+#install .cb,
+#install .tabs,
+#install .card { transform: translateX(-32px); }
+#install .cb.is-revealed,
+#install .tabs.is-revealed,
+#install .card.is-revealed { transform: translateX(0); }
+
+/* Providers section: 3D "deal in" with perspective. */
+.pgrid { perspective: 1200px; }
+#providers .pcard {
+  transform: rotateY(-25deg) translateY(28px);
+  transform-origin: center bottom;
+}
+#providers .pcard.is-revealed { transform: rotateY(0) translateY(0); }
+
+/* Features section: rise + slight scale-up. */
+#features .card { transform: translateY(32px) scale(0.96); }
+#features .card.is-revealed { transform: translateY(0) scale(1); }
+
+/* Commands: subtle rotate-pop. */
+#commands .acc,
+#commands .card { transform: translateY(36px) rotate(-1.2deg); }
+#commands .acc.is-revealed,
+#commands .card.is-revealed { transform: translateY(0) rotate(0); }
+
+/* Tools: elastic bounce. */
+#tools .tcard {
+  transform: scale(0.7);
+  opacity: 0;
+  transition: opacity .5s cubic-bezier(.34, 1.56, .64, 1),
+              transform .6s cubic-bezier(.34, 1.56, .64, 1);
+}
+#tools .tcard.is-revealed { transform: scale(1); opacity: 1; }
+
+/* More-features: alternating left/right slide-in. */
+#more-features .card:nth-child(odd)  { transform: translateX(-36px); }
+#more-features .card:nth-child(even) { transform: translateX(36px);  }
+#more-features .card.is-revealed     { transform: translateX(0); }
+
+/* Credits: gentle slow fade. */
+#credits .credits,
+#credits .card {
+  transform: translateY(14px);
+  transition-duration: 0.9s;
+}
+
+/* ===================================================================
+   LEGAL / LICENSE SECTION
+   =================================================================== */
+
+#license {
+  position: relative;
+  padding: 80px 0;
+  background:
+    radial-gradient(ellipse at 50% 0%, rgba(239, 68, 68, 0.05), transparent 50%),
+    var(--bg);
+  overflow: hidden;
+}
+#license::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background-image: repeating-linear-gradient(
+    45deg,
+    transparent,
+    transparent 22px,
+    rgba(239, 68, 68, 0.03) 22px,
+    rgba(239, 68, 68, 0.03) 24px
+  );
+  pointer-events: none;
+  z-index: -1;
+  animation: oa-stripe-shift 18s linear infinite;
+}
+@keyframes oa-stripe-shift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 100px 0; }
+}
+
+.legal-card {
+  background: linear-gradient(180deg, rgba(239, 68, 68, 0.04), rgba(255, 107, 0, 0.02));
+  border: 1px solid rgba(239, 68, 68, 0.35);
+  border-radius: 18px;
+  padding: 32px;
+  position: relative;
+  overflow: hidden;
+}
+.legal-card::before {
+  content: "";
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, rgba(239,68,68,0.5), rgba(255,107,0,0.35), rgba(239,68,68,0.5));
+  background-size: 200% 200%;
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+          mask-composite: exclude;
+  animation: oa-legal-shimmer 4s ease-in-out infinite;
+  pointer-events: none;
+}
+@keyframes oa-legal-shimmer {
+  0%,100% { background-position: 0% 50%; }
+  50%     { background-position: 100% 50%; }
+}
+
+.legal-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 2px;
+  text-transform: uppercase;
+  color: #ef4444;
+  background: rgba(239, 68, 68, 0.1);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  padding: 4px 10px;
+  border-radius: 6px;
+  margin-bottom: 16px;
+}
+.legal-badge::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: #ef4444;
+  animation: oa-pulse-red 1.6s ease-in-out infinite;
+  box-shadow: 0 0 8px rgba(239, 68, 68, 0.8);
+}
+@keyframes oa-pulse-red {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%     { opacity: 0.4; transform: scale(0.8); }
+}
+
+.legal-title { font-size: 26px; font-weight: 700; margin-bottom: 12px; color: var(--text); }
+.legal-sub { color: var(--muted); font-size: 14px; line-height: 1.7; margin-bottom: 20px; }
+.legal-rules { margin: 16px 0; padding: 0 0 0 18px; }
+.legal-rules li { color: var(--muted); font-size: 13.5px; line-height: 1.8; margin-bottom: 6px; }
+.legal-rules li strong { color: var(--text); }
+
+.legal-warn {
+  margin-top: 22px;
+  padding: 14px 16px;
+  background: rgba(239, 68, 68, 0.08);
+  border-left: 3px solid #ef4444;
+  border-radius: 4px;
+  color: #fca5a5;
+  font-size: 13px;
+  line-height: 1.7;
+}
+.legal-warn strong { color: #fecaca; }
+.legal-contact { margin-top: 18px; font-size: 13px; color: var(--dim); }
+.legal-contact a { color: var(--accent); text-decoration: none; font-weight: 500; }
+.legal-contact a:hover { text-decoration: underline; }
+
+.legal-ticker {
+  display: flex;
+  overflow: hidden;
+  margin-bottom: 28px;
+  border-top: 1px solid rgba(239, 68, 68, 0.2);
+  border-bottom: 1px solid rgba(239, 68, 68, 0.2);
+  padding: 10px 0;
+  background: rgba(239, 68, 68, 0.03);
+  mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+  -webkit-mask-image: linear-gradient(90deg, transparent, #000 8%, #000 92%, transparent);
+}
+.legal-ticker-track {
+  display: flex;
+  gap: 48px;
+  white-space: nowrap;
+  animation: oa-ticker 38s linear infinite;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 1.5px;
+  color: rgba(239, 68, 68, 0.7);
+}
+.legal-ticker-track span::before { content: "º6 "; color: var(--accent); }
+@keyframes oa-ticker {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* ===================================================================
+   CURSOR SPOTLIGHT (subtle, follows mouse, hero only)
+   =================================================================== */
+@media (hover: hover) and (pointer: fine) {
+  .hero::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    z-index: -1;
+    background:
+      radial-gradient(circle 280px at var(--oa-mx, 50%) var(--oa-my, 50%),
+        rgba(255,107,0,0.07), transparent 70%);
+    pointer-events: none;
+    transition: background 0.1s linear;
+  }
+}
 </style>
 </head>
 <body>
@@ -400,7 +608,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 <!-- â•â•â• 1. NAVBAR â•â•â• -->
 <nav style="position:sticky;top:0;z-index:100;background:rgba(10,10,15,0.9);backdrop-filter:blur(16px);border-bottom:1px solid rgba(255,255,255,0.06)">
 <div class="nav">
-  <a href="#" class="nav-logo"><img src="https://openanalyst.com/images/new-logo.png" alt="OA"><span>OpenAnalyst</span></a>
+  <a href="#" class="nav-logo"><img src="openanalyst-icon.png" alt="OA"><span>OpenAnalyst</span></a>
   <ul class="nav-links">
     <li><a href="Documentation/index.html" target="_blank" style="color:var(--accent);font-weight:600">Documentation</a></li>
     <li><a href="#install">Install</a></li>
@@ -409,6 +617,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
     <li><a href="#commands">Commands</a></li>
     <li><a href="#tools">Tools</a></li>
     <li><a href="#credits">Credits</a></li>
+    <li><a href="#license" style="color:#ef4444">License</a></li>
   </ul>
 </div>
 </nav>
@@ -419,7 +628,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 
 <div class="hero">
   <div class="hero-grid" aria-hidden="true"></div>
-  <img src="https://openanalyst.com/images/new-logo.png" alt="OpenAnalyst" class="hero-logo">
+  <img src="openanalyst-icon.png" alt="OpenAnalyst" class="hero-logo">
   <h1>OpenAnalyst CLI</h1>
   <p class="hero-sub">The universal AI agent</p>
   <div class="hero-cycle-wrap"><span class="hero-cycle" id="cycle"></span><span class="hero-cursor"></span></div>
@@ -937,6 +1146,109 @@ let si=0;const st=document.getElementById('status-text');
 setInterval(()=>{si=(si+1)%statuses.length;st.textContent=statuses[si]},2e3);
 </script>
 <script src="version.js"></script>
+
+<!-- ╔══════════════════════════════════════════════════════════════╗
+     ║  LICENSE / LEGAL — proprietary, closed source                ║
+     ╚══════════════════════════════════════════════════════════════╝ -->
+<section id="license">
+<div class="wrap">
+  <div class="legal-ticker" aria-hidden="true">
+    <div class="legal-ticker-track">
+      <span>APACHE LICENSE 2.0</span>
+      <span>OPEN SOURCE</span>
+      <span>FREE TO USE</span>
+      <span>ATTRIBUTION REQUIRED</span>
+      <span>(C) 2026 OPENANALYST INC</span>
+      <span>PATENT GRANT INCLUDED</span>
+      <!-- duplicate set so the infinite loop seam is invisible -->
+      <span>APACHE LICENSE 2.0</span>
+      <span>OPEN SOURCE</span>
+      <span>FREE TO USE</span>
+      <span>ATTRIBUTION REQUIRED</span>
+      <span>(C) 2026 OPENANALYST INC</span>
+      <span>PATENT GRANT INCLUDED</span>
+    </div>
+  </div>
+
+  <div class="legal-card">
+    <div class="legal-badge">License &middot; Apache 2.0</div>
+    <h2 class="legal-title">Licensed under the Apache License, Version 2.0.</h2>
+    <p class="legal-sub">
+      Copyright &copy; 2026 <strong>OpenAnalyst Inc.</strong>
+      OpenAnalyst CLI is released under the
+      <a href="https://www.apache.org/licenses/LICENSE-2.0" style="color:var(--accent);text-decoration:none">Apache License 2.0</a>.
+      The full text is in the
+      <a href="https://github.com/OpenAnalystInc/cli/blob/main/LICENSE" style="color:var(--accent);text-decoration:none">LICENSE</a>
+      file at the project root.
+    </p>
+
+    <p style="font-size:14px;color:var(--muted);margin-bottom:8px"><strong style="color:var(--text)">What Apache 2.0 grants you:</strong></p>
+    <ul class="legal-rules">
+      <li><strong>Use</strong> the software for any purpose, including commercial.</li>
+      <li><strong>Modify</strong> it, build derivative works, and distribute them.</li>
+      <li><strong>Redistribute</strong> the original or modified versions, in source or binary form.</li>
+      <li><strong>Sublicense</strong> derivative works under any compatible terms you choose.</li>
+      <li><strong>Patent grant.</strong> Contributors give you a royalty-free patent license covering their contributions.</li>
+    </ul>
+
+    <p style="font-size:14px;color:var(--muted);margin:20px 0 8px"><strong style="color:var(--text)">What Apache 2.0 asks in return:</strong></p>
+    <ul class="legal-rules">
+      <li><strong>Include the license.</strong> Ship a copy of the LICENSE file with any redistribution.</li>
+      <li><strong>State changes.</strong> If you modify the software, mark modified files as such.</li>
+      <li><strong>Preserve notices.</strong> Keep copyright, patent, trademark, and attribution notices intact.</li>
+      <li><strong>NOTICE file.</strong> If the original ships a NOTICE file, include its attribution notices in your distribution.</li>
+      <li><strong>No trademark grant.</strong> The license doesn't authorize use of "OpenAnalyst" or related marks beyond fair attribution.</li>
+    </ul>
+
+    <div class="legal-warn">
+      <strong>No warranty.</strong> The software is provided "AS IS",
+      without warranty of any kind, express or implied, including
+      merchantability, fitness for a particular purpose, and
+      non-infringement. The Apache 2.0 text in LICENSE is the
+      authoritative version of these terms.
+    </div>
+
+    <p class="legal-contact">
+      Full license text:
+      <a href="https://github.com/OpenAnalystInc/cli/blob/main/LICENSE">LICENSE</a>
+      &middot; Apache 2.0 reference:
+      <a href="https://www.apache.org/licenses/LICENSE-2.0">apache.org/licenses/LICENSE-2.0</a>
+      &middot; Questions:
+      <a href="mailto:support@openanalyst.com">support@openanalyst.com</a>
+    </p>
+  </div>
+</div>
+</section>
+
+<!-- Cursor spotlight: feeds CSS variables that the .hero::before
+     pseudo-element reads to render a soft radial glow that
+     follows the mouse. Gated by hover-capable / fine-pointer
+     so it's a no-op on touch devices. -->
+<script>
+(function() {
+  if (!window.matchMedia) return;
+  if (!window.matchMedia('(hover: hover) and (pointer: fine)').matches) return;
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) return;
+  var hero = document.querySelector('.hero');
+  if (!hero) return;
+  var rafQueued = false;
+  var lastX = 50, lastY = 50;
+  hero.addEventListener('mousemove', function(e) {
+    var rect = hero.getBoundingClientRect();
+    lastX = ((e.clientX - rect.left) / rect.width) * 100;
+    lastY = ((e.clientY - rect.top)  / rect.height) * 100;
+    if (!rafQueued) {
+      rafQueued = true;
+      requestAnimationFrame(function() {
+        rafQueued = false;
+        hero.style.setProperty('--oa-mx', lastX + '%');
+        hero.style.setProperty('--oa-my', lastY + '%');
+      });
+    }
+  }, { passive: true });
+})();
+</script>
+
 <!-- Animation runtime (v2.0.32+): scroll-progress bar +
      IntersectionObserver-driven reveals with cascading stagger. -->
 <script>

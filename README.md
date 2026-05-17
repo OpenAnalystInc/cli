@@ -64,3 +64,22 @@ This repository is intentionally limited to public release assets:
 - npm package metadata
 
 Source development for the private release pipeline happens separately.
+
+## License
+
+Copyright (c) 2026 OpenAnalyst Inc.
+
+OpenAnalyst CLI is released under the
+[Apache License 2.0](https://www.apache.org/licenses/LICENSE-2.0).
+The full text is in the [LICENSE](LICENSE) file at the project root.
+
+Apache 2.0 grants you the right to use, modify, and redistribute
+the software (including for commercial purposes), provided that
+you include the license, state any modifications, and preserve
+copyright, patent, trademark, and attribution notices. A
+royalty-free patent grant is included. The software is provided
+"AS IS" with no warranty.
+
+The Apache 2.0 license does NOT grant rights to the
+**OpenAnalyst** name or marks beyond fair attribution. For
+questions: support@openanalyst.com.
