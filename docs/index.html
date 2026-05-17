@@ -59,7 +59,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 .c-g{color:var(--green)}.c-c{color:var(--cyan)}.c-p{color:var(--purple)}.c-y{color:var(--yellow)}.c-d{color:var(--dim)}.c-k{color:var(--pink)}.c-o{color:var(--orange)}
 
 /* â”€â”€ Tabs â”€â”€ */
-.tabs{display:flex;gap:0;margin-bottom:0}.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--dim);background:transparent;border:1px solid var(--border);border-bottom:0;border-radius:10px 10px 0 0;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.tab.on{background:var(--code);color:var(--accent);border-color:var(--border)}.tc{display:none}.tc.on{display:block}.tc .cb{border-top-left-radius:0;margin-top:0}
+.tabs{display:flex;gap:0;margin-bottom:0}.tab{padding:10px 20px;font-size:13px;font-weight:500;color:var(--dim);background:transparent;border:1px solid var(--border);border-bottom:0;border-radius:10px 10px 0 0;cursor:pointer;font-family:'Inter',sans-serif;transition:.2s}.tab.on{background:var(--code);color:var(--accent);border-color:var(--border)}.tc{display:none}.tc.on{display:block}.tc>.cb:first-child{border-top-left-radius:0;margin-top:0}.tc>.cb+.cb{margin-top:14px}
 
 /* â”€â”€ Provider grid â”€â”€ */
 .pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:14px;margin-top:20px}
@@ -894,12 +894,13 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   <div id="ins-1" class="tc on">
     <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Terminal</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
 <pre class="code"><span class="c-g">curl</span> <span class="c-c">-fsSL</span> https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh | <span class="c-g">bash</span></pre></div>
+    <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Or install via npm</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
+<pre class="code"><span class="c-g">npm</span> install -g <span class="c-c">@openanalystinc/openanalyst-cli</span></pre></div>
+    <p style="font-size:12px;color:var(--dim);margin-top:8px">Auto-updates built in &mdash; the CLI checks for new versions and updates itself.</p>
   </div>
   <div id="ins-2" class="tc">
     <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">PowerShell</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
 <pre class="code"><span class="c-g">irm</span> https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | <span class="c-g">iex</span></pre></div>
-  </div>
-  <div style="margin-top:16px">
     <div class="cb"><div class="cb-header"><div style="display:flex;align-items:center;gap:8px"><div class="cb-dots"><span class="cb-dot d1"></span><span class="cb-dot d2"></span><span class="cb-dot d3"></span></div><span class="cb-label">Or install via npm</span></div><button class="cb-copy" onclick="cc(this)">Copy</button></div>
 <pre class="code"><span class="c-g">npm</span> install -g <span class="c-c">@openanalystinc/openanalyst-cli</span></pre></div>
     <p style="font-size:12px;color:var(--dim);margin-top:8px">Auto-updates built in &mdash; the CLI checks for new versions and updates itself.</p>
