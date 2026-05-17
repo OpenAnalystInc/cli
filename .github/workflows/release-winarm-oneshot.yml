@@ -1,0 +1,104 @@
+# =============================================================
+# ONE-SHOT WORKFLOW — DELETE AFTER USE
+# =============================================================
+# Backfills the Windows ARM64 binary for an existing release.
+# The main `release.yml` build matrix will be expanded to include
+# `aarch64-pc-windows-msvc` in the next release; this workflow is
+# the patch for 2.0.34. Once the main workflow ships ARM Windows
+# natively, delete this file.
+#
+# Usage:
+#   gh workflow run release-winarm-oneshot.yml -R OpenAnalystInc/cli \
+#     -f version=2.0.34
+#
+# Requires the same PRIVATE_REPO_TOKEN secret used by release.yml.
+# =============================================================
+
+name: Release Windows ARM64 (one-shot)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to backfill (e.g. 2.0.34)'
+        required: true
+
+permissions:
+  contents: write
+
+env:
+  PRIVATE_REPO: OpenAnalystInc/openanalyst-cli
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ env.PRIVATE_REPO }}
+          token: ${{ secrets.PRIVATE_REPO_TOKEN }}
+          ref: v${{ inputs.version }}
+          path: source
+
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: aarch64-pc-windows-msvc
+
+      - name: Build aarch64-pc-windows-msvc
+        working-directory: source/rust
+        shell: bash
+        run: cargo build --release --target aarch64-pc-windows-msvc -p openanalyst-cli
+
+      - name: Stage binary
+        shell: bash
+        run: |
+          set -e
+          mkdir -p dist
+          SRC="source/rust/target/aarch64-pc-windows-msvc/release/openanalyst.exe"
+          DST="dist/openanalyst-aarch64-pc-windows-msvc.exe"
+          cp "$SRC" "$DST"
+          ls -lah "$DST"
+
+      # Mirror the same guards used by the main release workflow:
+      # refuse to upload source/docs/secret-shaped files.
+      - name: Guard against leaks in artifact
+        shell: bash
+        run: |
+          set -e
+          LEAKS=$(find dist -type f \
+            \( -name '*.rs' -o -name '*.tsx' -o -name '*.py' \
+               -o -name '*.toml' -o -name '*.lock' \
+               -o -name '*.map' -o -name '*.md' -o -name '*.mdx' \
+               -o \( -name '*.ts' ! -name '*.d.ts' \) \) || true)
+          if [ -n "$LEAKS" ]; then
+            echo "FATAL: non-binary files in dist/:"
+            echo "$LEAKS"
+            exit 1
+          fi
+          SECRETS=$(grep -ar -E \
+            -e 'sk-oa-v1-[A-Za-z0-9]{20,}' \
+            -e 'sk-ant-api[0-9]+-[A-Za-z0-9_-]{40,}' \
+            -e 'AKIA[0-9A-Z]{16}' \
+            -e 'ghp_[A-Za-z0-9]{30,}' \
+            dist/ || true)
+          if [ -n "$SECRETS" ]; then
+            echo "FATAL: secret-shaped strings in dist/."
+            exit 1
+          fi
+          echo "OK"
+
+      - name: Upload to existing release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
+        run: |
+          set -e
+          TAG="v${{ inputs.version }}"
+          # The release should already exist (created by the main
+          # workflow). Fail fast if it does not.
+          if ! gh release view "$TAG" >/dev/null 2>&1; then
+            echo "Release $TAG does not exist; the main release.yml must run first."
+            exit 1
+          fi
+          gh release upload "$TAG" dist/openanalyst-aarch64-pc-windows-msvc.exe --clobber
+          echo "Uploaded aarch64-pc-windows-msvc binary to $TAG."
