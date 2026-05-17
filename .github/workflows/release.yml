@@ -152,6 +152,7 @@ jobs:
           find artifacts -type f
           echo "---"
           LEAKS=$(find artifacts -type f \
+            -not -path '*/managed/*' \
             \( -name '*.rs' -o -name '*.tsx' -o -name '*.py' \
                -o -name '*.toml' -o -name '*.lock' \
                -o -name '*.map' \
@@ -222,6 +223,11 @@ jobs:
           const pack = JSON.parse(fs.readFileSync('/tmp/npm-pack.json', 'utf8'));
           const files = (pack[0]?.files ?? []).map(f => f.path);
           const forbidden = files.filter(f => {
+            // Allow-list: managed/ is the user-facing skill
+            // catalog (e.g. managed/skills/.../*.py helpers
+            // that ship as runnable skill artifacts, NOT CLI
+            // source). Never flag anything under managed/.
+            if (f.startsWith('managed/')) return false;
             return f.endsWith('.rs')
                 || f.endsWith('.tsx')
                 || f.endsWith('.py')
