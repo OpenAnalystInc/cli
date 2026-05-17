@@ -140,6 +140,29 @@ jobs:
           path: artifacts
           merge-multiple: true
 
+      # Hard guard: refuse to upload anything that isn't a compiled
+      # binary. Source files (.rs, .ts, .tsx, .py, .toml) MUST NOT
+      # appear in the artifact tree. If any do, abort the workflow
+      # before the release upload step can run.
+      - name: Guard against source leak in release artifacts
+        shell: bash
+        run: |
+          set -e
+          echo "Files staged for release upload:"
+          find artifacts -type f
+          echo "---"
+          LEAKS=$(find artifacts -type f \
+            \( -name '*.rs' -o -name '*.tsx' -o -name '*.py' \
+               -o -name '*.toml' -o -name '*.lock' \
+               -o -name '*.map' \
+               -o \( -name '*.ts' ! -name '*.d.ts' \) \) || true)
+          if [ -n "$LEAKS" ]; then
+            echo "FATAL: source-shaped files detected in release artifacts:"
+            echo "$LEAKS"
+            exit 1
+          fi
+          echo "OK — only binary artifacts present."
+
       - name: Create or update the release on this (public) repo
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -181,9 +204,46 @@ jobs:
         working-directory: source
         run: npm run build --prefix ink-tui
 
-      - name: Inspect npm package (sanity)
+      # Hard guard: parse `npm pack --dry-run --json` and fail the
+      # workflow before `npm publish` if any file in the tarball
+      # looks like source. The `.npmignore` already filters source,
+      # but this re-checks at publish time so even an accidental
+      # `.npmignore` regression can't quietly ship source.
+      - name: Guard against source leak in npm tarball
         working-directory: source
-        run: npm pack --dry-run
+        shell: bash
+        run: |
+          set -e
+          npm pack --dry-run --json > /tmp/npm-pack.json
+          echo "Tarball file count:"
+          node -e 'const p = require("/tmp/npm-pack.json"); console.log(p[0].files.length, "files,", p[0].size, "bytes")'
+          node <<'EOF'
+          const fs = require('fs');
+          const pack = JSON.parse(fs.readFileSync('/tmp/npm-pack.json', 'utf8'));
+          const files = (pack[0]?.files ?? []).map(f => f.path);
+          const forbidden = files.filter(f => {
+            return f.endsWith('.rs')
+                || f.endsWith('.tsx')
+                || f.endsWith('.py')
+                || f.endsWith('.toml')
+                || f.endsWith('.lock')
+                || f.endsWith('.map')
+                || f.startsWith('rust/')
+                || f.startsWith('backend/')
+                || f.startsWith('AgenticRAG/')
+                || f.startsWith('knowledgeBase/')
+                || f.startsWith('Dev/')
+                || f.startsWith('src/')
+                || f.startsWith('ink-tui/src/')
+                || (f.endsWith('.ts') && !f.endsWith('.d.ts'));
+          });
+          if (forbidden.length > 0) {
+            console.error('FATAL: source-shaped files detected in npm tarball:');
+            forbidden.forEach(f => console.error('  ' + f));
+            process.exit(1);
+          }
+          console.log('OK — no source files in tarball.');
+          EOF
 
       - name: Publish to npm
         working-directory: source
