@@ -82,6 +82,9 @@ jobs:
           - os: windows-latest
             target: x86_64-pc-windows-msvc
             binary: openanalyst.exe
+          - os: windows-latest
+            target: aarch64-pc-windows-msvc
+            binary: openanalyst.exe
     runs-on: ${{ matrix.os }}
     steps:
       # Clone the private repo (the source of truth). The PAT lives
