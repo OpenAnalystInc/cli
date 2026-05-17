@@ -167,6 +167,35 @@ jobs:
           fi
           echo "OK — only binary artifacts present."
 
+          # Defense-in-depth: docs and Markdown must never reach the
+          # public release. The Package step only copies binaries
+          # today, but a future regression could change that.
+          DOC_LEAKS=$(find artifacts -type f \
+            \( -name '*.md' -o -name '*.mdx' -o -path '*/docs/*' \) || true)
+          if [ -n "$DOC_LEAKS" ]; then
+            echo "FATAL: documentation files detected in release artifacts:"
+            echo "$DOC_LEAKS"
+            exit 1
+          fi
+          echo "OK — no docs in release artifacts."
+
+          # Belt-and-suspenders: scan every staged file for literal
+          # API-key shapes. The CLI never embeds credentials, but if
+          # a developer ever accidentally commits one, this aborts
+          # before the public release ships it.
+          SECRETS=$(grep -ar -E \
+            -e 'sk-oa-v1-[A-Za-z0-9]{20,}' \
+            -e 'sk-ant-api[0-9]+-[A-Za-z0-9_-]{40,}' \
+            -e 'AKIA[0-9A-Z]{16}' \
+            -e 'ghp_[A-Za-z0-9]{30,}' \
+            artifacts/ || true)
+          if [ -n "$SECRETS" ]; then
+            echo "FATAL: API-key-shaped strings detected in release artifacts. Refusing to publish."
+            echo "$SECRETS" | head -20
+            exit 1
+          fi
+          echo "OK — no API-key shapes in release artifacts."
+
       - name: Create or update the release on this (public) repo
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -231,6 +260,15 @@ jobs:
             // that ship as runnable skill artifacts, NOT CLI
             // source). Never flag anything under managed/.
             if (f.startsWith('managed/')) return false;
+            // Only the minimal public README ships. CHANGELOG and
+            // any internal docs stay private. Anything else markdown
+            // is treated as a leak — including any `*.internal.md`
+            // file regardless of name.
+            const isAllowedMd = f === 'README.md';
+            const isDocLeak = (f.endsWith('.md') && !isAllowedMd)
+                           || f.endsWith('.mdx')
+                           || f.includes('.internal.')
+                           || f.startsWith('docs/');
             return f.endsWith('.rs')
                 || f.endsWith('.tsx')
                 || f.endsWith('.py')
@@ -244,6 +282,9 @@ jobs:
                 || f.startsWith('Dev/')
                 || f.startsWith('src/')
                 || f.startsWith('ink-tui/src/')
+                || f.startsWith('web-ui/src/')
+                || f.startsWith('web-ui/')
+                || isDocLeak
                 || (f.endsWith('.ts') && !f.endsWith('.d.ts'));
           });
           if (forbidden.length > 0) {
@@ -253,6 +294,28 @@ jobs:
           }
           console.log('OK — no source files in tarball.');
           EOF
+
+          # Secret-scan: build the real tarball, untar to a temp dir,
+          # and grep its contents for API-key shapes. Aborts publish
+          # if any literal key material is present.
+          echo "Scanning tarball contents for API-key shapes..."
+          npm pack > /tmp/pack-name.txt
+          PKG_TARBALL=$(tail -n1 /tmp/pack-name.txt)
+          mkdir -p /tmp/pkg-scan
+          tar -xzf "$PKG_TARBALL" -C /tmp/pkg-scan
+          KEY_HITS=$(grep -ar -E \
+            -e 'sk-oa-v1-[A-Za-z0-9]{20,}' \
+            -e 'sk-ant-api[0-9]+-[A-Za-z0-9_-]{40,}' \
+            -e 'AKIA[0-9A-Z]{16}' \
+            -e 'ghp_[A-Za-z0-9]{30,}' \
+            /tmp/pkg-scan/ || true)
+          if [ -n "$KEY_HITS" ]; then
+            echo "FATAL: API-key-shaped strings detected in npm tarball. Refusing to publish."
+            echo "$KEY_HITS" | head -20
+            exit 1
+          fi
+          rm -rf /tmp/pkg-scan "$PKG_TARBALL"
+          echo "OK — no API-key shapes in tarball."
 
       - name: Publish to npm
         working-directory: source
