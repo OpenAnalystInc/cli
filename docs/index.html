@@ -809,6 +809,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   <a href="#" class="nav-logo"><img src="openanalyst-icon.png" alt="OA"><span>OpenAnalyst</span></a>
   <ul class="nav-links">
     <li><a href="Documentation/index.html" target="_blank" style="color:var(--accent);font-weight:600">Documentation</a></li>
+    <li><a href="#modes">Modes</a></li>
     <li><a href="#install">Install</a></li>
     <li><a href="#providers">Providers</a></li>
     <li><a href="#features">Features</a></li>
@@ -838,6 +839,48 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
 </div>
 
 <!-- â•â•â• 3. INSTALL â•â•â• -->
+
+<!-- ====== Three Ways To Use It (web-ui era) ====== -->
+<section id="modes" style="background:var(--bg2)">
+<div class="wrap">
+  <div class="section-label">How to run it</div>
+  <div class="section-title">Three ways. One binary.</div>
+  <div class="section-sub">OpenAnalyst ships as a single CLI that fronts three independent surfaces. Use whichever fits the moment — they all speak to the same engine, share the same sessions, respect the same workspace boundary.</div>
+
+  <div class="pgrid" style="margin-top:24px">
+    <div class="pcard">
+      <div class="pcard-name">🖥️ Terminal TUI</div>
+      <div class="pcard-env">openanalyst</div>
+      <div class="pcard-desc">Full interactive TUI in your shell. The whole folder becomes your workspace. Best for power users in their editor flow.</div>
+    </div>
+    <div class="pcard">
+      <div class="pcard-name">🌐 Web console</div>
+      <div class="pcard-env">openanalyst --serve 3080</div>
+      <div class="pcard-desc">Hosted HTTP+SSE API plus a SolidJS web UI you open in any browser. Tab-based sessions, model picker, file viewer with download, validate-then-save provider keys.</div>
+    </div>
+    <div class="pcard">
+      <div class="pcard-name">☁️ Self-hosted SaaS</div>
+      <div class="pcard-env">deploy --serve to your cloud</div>
+      <div class="pcard-desc">Same binary on AWS / Fly / Render / your VPS. Ship the web UI static bundle to S3 + CloudFront. One client per deployment, your infrastructure, your data.</div>
+    </div>
+  </div>
+
+  <div style="margin-top:32px;padding:18px;border:1px solid rgba(255,107,0,0.25);border-radius:14px;background:rgba(255,107,0,0.04)">
+    <div style="font-size:12px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;color:var(--accent);margin-bottom:6px">Workspace jail · admin-only escape</div>
+    <div style="font-size:15px;font-weight:600;margin-bottom:6px">Every file operation is locked to the folder the CLI was launched from.</div>
+    <div style="font-size:14px;color:var(--muted);line-height:1.7">
+      <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3);background:rgba(255,107,0,0.06);padding:1px 6px;border-radius:4px">Read</code>,
+      <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3);background:rgba(255,107,0,0.06);padding:1px 6px;border-radius:4px">Write</code>,
+      <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3);background:rgba(255,107,0,0.06);padding:1px 6px;border-radius:4px">Edit</code>,
+      <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3);background:rgba(255,107,0,0.06);padding:1px 6px;border-radius:4px">Glob</code>,
+      <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3);background:rgba(255,107,0,0.06);padding:1px 6px;border-radius:4px">Grep</code>, and
+      <code style="font-family:'JetBrains Mono',monospace;color:var(--accent3);background:rgba(255,107,0,0.06);padding:1px 6px;border-radius:4px">Bash</code>
+      all canonicalize the requested path and refuse anything outside the workspace root — including path traversal (<code style="font-family:'JetBrains Mono',monospace">../../etc/passwd</code>) and symlink escapes. The end user using the web UI cannot disable this. Only the operator running the server can, by setting <code style="font-family:'JetBrains Mono',monospace">OPENANALYST_DISABLE_WORKSPACE_JAIL=1</code> before launch.
+    </div>
+  </div>
+</div>
+</section>
+
 <section id="install">
 <div class="wrap">
   <div class="section-label">Get Started</div>
