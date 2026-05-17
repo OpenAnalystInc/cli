@@ -579,7 +579,7 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
   letter-spacing: 1.5px;
   color: rgba(239, 68, 68, 0.7);
 }
-.legal-ticker-track span::before { content: "º6 "; color: var(--accent); }
+.legal-ticker-track span::before { content: "▸ "; color: var(--accent); margin-right: 6px; }
 @keyframes oa-ticker {
   0%   { transform: translateX(0); }
   100% { transform: translateX(-50%); }
@@ -599,6 +599,204 @@ pre.code{margin:0;padding:16px 20px;font-family:'JetBrains Mono',monospace;font-
         rgba(255,107,0,0.07), transparent 70%);
     pointer-events: none;
     transition: background 0.1s linear;
+  }
+}
+
+/* ===================================================================
+   CONTINUOUS BACKGROUND ANIMATIONS (v2.0.32+) — always playing
+   Each non-hero section gets its own slow ambient animation so the
+   page never feels static. Distinct timing + motion per section so
+   the eye reads each as its own space, not a uniform parallax.
+   =================================================================== */
+
+/* INSTALL — soft diagonal gradient that pans top-left to bottom-right
+   forever, behind everything else. ~40s loop. */
+#install {
+  position: relative;
+  isolation: isolate;
+}
+#install::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(135deg,
+    rgba(255,107,0,0.04) 0%,
+    transparent 30%,
+    rgba(139,92,246,0.04) 60%,
+    transparent 100%);
+  background-size: 280% 280%;
+  animation: oa-bg-sweep 40s linear infinite;
+}
+@keyframes oa-bg-sweep {
+  0%   { background-position: 0% 0%; }
+  100% { background-position: 100% 100%; }
+}
+
+/* PROVIDERS — animated dot grid that drifts left-to-right behind
+   the cards, plus an orange horizon-line at the bottom that breathes. */
+#providers::before {
+  animation: oa-dots-drift 28s linear infinite;
+  background-size: 32px 32px;
+}
+@keyframes oa-dots-drift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 32px 0; }
+}
+#providers::after {
+  content: "";
+  position: absolute;
+  left: 10%; right: 10%;
+  bottom: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent, rgba(255,107,0,0.5), transparent);
+  animation: oa-horizon 6s ease-in-out infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+@keyframes oa-horizon {
+  0%,100% { opacity: 0.3; transform: scaleX(0.9); }
+  50%     { opacity: 1;   transform: scaleX(1); }
+}
+
+/* FEATURES — radial spotlight behind the section title that
+   breathes. Different rhythm from the horizon line above. */
+#features {
+  position: relative;
+  isolation: isolate;
+}
+#features::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse 600px 300px at 50% 20%,
+    rgba(255,107,0,0.06), transparent 70%);
+  animation: oa-spotlight-breathe 7s ease-in-out infinite;
+}
+@keyframes oa-spotlight-breathe {
+  0%,100% { opacity: 0.5; transform: scale(1); }
+  50%     { opacity: 1;   transform: scale(1.08); }
+}
+
+/* COMMANDS — drifting dot grid with a slow horizontal sweep
+   (different speed from providers so the parallax reads as
+   separate). */
+#commands::before {
+  animation: oa-dots-drift 38s linear infinite reverse;
+  background-size: 28px 28px;
+}
+/* Plus a faint cyan accent line that scans top to bottom. */
+#commands::after {
+  content: "";
+  position: absolute;
+  left: 0; right: 0;
+  top: 0;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent, rgba(34,211,238,0.45), transparent);
+  animation: oa-scanline 11s linear infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+@keyframes oa-scanline {
+  0%   { transform: translateY(0);     opacity: 0; }
+  10%  { opacity: 1; }
+  90%  { opacity: 1; }
+  100% { transform: translateY(100vh); opacity: 0; }
+}
+
+/* TOOLS — large slow-rotating conic gradient mask behind the grid
+   (visible only as a subtle hue shift, ~60s loop). */
+#tools {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+#tools::before {
+  content: "";
+  position: absolute;
+  width: 140%; height: 140%;
+  left: -20%; top: -20%;
+  z-index: -1;
+  background: conic-gradient(from 0deg at 50% 50%,
+    rgba(255,107,0,0.04) 0%,
+    transparent 25%,
+    rgba(139,92,246,0.03) 50%,
+    transparent 75%,
+    rgba(255,107,0,0.04) 100%);
+  animation: oa-conic-spin 60s linear infinite;
+  pointer-events: none;
+}
+@keyframes oa-conic-spin {
+  0%   { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+/* MORE-FEATURES — two drifting orbs with different speeds, opposite
+   directions. Adds depth without distracting from content. */
+#more-features {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+}
+#more-features::before {
+  background-size: 36px 36px;
+  animation: oa-dots-drift 44s linear infinite;
+}
+#more-features::after {
+  content: "";
+  position: absolute;
+  width: 400px; height: 400px;
+  left: -100px; top: 20%;
+  background: radial-gradient(circle, rgba(139,92,246,0.08), transparent 70%);
+  border-radius: 50%;
+  animation: oa-orb-drift-a 22s ease-in-out infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+@keyframes oa-orb-drift-a {
+  0%,100% { transform: translate(0,0)    scale(1); }
+  50%     { transform: translate(60px,30px) scale(1.1); }
+}
+
+/* CREDITS — gentle background pulse with golden hue. */
+#credits::before {
+  background-size: 30px 30px;
+  animation: oa-dots-drift 50s linear infinite;
+}
+#credits::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(ellipse at 50% 50%,
+    rgba(245,158,11,0.04), transparent 60%);
+  animation: oa-spotlight-breathe 10s ease-in-out infinite;
+  z-index: -1;
+  pointer-events: none;
+}
+
+/* LICENSE — already has oa-stripe-shift. Add a slow second-layer
+   warning pulse so the section reads as ACTIVE rather than static. */
+#license::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: radial-gradient(ellipse at 50% 100%,
+    rgba(239,68,68,0.05), transparent 60%);
+  animation: oa-spotlight-breathe 9s ease-in-out infinite;
+  pointer-events: none;
+}
+
+/* Reduced-motion users: stop every continuous animation we added. */
+@media (prefers-reduced-motion: reduce) {
+  #install::before, #providers::before, #providers::after,
+  #features::before, #commands::before, #commands::after,
+  #tools::before, #more-features::before, #more-features::after,
+  #credits::before, #credits::after, #license::before {
+    animation: none !important;
   }
 }
 </style>
