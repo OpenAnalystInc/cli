@@ -16,7 +16,7 @@
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
-        <span data-version-prefix="Documentation v">Documentation v2.0.26</span>
+        <span data-version-prefix="Documentation v">Documentation v2.0.30</span>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Documentation</div>
@@ -38,6 +38,8 @@
         <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
         <a href="configuration.html" class="sidebar-link">Configuration</a>
         <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="server-api.html" class="sidebar-link">Server API</a>
+        
         <a href="architecture.html" class="sidebar-link">Architecture</a>
       </div>
     </nav>
@@ -52,26 +54,32 @@
 
       <h2 id="supported">Supported Providers</h2>
 
+      <div class="callout callout-tip">
+        <div class="callout-title">Recommended: OpenAnalyst account</div>
+        Run <code>openanalyst account login</code> for OTP-based sign-in. Create a free account at <a href="https://10x.in" target="_blank" rel="noopener">10x.in</a> to get free credits plus access to the skills and plugins catalogs. For other providers, bring your own API key via env vars.
+      </div>
+
       <div class="card-grid">
         <div class="card">
           <h3>OpenAnalyst <span class="badge-sm badge-blue">Default</span></h3>
           <p>OpenAnalyst's live routed catalog with OpenAnalyst, GPT, Claude, Gemini, DeepSeek, Qwen, and free models fetched live.</p>
-          <p><code>OPENANALYST_API_KEY</code></p>
+          <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst account login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>OPENANALYST_API_KEY</code></p>
+          <p style="color:var(--oa-text-muted);font-size:12px;margin-top:4px">Free account + credits at <a href="https://10x.in" target="_blank" rel="noopener">10x.in</a>.</p>
         </div>
         <div class="card">
           <h3>Anthropic / Claude</h3>
           <p>Claude Opus 4.6, Sonnet 4.6, Haiku with extended thinking support.</p>
-          <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>ANTHROPIC_API_KEY</code></p>
+          <p style="margin-top:8px"><code>ANTHROPIC_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>OpenAI / Codex</h3>
           <p>GPT-5.4, GPT-4.1, GPT-4o, o3, o4 Mini, and Codex via direct OpenAI API.</p>
-          <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>OPENAI_API_KEY</code></p>
+          <p style="margin-top:8px"><code>OPENAI_API_KEY</code></p>
         </div>
         <div class="card">
-          <h3>Google Gemini <span class="badge-sm badge-green">OAuth</span></h3>
+          <h3>Google Gemini</h3>
           <p>Gemini 3.1 Pro, Gemini 3.1 Flash with live model discovery.</p>
-          <p style="margin-top:8px"><span class="badge-sm badge-green">openanalyst login</span> <span style="color:var(--oa-text-muted);font-size:12px">or</span> <code>GEMINI_API_KEY</code></p>
+          <p style="margin-top:8px"><code>GEMINI_API_KEY</code></p>
         </div>
         <div class="card">
           <h3>xAI / Grok</h3>

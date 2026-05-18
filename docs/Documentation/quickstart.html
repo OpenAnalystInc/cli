@@ -16,7 +16,7 @@
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
-        <span data-version-prefix="Documentation v">Documentation v2.0.26</span>
+        <span data-version-prefix="Documentation v">Documentation v2.0.30</span>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Documentation</div>
@@ -38,6 +38,8 @@
         <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
         <a href="configuration.html" class="sidebar-link">Configuration</a>
         <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="server-api.html" class="sidebar-link">Server API</a>
+        
         <a href="architecture.html" class="sidebar-link">Architecture</a>
       </div>
     </nav>
@@ -53,15 +55,26 @@
       <div class="steps">
 
         <div class="step">
-          <h3>Login to a Provider</h3>
-          <p>Run the interactive login command to authenticate with your preferred provider:</p>
-          <pre><code>openanalyst login</code></pre>
-          <p>This opens the provider picker. OpenAnalyst, Anthropic, OpenAI, xAI, OpenRouter, Bedrock, and Stability use interactive API-key login. Gemini supports either browser OAuth or API key login. Credentials are saved to <code>~/.openanalyst/credentials.json</code> and mirrored into <code>~/.openanalyst/.env</code>.</p>
+          <h3>Install the CLI</h3>
+          <p>If you haven't already, install OpenAnalyst CLI for your platform.</p>
+          <pre><code>npm install -g @openanalystai/openanalyst-cli</code></pre>
+          <p>See the <a href="installation.html">Installation</a> page for Homebrew, winget, and direct binary downloads.</p>
+        </div>
+
+        <div class="step">
+          <h3>Sign in to Your Account</h3>
+          <p>Create a free account at <a href="https://10x.in" target="_blank" rel="noopener">https://10x.in</a> if you don't have one, then sign in via email + OTP:</p>
+          <pre><code>openanalyst account login</code></pre>
+          <p>Enter your email, then paste the 6-digit code we send you. Signing in unlocks credits-based access to the full OpenAnalyst-routed catalog on one balance &mdash; Beta, Max, GPT-5, Claude Opus, Gemini Pro, and Grok &mdash; with free credits granted on signup.</p>
           <div class="callout callout-tip">
-            <div class="callout-title">OpenAnalyst Default</div>
-            OpenAnalyst is the default provider. Use the free model path in login for instant access, or attach your own OpenAnalyst API key for paid usage and hosted session workflows.
+            <div class="callout-title">Check your balance</div>
+            Run <code>openanalyst account status</code> to see the signed-in email and current credit balance.
           </div>
-          <p>Alternatively, set API keys directly:</p>
+
+          <h4 style="margin-top:1.5rem;">Alternative: bring your own provider key</h4>
+          <p>If you prefer to use your own provider keys (Anthropic, OpenAI, Gemini, xAI, OpenRouter, Bedrock, Stability), run the interactive provider picker:</p>
+          <pre><code>openanalyst login</code></pre>
+          <p>Or set keys directly in your environment:</p>
           <pre><code><span class="token-comment"># Edit ~/.openanalyst/.env</span>
 OPENANALYST_API_KEY=sk-oa-...
 ANTHROPIC_API_KEY=sk-ant-...
@@ -149,7 +162,7 @@ openanalyst --serve 3080</code></pre>
       <table>
         <thead><tr><th>Flag</th><th>Description</th></tr></thead>
         <tbody>
-          <tr><td><code>--model &lt;name&gt;</code></td><td>Use a specific model (e.g., <code>opus</code>, <code>gpt-4o</code>, <code>gemini-2.5-pro</code>)</td></tr>
+          <tr><td><code>--model &lt;name&gt;</code></td><td>Use a specific model (e.g., <code>opus</code>, <code>gpt-4o</code>, <code>gemini-3-pro</code>)</td></tr>
           <tr><td><code>--notui</code></td><td>Disable the TUI and run the backend CLI directly</td></tr>
           <tr><td><code>--serve [port]</code></td><td>Expose hosted HTTP session endpoints for remote users</td></tr>
           <tr><td><code>--permission-mode &lt;mode&gt;</code></td><td>Set permission level: <code>read-only</code>, <code>workspace-write</code>, <code>danger-full-access</code></td></tr>

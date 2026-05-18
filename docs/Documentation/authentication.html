@@ -16,7 +16,7 @@
           <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
-        <span data-version-prefix="Documentation v">Documentation v2.0.26</span>
+        <span data-version-prefix="Documentation v">Documentation v2.0.30</span>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Documentation</div>
@@ -38,6 +38,8 @@
         <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
         <a href="configuration.html" class="sidebar-link">Configuration</a>
         <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="server-api.html" class="sidebar-link">Server API</a>
+        
         <a href="architecture.html" class="sidebar-link">Architecture</a>
       </div>
     </nav>
@@ -47,7 +49,7 @@
       <div class="page-header">
         <span class="badge">Getting Started</span>
         <h1>Authentication</h1>
-        <p class="subtitle">Connect to any LLM provider using interactive login, API keys, or environment variables.</p>
+        <p class="subtitle">Three ways to give the CLI credentials &mdash; OpenAnalyst account login, an <code>sk-oa-v1-*</code> key, or your own per-provider API keys. Mix and match.</p>
       </div>
 
       <h2 id="methods">Authentication Methods</h2>
@@ -55,109 +57,137 @@
       <div class="card-grid">
         <div class="card">
           <div class="card-icon">&#128273;</div>
-          <h3>Interactive Login</h3>
-          <p>Use the built-in picker flow to choose a provider, paste a key, and optionally set a default model.</p>
+          <h3>OpenAnalyst Account Login</h3>
+          <p><strong>Recommended.</strong> Email + 6-digit OTP. Frontier models on one credit balance, plus skills &amp; plugins from <a href="https://10x.in" target="_blank" rel="noopener">10x.in</a>.</p>
         </div>
         <div class="card">
           <div class="card-icon">&#128272;</div>
-          <h3>API Key</h3>
-          <p>Set environment variables or edit <code>.env</code> file directly.</p>
+          <h3>OpenAnalyst API Key</h3>
+          <p>Long-lived <code>sk-oa-v1-*</code> key from <a href="https://10x.in" target="_blank" rel="noopener">10x.in</a> &rarr; Dashboard &rarr; API Keys. Same catalog, static credential.</p>
         </div>
         <div class="card">
           <div class="card-icon">&#128196;</div>
-          <h3>Credentials File</h3>
-          <p>Saved automatically by <code>openanalyst login</code> to <code>~/.openanalyst/credentials.json</code>.</p>
+          <h3>Bring Your Own Keys (BYOP)</h3>
+          <p>Your own Anthropic, OpenAI, Gemini, xAI, OpenRouter, or Bedrock keys. Set as env vars or in <code>~/.openanalyst/.env</code>.</p>
         </div>
       </div>
 
-      <h2 id="oauth">Interactive Login</h2>
-      <p>The recommended way to authenticate. OpenAnalyst, Anthropic, OpenAI, xAI, OpenRouter, Bedrock, and Stability use interactive API-key login. Google Gemini supports either browser OAuth or API key login.</p>
+      <h2 id="account-login">1. OpenAnalyst Account Login (recommended)</h2>
+      <p>The fastest path from a fresh install to a working AI call. One credential covers every frontier model the CLI knows about, billed against a single credit balance you can top up at <a href="https://10x.in" target="_blank" rel="noopener">10x.in</a>.</p>
 
       <div class="callout callout-tip">
-        <div class="callout-title">Current Login Options</div>
-        Most providers use interactive API-key login. Gemini also offers browser OAuth for users who prefer signing in with Google.
+        <div class="callout-title">Don't have an account yet?</div>
+        <a href="https://10x.in" target="_blank" rel="noopener">Sign up at <strong>10x.in</strong></a> &mdash; it's free, takes 30 seconds, and new accounts get free credits to try the CLI immediately. You'll also get access to <a href="https://10x.in/skills" target="_blank" rel="noopener">10x.in/skills</a> (curated slash commands) and <a href="https://10x.in/plugins" target="_blank" rel="noopener">10x.in/plugins</a> (CRM, deploy, doc-reader tools).
       </div>
 
-      <pre><code><span class="token-comment"># Interactive provider picker</span>
-openanalyst login
+      <pre><code><span class="token-comment"># Sign in with email + OTP &mdash; no browser, no API key</span>
+openanalyst account login
 
-<span class="token-comment"># Login to a specific provider</span>
-openanalyst login --provider anthropic
+<span class="token-comment"># Skip the email prompt</span>
+openanalyst account login --email you@example.com
 
-<span class="token-comment"># Check logged-in providers</span>
-openanalyst whoami</code></pre>
+<span class="token-comment"># See plan + credits anytime</span>
+openanalyst account status
 
-      <h3>How Interactive Login Works</h3>
+<span class="token-comment"># Sign out</span>
+openanalyst account logout</code></pre>
+
+      <h3>How the OTP flow works</h3>
       <ol>
-        <li>You run <code>openanalyst login</code> and pick a provider</li>
-        <li>The CLI opens the right interactive flow for that provider</li>
-        <li>For Gemini, you can choose browser OAuth or paste a <code>GEMINI_API_KEY</code></li>
-        <li>For other providers, you paste the provider key directly into the picker flow</li>
-        <li>Credentials are stored in <code>~/.openanalyst/credentials.json</code> and mirrored into <code>~/.openanalyst/.env</code></li>
+        <li>The CLI asks for your email.</li>
+        <li>It hits <code>POST ai.10x.in/v2/auth/passwordless/start</code> &mdash; a 6-digit code is emailed to you.</li>
+        <li>You paste the code; the CLI hits <code>POST ai.10x.in/v2/auth/passwordless/confirm</code>.</li>
+        <li>On success the dedicated OpenAnalyst access token is stored locally in <code>~/.openanalyst/credentials.json</code> as <code>OPENANALYST_AUTH_TOKEN</code> with <code>auth_method=&quot;oauth&quot;</code>.</li>
+        <li>Subsequent CLI runs pick it up automatically &mdash; inference flows through <code>api.openanalyst.com/api/v1</code> with that token as a Bearer.</li>
       </ol>
 
       <div class="callout callout-info">
-        <div class="callout-title">Security</div>
-        Gemini browser OAuth uses <strong>PKCE</strong> (Proof Key for Code Exchange). API-key providers stay local to your OpenAnalyst config files unless you explicitly export them elsewhere.
+        <div class="callout-title">Token lifetime</div>
+        The CLI-issued access token expires after ~1 hour. The web console (<code>openanalyst --serve</code> &rarr; Settings &rarr; Account) auto-refreshes it. For the pure-CLI path, just re-run <code>openanalyst account login</code> if you see a 401 &mdash; the round trip takes about 10 seconds.
       </div>
 
-      <h2 id="api-keys">API Key Authentication</h2>
-      <p>Set API keys via environment variables or the <code>.env</code> file:</p>
+      <h2 id="api-key">2. OpenAnalyst API Key</h2>
+      <p>Prefer a long-lived static credential? Mint an <code>sk-oa-v1-*</code> key at <a href="https://10x.in" target="_blank" rel="noopener">10x.in</a> &rarr; Dashboard &rarr; API Keys, then expose it:</p>
+
+      <div class="code-title">Shell or ~/.openanalyst/.env</div>
+      <pre><code><span class="token-comment"># Either as an env var</span>
+export OPENANALYST_API_KEY=sk-oa-v1-...
+
+<span class="token-comment"># Or persist once in the dotenv file</span>
+echo <span class="token-string">"OPENANALYST_API_KEY=sk-oa-v1-..."</span> &gt;&gt; ~/.openanalyst/.env</code></pre>
+
+      <p>Same model catalog, same credits as the account-login path &mdash; just authenticated with a static key instead of a session. The API key is sent as <code>x-api-key</code>; the OAuth token is sent as <code>Authorization: Bearer</code>. The OpenAnalyst gateway accepts both schemes interchangeably.</p>
+
+      <h2 id="byop">3. Bring Your Own Provider Keys (BYOP)</h2>
+      <p>Already pay Anthropic / OpenAI / Gemini / xAI directly and want to use those keys? Fully supported. The CLI auto-discovers what's available based on which env vars are set and surfaces only the models you can actually use.</p>
 
       <div class="code-title">~/.openanalyst/.env</div>
-      <pre><code><span class="token-comment"># OpenAnalyst (default provider)</span>
-OPENANALYST_API_KEY=your-openanalyst-key
-OPENANALYST_BASE_URL=https://api.openanalyst.com/api
-
-<span class="token-comment"># Anthropic / Claude</span>
+      <pre><code><span class="token-comment"># Anthropic / Claude</span>
 ANTHROPIC_API_KEY=sk-ant-api03-...
 
 <span class="token-comment"># OpenAI / GPT / Codex</span>
 OPENAI_API_KEY=sk-...
 
-<span class="token-comment"># Google Gemini (also supports OAuth: openanalyst login)</span>
+<span class="token-comment"># Google Gemini</span>
 GEMINI_API_KEY=AIzaSy...
 
 <span class="token-comment"># xAI / Grok</span>
 XAI_API_KEY=xai-...
 
-<span class="token-comment"># OpenRouter (350+ models)</span>
+<span class="token-comment"># OpenRouter (350+ models behind one key)</span>
 OPENROUTER_API_KEY=sk-or-v1-...
 
 <span class="token-comment"># Amazon Bedrock</span>
-BEDROCK_API_KEY=your-bedrock-key</code></pre>
+BEDROCK_API_KEY=your-bedrock-key
+
+<span class="token-comment"># Image generation</span>
+STABILITY_API_KEY=...
+GEMINI_IMAGE_API_KEY=...   <span class="token-comment"># or reuse GEMINI_API_KEY</span>
+OPENAI_IMAGE_API_KEY=...   <span class="token-comment"># or reuse OPENAI_API_KEY</span>
+
+<span class="token-comment"># Web search (used by /scrape and the WebSearch tool)</span>
+BRAVE_SEARCH_API_KEY=...
+TAVILY_API_KEY=...
+SERPER_API_KEY=...
+EXA_API_KEY=...</code></pre>
+
+      <p>You can mix BYOP with an OpenAnalyst login. Both work side-by-side; you choose per-session which one inference uses via the <code>--model</code> flag (the CLI picks the right credential for the model you name) or via the web console's Settings &rarr; Account &rarr; &quot;Use account login / Use API key&quot; chooser.</p>
 
       <h2 id="resolution">Provider Resolution Order</h2>
-      <p>When you specify a model, OpenAnalyst resolves the provider and auth in this order:</p>
+      <p>When you name a model with <code>-m</code> or the <code>/model</code> slash command, the CLI picks the credential like this:</p>
 
       <table>
-        <thead><tr><th>Model</th><th>Provider</th><th>Auth Variable</th><th>Fallback</th></tr></thead>
+        <thead><tr><th>Model alias</th><th>Provider</th><th>Auth (in order)</th></tr></thead>
         <tbody>
-          <tr><td><code>openanalyst-beta</code></td><td>OpenAnalyst</td><td><code>OPENANALYST_API_KEY</code></td><td><code>OPENANALYST_AUTH_TOKEN</code> (legacy alias)</td></tr>
-          <tr><td><code>opus</code>, <code>sonnet</code>, <code>haiku</code></td><td>Anthropic</td><td><code>ANTHROPIC_API_KEY</code></td><td>&mdash;</td></tr>
-          <tr><td><code>gpt-4o</code>, <code>o3</code>, <code>codex-mini</code></td><td>OpenAI</td><td><code>OPENAI_API_KEY</code></td><td>&mdash;</td></tr>
-          <tr><td><code>gemini-2.5-pro</code></td><td>Google</td><td><code>GEMINI_API_KEY</code></td><td>&mdash;</td></tr>
-          <tr><td><code>grok-3</code></td><td>xAI</td><td><code>XAI_API_KEY</code></td><td>&mdash;</td></tr>
-          <tr><td><code>openrouter/*</code></td><td>OpenRouter</td><td><code>OPENROUTER_API_KEY</code></td><td>&mdash;</td></tr>
-          <tr><td><code>bedrock/*</code></td><td>Bedrock</td><td><code>BEDROCK_API_KEY</code></td><td>&mdash;</td></tr>
+          <tr><td><code>openanalyst-beta</code>, <code>openanalyst-max</code></td><td>OpenAnalyst gateway</td><td><code>OPENANALYST_AUTH_TOKEN</code> (OAuth) &rarr; <code>OPENANALYST_API_KEY</code> (manual)</td></tr>
+          <tr><td><code>opus</code>, <code>sonnet</code>, <code>haiku</code></td><td>Anthropic <em>or</em> OpenAnalyst gateway</td><td>Direct: <code>ANTHROPIC_API_KEY</code> &middot; via OA: routed automatically</td></tr>
+          <tr><td><code>claude-opus-4-6</code>, <code>claude-sonnet-4-6</code></td><td>Anthropic (direct)</td><td><code>ANTHROPIC_API_KEY</code></td></tr>
+          <tr><td><code>gpt-5</code>, <code>gpt-4.1</code>, <code>o3</code>, <code>o4-mini</code></td><td>OpenAI <em>or</em> OpenAnalyst gateway</td><td>Direct: <code>OPENAI_API_KEY</code> &middot; via OA: routed automatically</td></tr>
+          <tr><td><code>gemini-3-pro</code>, <code>gemini-3-flash</code></td><td>Google <em>or</em> OpenAnalyst gateway</td><td>Direct: <code>GEMINI_API_KEY</code> &middot; via OA: routed automatically</td></tr>
+          <tr><td><code>grok-4</code>, <code>grok-4-fast</code></td><td>xAI <em>or</em> OpenAnalyst gateway</td><td>Direct: <code>XAI_API_KEY</code> &middot; via OA: routed automatically</td></tr>
+          <tr><td><code>openrouter/*</code></td><td>OpenRouter</td><td><code>OPENROUTER_API_KEY</code></td></tr>
+          <tr><td><code>bedrock/*</code></td><td>Bedrock</td><td><code>BEDROCK_API_KEY</code></td></tr>
         </tbody>
       </table>
 
       <h2 id="credentials-file">Credentials File</h2>
-      <p>After <code>openanalyst login</code>, credentials are saved to:</p>
+      <p>All credentials &mdash; both <code>account login</code> tokens and manually-pasted keys &mdash; live in:</p>
       <pre><code>~/.openanalyst/credentials.json</code></pre>
-      <p>This file can contain provider API keys, auth tokens, and provider metadata. It is automatically managed &mdash; you should not edit it manually.</p>
+      <p>Schema: one entry per provider, each carrying an encrypted secret, <code>auth_method</code> (<code>oauth</code> for OTP-issued tokens, <code>api_key</code> for manual keys), and metadata (email, expiry, refresh cookie for OAuth). The file is automatically managed &mdash; do not edit it by hand.</p>
 
       <div class="callout callout-warning">
-        <div class="callout-title">Warning</div>
-        Never commit <code>credentials.json</code> or <code>.env</code> to version control. The <code>~/.openanalyst/</code> directory should remain private.
+        <div class="callout-title">Never commit credentials</div>
+        Don't commit <code>credentials.json</code> or <code>.env</code> to version control. The entire <code>~/.openanalyst/</code> directory should stay local. Credentials are encrypted at rest using a per-machine key, but anything committed to a repo is effectively public the moment it's pushed.
       </div>
 
-      <h2 id="logout">Logging Out</h2>
-      <pre><code><span class="token-comment"># Logout from all providers</span>
+      <h2 id="logout">Signing Out</h2>
+      <pre><code><span class="token-comment"># Sign out of your OpenAnalyst account</span>
+openanalyst account logout
+
+<span class="token-comment"># Wipe ALL credentials (account + BYOP keys)</span>
 openanalyst logout
 
-<span class="token-comment"># Or from within the TUI</span>
+<span class="token-comment"># From within the TUI</span>
 /logout</code></pre>
 
       <div class="page-footer">

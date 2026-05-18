@@ -1,0 +1,559 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Server API - OpenAnalyst CLI Docs</title>
+  <meta name="description" content="Run OpenAnalyst as a headless HTTP server with real-time SSE streaming, session management, and full AI agent capabilities.">
+  <link rel="stylesheet" href="styles.css">
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+</head>
+<body>
+  <div class="docs-layout">
+    <nav class="sidebar">
+      <div class="sidebar-logo">
+        <a href="../index.html">
+          <img src="https://openanalyst.com/images/new-logo.png" alt="OA">
+          <h2>OpenAnalyst CLI</h2>
+        </a>
+        <span data-version-prefix="Documentation v">Documentation v2.0.30</span>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Documentation</div>
+        <a href="index.html" class="sidebar-link">Introduction</a>
+        <a href="installation.html" class="sidebar-link">Installation</a>
+        <a href="quickstart.html" class="sidebar-link">Quick Start</a>
+        <a href="authentication.html" class="sidebar-link">Authentication</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Core Concepts</div>
+        <a href="providers.html" class="sidebar-link">LLM Providers</a>
+        <a href="tui.html" class="sidebar-link">Terminal UI</a>
+        <a href="commands.html" class="sidebar-link">Slash Commands</a>
+        <a href="tools.html" class="sidebar-link">Built-in Tools</a>
+      </div>
+      <div class="sidebar-section">
+        <div class="sidebar-section-title">Advanced</div>
+        <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
+        <a href="configuration.html" class="sidebar-link">Configuration</a>
+        <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="server-api.html" class="sidebar-link active">Server API</a>
+        <a href="architecture.html" class="sidebar-link">Architecture</a>
+      </div>
+    </nav>
+
+    <main class="main-content">
+      <div class="page-header">
+        <span class="badge">Advanced</span>
+        <h1>Server API</h1>
+        <p class="subtitle">Run OpenAnalyst as a headless HTTP server with real-time SSE streaming, session management, and full AI agent capabilities.</p>
+      </div>
+
+      <!-- Getting Started -->
+      <h2 id="getting-started">Getting Started</h2>
+      <p>Start OpenAnalyst in server mode with the <code>--serve</code> flag. The server listens on port <strong>3080</strong> by default and exposes a full REST + SSE API for programmatic access to all AI agent capabilities.</p>
+
+      <div class="code-title">Start the server</div>
+      <pre><code><span class="token-comment"># Default port (3080)</span>
+openanalyst --serve
+
+<span class="token-comment"># Custom port</span>
+openanalyst --serve 8080</code></pre>
+
+      <p>On startup, the server:</p>
+      <ul>
+        <li>Creates an <strong>owner user</strong> automatically (single-tenant mode)</li>
+        <li>Auto-loads provider API keys from environment variables (<code>ANTHROPIC_API_KEY</code>, <code>OPENAI_API_KEY</code>, etc.)</li>
+        <li>Enables <strong>CORS</strong> for browser clients</li>
+        <li>Requires <strong>no authentication</strong> by default &mdash; zero-friction setup</li>
+      </ul>
+
+      <div class="callout callout-tip">
+        <div class="callout-title">Quick test</div>
+        Once the server is running, verify with: <code>curl http://localhost:3080/health</code> &mdash; you should see <code>{"status":"ok"}</code>.
+      </div>
+
+      <!-- Authentication Model -->
+      <h2 id="authentication">Authentication Model</h2>
+      <p>The server supports two operating modes depending on your deployment needs:</p>
+
+      <h3 id="single-tenant">Single-Tenant (Default)</h3>
+      <p>No authentication required. All requests default to the <strong>owner</strong> user. One user, one server, zero friction. Ideal for local development, CI/CD pipelines, and personal automation.</p>
+
+      <div class="code-title">Single-tenant request</div>
+      <pre><code><span class="token-comment"># No headers needed &mdash; you're the owner</span>
+curl http://localhost:3080/health
+curl http://localhost:3080/me
+curl http://localhost:3080/sessions</code></pre>
+
+      <h3 id="multi-tenant">Multi-Tenant</h3>
+      <p>Pass the <code>X-Tenant-ID</code> header to isolate sessions, conversations, and workspace directories per tenant. Each tenant gets a sandboxed environment with no access to other tenants' data.</p>
+
+      <div class="code-title">Multi-tenant request</div>
+      <pre><code><span class="token-comment"># Each tenant is fully isolated</span>
+curl -H <span class="token-string">"X-Tenant-ID: team-alpha"</span> http://localhost:3080/sessions
+curl -H <span class="token-string">"X-Tenant-ID: team-beta"</span> http://localhost:3080/sessions</code></pre>
+
+      <div class="callout callout-info">
+        <div class="callout-title">Enterprise pattern</div>
+        The server is designed as a single-tenant core that you wrap with your own auth middleware. Add your own JWT verification, OAuth, or API key validation in front of the server &mdash; then pass <code>X-Tenant-ID</code> from your middleware to the server.
+      </div>
+
+      <!-- API Reference -->
+      <h2 id="api-reference">API Reference</h2>
+      <p>Complete list of all endpoints exposed by the server.</p>
+
+      <h3 id="endpoints-health">Health &amp; User</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET</code></td><td><code>/health</code></td><td>Health check &mdash; returns <code>{"status":"ok"}</code></td></tr>
+          <tr><td><code>GET</code></td><td><code>/me</code></td><td>Get current user info</td></tr>
+          <tr><td><code>GET</code></td><td><code>/api/ai/account</code></td><td>Get account details (email, plan, credits)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="endpoints-providers">Provider Management</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET</code></td><td><code>/me/providers</code></td><td>List configured provider credentials</td></tr>
+          <tr><td><code>PUT</code></td><td><code>/me/providers/{name}</code></td><td>Add or update a provider API key</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="endpoints-chat">Quick Chat</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>POST</code></td><td><code>/v1/chat</code></td><td>Simple chat &mdash; send a message, get SSE response</td></tr>
+          <tr><td><code>POST</code></td><td><code>/v1/query</code></td><td>Alias for <code>/v1/chat</code></td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="endpoints-skills">Skills</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>GET</code></td><td><code>/v1/skills</code></td><td>List all available skills</td></tr>
+          <tr><td><code>POST</code></td><td><code>/v1/skills/match</code></td><td>Find skills matching a query</td></tr>
+          <tr><td><code>POST</code></td><td><code>/v1/skills/execute</code></td><td>Execute matched skills</td></tr>
+          <tr><td><code>POST</code></td><td><code>/v1/skills/{name}/run</code></td><td>Run a specific skill by name</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="endpoints-sessions">Sessions</h3>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>POST</code></td><td><code>/sessions</code></td><td>Create a new persistent session</td></tr>
+          <tr><td><code>GET</code></td><td><code>/sessions</code></td><td>List all sessions for the user</td></tr>
+          <tr><td><code>GET</code></td><td><code>/sessions/{id}</code></td><td>Get session details + conversation history</td></tr>
+          <tr><td><code>DELETE</code></td><td><code>/sessions/{id}</code></td><td>Delete a session and its data</td></tr>
+          <tr><td><code>POST</code></td><td><code>/sessions/{id}/message</code></td><td>Send a message to a session (SSE response)</td></tr>
+          <tr><td><code>GET</code></td><td><code>/sessions/{id}/events</code></td><td>Subscribe to real-time session events (SSE)</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="endpoints-account">OpenAnalyst Account</h3>
+      <p>Email + 6-digit OTP login flow. On successful verification the server stores an OAuth credential locally and uses it automatically for inference &mdash; clients never see the token.</p>
+      <table>
+        <thead><tr><th>Method</th><th>Path</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>POST</code></td><td><code>/me/auth/otp/start</code></td><td>Send a 6-digit code to an email address</td></tr>
+          <tr><td><code>POST</code></td><td><code>/me/auth/otp/verify</code></td><td>Exchange the code for a stored OAuth session</td></tr>
+          <tr><td><code>GET</code></td><td><code>/me/auth/status</code></td><td>Current sign-in state, plan, and credit balance</td></tr>
+          <tr><td><code>POST</code></td><td><code>/me/auth/logout</code></td><td>Wipe the stored OAuth credential (<code>204</code>)</td></tr>
+          <tr><td><code>PUT</code></td><td><code>/me/providers/openanalyst/preferred-source</code></td><td>Choose <code>oauth</code> vs <code>manual</code> key (<code>204</code>)</td></tr>
+        </tbody>
+      </table>
+
+      <!-- Quick Chat -->
+      <h2 id="quick-chat">Quick Chat</h2>
+      <p>The simplest way to use the server. Send a message and receive a streaming SSE response as the AI types. No session management required &mdash; fire and forget.</p>
+
+      <div class="code-title">curl</div>
+      <pre><code>curl -X POST http://localhost:3080/v1/chat \
+  -H <span class="token-string">"Content-Type: application/json"</span> \
+  -d <span class="token-string">'{"message": "Explain Rust ownership in 3 sentences"}'</span></code></pre>
+
+      <p>The response is an SSE stream with <code>assistant_delta</code> events as the AI generates text in real time.</p>
+
+      <h3 id="chat-options">Optional Fields</h3>
+      <div class="param-table">
+        <div class="param-row">
+          <span class="param-name">message</span>
+          <span class="param-type">string</span>
+          <span class="param-required">Required</span>
+          <span class="param-desc">The prompt or question to send to the AI</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">model</span>
+          <span class="param-type">string</span>
+          <span class="param-optional">Optional</span>
+          <span class="param-desc">Override the model (e.g., <code>"gpt-4o"</code>, <code>"claude-sonnet-4-6"</code>)</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">system_prompt</span>
+          <span class="param-type">string</span>
+          <span class="param-optional">Optional</span>
+          <span class="param-desc">Custom system prompt for this request</span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">effort</span>
+          <span class="param-type">string</span>
+          <span class="param-optional">Optional</span>
+          <span class="param-desc">Thinking effort level: <code>"low"</code>, <code>"medium"</code>, <code>"high"</code>, <code>"max"</code></span>
+        </div>
+        <div class="param-row">
+          <span class="param-name">stream</span>
+          <span class="param-type">boolean</span>
+          <span class="param-optional">Optional</span>
+          <span class="param-desc">Default <code>true</code>. Set to <code>false</code> for a non-streaming JSON response</span>
+        </div>
+      </div>
+
+      <div class="code-title">With options</div>
+      <pre><code>curl -X POST http://localhost:3080/v1/chat \
+  -H <span class="token-string">"Content-Type: application/json"</span> \
+  -d <span class="token-string">'{
+    "message": "Write a Python web scraper for Hacker News",
+    "model": "claude-sonnet-4-6",
+    "effort": "high",
+    "system_prompt": "You are a senior Python developer. Write clean, typed code."
+  }'</span></code></pre>
+
+      <!-- OpenAnalyst Account -->
+      <h2 id="account">OpenAnalyst Account</h2>
+      <p>The server can sign the user into their OpenAnalyst account directly &mdash; no manual API key needed. The flow is email + 6-digit OTP. The resulting access token is stored in the local <code>provider_credentials</code> store with <code>auth_method="oauth"</code>, and all subsequent inference calls pick it up automatically. Clients never handle the token themselves; they only ever hit these local endpoints.</p>
+
+      <h3 id="account-start">Start the OTP flow</h3>
+      <div class="code-title">curl</div>
+      <pre><code>curl -X POST http://localhost:3080/me/auth/otp/start \
+  -H <span class="token-string">"Content-Type: application/json"</span> \
+  -d <span class="token-string">'{"email": "alice@example.com"}'</span></code></pre>
+
+      <p>Returns an opaque <code>challenge_id</code> to round-trip into <code>/verify</code>. A 6-digit code is emailed to the user.</p>
+
+      <div class="code-title">Response</div>
+      <pre><code>{
+  <span class="token-string">"challenge_id"</span>: <span class="token-string">"chl_..."</span>,
+  <span class="token-string">"code_delivery"</span>: { <span class="token-string">"destination"</span>: <span class="token-string">"a***@example.com"</span>, <span class="token-string">"delivery_medium"</span>: <span class="token-string">"EMAIL"</span> },
+  <span class="token-string">"expires_at"</span>: 1731000000000,
+  <span class="token-string">"rate_limited"</span>: false,
+  <span class="token-string">"retry_after_seconds"</span>: null
+}</code></pre>
+
+      <p>If <code>rate_limited</code> is <code>true</code>, wait <code>retry_after_seconds</code> before retrying.</p>
+
+      <h3 id="account-verify">Verify the code</h3>
+      <div class="code-title">curl</div>
+      <pre><code>curl -X POST http://localhost:3080/me/auth/otp/verify \
+  -H <span class="token-string">"Content-Type: application/json"</span> \
+  -d <span class="token-string">'{
+    "email": "alice@example.com",
+    "code": "123456",
+    "challenge_id": "chl_..."
+  }'</span></code></pre>
+
+      <p>On success, the server stores the OAuth credential and returns the same shape as <code>GET /me/auth/status</code> (see below). Inference calls now work without any further client setup.</p>
+
+      <h3 id="account-status">Check sign-in status</h3>
+      <div class="code-title">curl</div>
+      <pre><code>curl http://localhost:3080/me/auth/status</code></pre>
+
+      <p>Reports current sign-in state, plan, and credit balance. If the access token is within 60 seconds of expiry, the server refreshes it transparently before responding.</p>
+
+      <div class="code-title">Response</div>
+      <pre><code>{
+  <span class="token-string">"signed_in"</span>: true,
+  <span class="token-string">"email"</span>: <span class="token-string">"alice@example.com"</span>,
+  <span class="token-string">"expires_at"</span>: <span class="token-string">"2026-05-18T14:00:00Z"</span>,
+  <span class="token-string">"balance"</span>: {
+    <span class="token-string">"plan_name"</span>: <span class="token-string">"Pro"</span>,
+    <span class="token-string">"plan_limit"</span>: 1000,
+    <span class="token-string">"plan_used"</span>: 142,
+    <span class="token-string">"plan_remaining"</span>: 858,
+    <span class="token-string">"purchases_total"</span>: 0,
+    <span class="token-string">"purchases_remaining"</span>: 0,
+    <span class="token-string">"total_available"</span>: 858
+  },
+  <span class="token-string">"manual_key_present"</span>: false,
+  <span class="token-string">"preferred_source"</span>: <span class="token-string">"oauth"</span>
+}</code></pre>
+
+      <p>When signed out, <code>signed_in</code> is <code>false</code> and <code>email</code>, <code>expires_at</code>, and <code>balance</code> are <code>null</code>. <code>manual_key_present</code> reports whether a manual <code>sk-oa-v1-*</code> key is also configured.</p>
+
+      <h3 id="account-logout">Sign out</h3>
+      <div class="code-title">curl</div>
+      <pre><code>curl -X POST http://localhost:3080/me/auth/logout</code></pre>
+
+      <p>Wipes the stored OAuth credential. Returns <code>204 No Content</code>. A manual key (if configured) is left intact.</p>
+
+      <h3 id="account-preferred-source">Choose preferred source</h3>
+      <p>When both an OAuth login <strong>and</strong> a manual <code>sk-oa-v1-*</code> key are present, this picks which one inference uses. The choice is persisted in <code>provider_credentials</code>.</p>
+
+      <div class="code-title">curl</div>
+      <pre><code>curl -X PUT http://localhost:3080/me/providers/openanalyst/preferred-source \
+  -H <span class="token-string">"Content-Type: application/json"</span> \
+  -d <span class="token-string">'{"source": "oauth"}'</span>     <span class="token-comment"># or "manual"</span></code></pre>
+
+      <p>Returns <code>204 No Content</code>.</p>
+
+      <!-- Session-based Conversations -->
+      <h2 id="sessions-flow">Session-Based Conversations</h2>
+      <p>For multi-turn conversations with persistent history, use the session endpoints. Sessions preserve the full conversation context, tool results, and agent state across multiple interactions.</p>
+
+      <div class="steps">
+        <div class="step">
+          <h3>Create a session</h3>
+          <div class="code-title">curl</div>
+          <pre><code>curl -X POST http://localhost:3080/sessions \
+  -H <span class="token-string">"Content-Type: application/json"</span>
+
+<span class="token-comment"># Response:</span>
+<span class="token-comment"># {"session_id": "sess_abc123", "created_at": "2026-04-10T..."}</span></code></pre>
+        </div>
+        <div class="step">
+          <h3>Send messages</h3>
+          <div class="code-title">curl</div>
+          <pre><code>curl -X POST http://localhost:3080/sessions/sess_abc123/message \
+  -H <span class="token-string">"Content-Type: application/json"</span> \
+  -d <span class="token-string">'{"message": "Read the main.rs file and explain the architecture"}'</span>
+
+<span class="token-comment"># Returns SSE stream with assistant_delta, tool_call, tool_result events</span></code></pre>
+        </div>
+        <div class="step">
+          <h3>Subscribe to real-time events</h3>
+          <div class="code-title">curl</div>
+          <pre><code>curl -N http://localhost:3080/sessions/sess_abc123/events
+
+<span class="token-comment"># Long-lived SSE connection &mdash; receives all session events in real time</span></code></pre>
+        </div>
+        <div class="step">
+          <h3>Resume later</h3>
+          <div class="code-title">curl</div>
+          <pre><code><span class="token-comment"># Get full conversation history</span>
+curl http://localhost:3080/sessions/sess_abc123
+
+<span class="token-comment"># Continue the conversation</span>
+curl -X POST http://localhost:3080/sessions/sess_abc123/message \
+  -H <span class="token-string">"Content-Type: application/json"</span> \
+  -d <span class="token-string">'{"message": "Now refactor that module to use async/await"}'</span></code></pre>
+        </div>
+      </div>
+
+      <!-- SSE Event Types -->
+      <h2 id="sse-events">SSE Event Types</h2>
+      <p>All streaming responses use <strong>Server-Sent Events</strong> (SSE). Each event has a <code>type</code> field and a JSON <code>data</code> payload. Connect with any SSE client &mdash; <code>EventSource</code> in browsers, <code>curl -N</code> for testing, or any HTTP client with streaming support.</p>
+
+      <table>
+        <thead><tr><th>Event</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>snapshot</code></td><td>Initial session state on connect</td></tr>
+          <tr><td><code>message</code></td><td>Complete message added to conversation</td></tr>
+          <tr><td><code>assistant_delta</code></td><td>Streaming text chunk from the AI (most frequent event)</td></tr>
+          <tr><td><code>tool_call</code></td><td>AI invoked a tool (name, arguments)</td></tr>
+          <tr><td><code>tool_result</code></td><td>Tool execution result (output, duration, errors)</td></tr>
+          <tr><td><code>usage</code></td><td>Token usage update (input tokens, output tokens, cost)</td></tr>
+          <tr><td><code>state</code></td><td>Session state change (<code>thinking</code>, <code>tool_use</code>, <code>idle</code>)</td></tr>
+          <tr><td><code>error</code></td><td>Error occurred during processing</td></tr>
+        </tbody>
+      </table>
+
+      <h3 id="sse-format">Event Format</h3>
+      <p>Each SSE event follows the standard format with an <code>event:</code> line and a <code>data:</code> line containing JSON:</p>
+
+      <div class="code-title">SSE stream output</div>
+      <pre><code><span class="token-keyword">event:</span> assistant_delta
+<span class="token-keyword">data:</span> <span class="token-string">{"text": "Rust ownership ensures "}</span>
+
+<span class="token-keyword">event:</span> assistant_delta
+<span class="token-keyword">data:</span> <span class="token-string">{"text": "memory safety without garbage collection."}</span>
+
+<span class="token-keyword">event:</span> tool_call
+<span class="token-keyword">data:</span> <span class="token-string">{"tool_name": "read_file", "arguments": {"path": "src/main.rs"}}</span>
+
+<span class="token-keyword">event:</span> tool_result
+<span class="token-keyword">data:</span> <span class="token-string">{"tool_name": "read_file", "output": "fn main() {...}", "duration_ms": 12}</span>
+
+<span class="token-keyword">event:</span> usage
+<span class="token-keyword">data:</span> <span class="token-string">{"input_tokens": 1250, "output_tokens": 340, "cost_usd": 0.0087}</span>
+
+<span class="token-keyword">event:</span> state
+<span class="token-keyword">data:</span> <span class="token-string">{"state": "idle"}</span></code></pre>
+
+      <div class="callout callout-tip">
+        <div class="callout-title">Browser client</div>
+        Use the native <code>EventSource</code> API: <code>const es = new EventSource('/sessions/sess_abc123/events')</code> &mdash; events arrive automatically as they happen.
+      </div>
+
+      <!-- Provider Configuration -->
+      <h2 id="providers">Provider Configuration</h2>
+      <p>Configure AI provider API keys at runtime via the API, or set them as environment variables before starting the server. The server auto-detects all configured providers on startup.</p>
+
+      <h3 id="runtime-config">Runtime Configuration</h3>
+      <div class="code-title">curl</div>
+      <pre><code><span class="token-comment"># Add or update a provider key at runtime</span>
+curl -X PUT http://localhost:3080/me/providers/anthropic \
+  -H <span class="token-string">"Content-Type: application/json"</span> \
+  -d <span class="token-string">'{"api_key": "sk-ant-api03-..."}'</span>
+
+<span class="token-comment"># List all configured providers</span>
+curl http://localhost:3080/me/providers</code></pre>
+
+      <h3 id="env-vars">Environment Variables</h3>
+      <p>Set these before starting the server &mdash; they are auto-detected on startup:</p>
+
+      <div class="code-title">Shell</div>
+      <pre><code><span class="token-comment"># Set provider keys, then start</span>
+ANTHROPIC_API_KEY=sk-ant-... openanalyst --serve</code></pre>
+
+      <table>
+        <thead><tr><th>Environment Variable</th><th>Provider</th></tr></thead>
+        <tbody>
+          <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Anthropic (Claude)</td></tr>
+          <tr><td><code>OPENAI_API_KEY</code></td><td>OpenAI (GPT-4o, o1, o3)</td></tr>
+          <tr><td><code>GOOGLE_API_KEY</code> or <code>GEMINI_API_KEY</code></td><td>Google Gemini</td></tr>
+          <tr><td><code>XAI_API_KEY</code></td><td>xAI (Grok)</td></tr>
+          <tr><td><code>OPENROUTER_API_KEY</code></td><td>OpenRouter</td></tr>
+          <tr><td><code>AWS_ACCESS_KEY_ID</code></td><td>AWS Bedrock</td></tr>
+          <tr><td><code>OPENANALYST_API_KEY</code></td><td>OpenAnalyst hosted</td></tr>
+        </tbody>
+      </table>
+
+      <!-- Sandbox & Security -->
+      <h2 id="security">Sandbox &amp; Security</h2>
+      <p>The server enforces a strict sandbox model to prevent unintended access to the host system.</p>
+
+      <div class="card-grid">
+        <div class="feature-card">
+          <div class="icon">&#128274;</div>
+          <div class="content">
+            <h4>Owner Mode (Default)</h4>
+            <p>Tools operate in the server's working directory. Full access to the local filesystem within the workspace.</p>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="icon">&#128451;</div>
+          <div class="content">
+            <h4>Tenant Mode</h4>
+            <p>Each tenant gets an isolated workspace at <code>~/.openanalyst/server/workspaces/{tenant_id}/</code>. No cross-tenant access.</p>
+          </div>
+        </div>
+        <div class="feature-card">
+          <div class="icon">&#128737;</div>
+          <div class="content">
+            <h4>Sandboxed Permissions</h4>
+            <p>Tools can read and write within the workspace but cannot modify server files, system files, or other tenants' directories.</p>
+          </div>
+        </div>
+      </div>
+
+      <h3 id="available-tools">Available Tools</h3>
+      <p>The server exposes <strong>22 tools</strong> to the AI agent, all operating within the sandbox boundary:</p>
+      <ul>
+        <li><strong>File operations</strong> &mdash; <code>read_file</code>, <code>write_file</code>, <code>edit_file</code></li>
+        <li><strong>Search</strong> &mdash; <code>grep_search</code>, <code>glob_search</code></li>
+        <li><strong>Execution</strong> &mdash; <code>bash</code>, <code>powershell</code>, <code>repl</code></li>
+        <li><strong>Web</strong> &mdash; <code>web_search</code>, <code>web_fetch</code></li>
+        <li><strong>Code execution</strong> &mdash; Python, JavaScript, and shell code in a jailed subprocess</li>
+        <li><strong>Agent</strong> &mdash; <code>agent</code> (sub-agent spawning), <code>todo_write</code>, <code>notebook_edit</code></li>
+        <li><strong>And more</strong> &mdash; <code>skill</code>, <code>tool_search</code>, <code>config</code>, <code>structured_output</code>, <code>sleep</code>, <code>send_user_message</code></li>
+      </ul>
+
+      <div class="callout callout-warning">
+        <div class="callout-title">ExecuteCode sandbox</div>
+        Python, JavaScript, and shell code execution runs in a <strong>jailed subprocess</strong> with restricted filesystem access. The subprocess cannot escape the workspace boundary.
+      </div>
+
+      <!-- Building on Top -->
+      <h2 id="building">Building on Top</h2>
+
+      <div class="callout callout-info">
+        <div class="callout-title">Developer Guide</div>
+        The server is designed as a single-tenant core that enterprises can wrap with their own authentication, authorization, and multi-tenancy. Add your own auth middleware, rate limiting, and user management &mdash; the server handles all AI agent capabilities.
+      </div>
+
+      <p>Here is a minimal Python wrapper to get started:</p>
+
+      <div class="code-title">Python client</div>
+      <pre><code><span class="token-keyword">import</span> requests
+
+<span class="token-keyword">class</span> <span class="token-function">OpenAnalystClient</span>:
+    <span class="token-keyword">def</span> <span class="token-function">__init__</span>(self, base_url=<span class="token-string">"http://localhost:3080"</span>):
+        self.base = base_url
+
+    <span class="token-keyword">def</span> <span class="token-function">chat</span>(self, message, model=<span class="token-keyword">None</span>, effort=<span class="token-keyword">None</span>):
+        payload = {<span class="token-string">"message"</span>: message}
+        <span class="token-keyword">if</span> model: payload[<span class="token-string">"model"</span>] = model
+        <span class="token-keyword">if</span> effort: payload[<span class="token-string">"effort"</span>] = effort
+        <span class="token-keyword">return</span> requests.post(f<span class="token-string">"{self.base}/v1/chat"</span>, json=payload, stream=<span class="token-keyword">True</span>)
+
+    <span class="token-keyword">def</span> <span class="token-function">create_session</span>(self):
+        <span class="token-keyword">return</span> requests.post(f<span class="token-string">"{self.base}/sessions"</span>).json()
+
+    <span class="token-keyword">def</span> <span class="token-function">send_message</span>(self, session_id, message):
+        <span class="token-keyword">return</span> requests.post(
+            f<span class="token-string">"{self.base}/sessions/{session_id}/message"</span>,
+            json={<span class="token-string">"message"</span>: message},
+            stream=<span class="token-keyword">True</span>
+        )
+
+    <span class="token-keyword">def</span> <span class="token-function">get_history</span>(self, session_id):
+        <span class="token-keyword">return</span> requests.get(f<span class="token-string">"{self.base}/sessions/{session_id}"</span>).json()
+
+
+<span class="token-comment"># Usage</span>
+client = OpenAnalystClient()
+session = client.create_session()
+response = client.send_message(session[<span class="token-string">"session_id"</span>], <span class="token-string">"Analyze this codebase"</span>)</code></pre>
+
+      <div class="code-title">JavaScript client</div>
+      <pre><code><span class="token-keyword">class</span> <span class="token-function">OpenAnalystClient</span> {
+  <span class="token-function">constructor</span>(baseUrl = <span class="token-string">'http://localhost:3080'</span>) {
+    <span class="token-keyword">this</span>.base = baseUrl;
+  }
+
+  <span class="token-keyword">async</span> <span class="token-function">chat</span>(message, options = {}) {
+    <span class="token-keyword">return</span> fetch(`${<span class="token-keyword">this</span>.base}/v1/chat`, {
+      method: <span class="token-string">'POST'</span>,
+      headers: { <span class="token-string">'Content-Type'</span>: <span class="token-string">'application/json'</span> },
+      body: JSON.stringify({ message, ...options })
+    });
+  }
+
+  <span class="token-function">subscribeToSession</span>(sessionId, onEvent) {
+    <span class="token-keyword">const</span> es = <span class="token-keyword">new</span> EventSource(`${<span class="token-keyword">this</span>.base}/sessions/${sessionId}/events`);
+    es.addEventListener(<span class="token-string">'assistant_delta'</span>, e =&gt; onEvent(<span class="token-string">'delta'</span>, JSON.parse(e.data)));
+    es.addEventListener(<span class="token-string">'tool_call'</span>, e =&gt; onEvent(<span class="token-string">'tool'</span>, JSON.parse(e.data)));
+    es.addEventListener(<span class="token-string">'error'</span>, e =&gt; onEvent(<span class="token-string">'error'</span>, e));
+    <span class="token-keyword">return</span> es;
+  }
+}</code></pre>
+
+      <!-- 8-Provider Failover -->
+      <h2 id="failover">Automatic Provider Failover</h2>
+      <p>OpenAnalyst automatically fails over between configured providers. If a provider is rate-limited, returns an error, or times out, the next configured provider is tried transparently. Zero downtime for your API consumers.</p>
+
+      <p>All <strong>8 supported providers</strong> participate in the failover: OpenAnalyst, Anthropic, OpenAI, xAI, OpenRouter, Bedrock, Gemini, and Ollama (local). The engine determines the optimal failover order based on your configuration and availability. Your client code does not need to handle provider errors &mdash; the server retries automatically and returns the response as if nothing happened.</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-title">Best practice</div>
+        Configure at least <strong>2&ndash;3 providers</strong> for production deployments. If your primary provider (e.g., Anthropic) hits rate limits during peak traffic, the server seamlessly falls over to your secondary (e.g., OpenAI) with no client-side changes.
+      </div>
+
+      <div class="page-footer">
+        <a href="mcp.html">&larr; MCP Integration</a>
+        <a href="architecture.html">Architecture &rarr;</a>
+      </div>
+
+      <div class="docs-site-footer">
+        <span><strong>OpenAnalyst CLI</strong> &mdash; An independent, open-source AI agent for the terminal</span>
+        <span>Built by <strong>OpenAnalyst Inc</strong></span>
+      </div>
+    </main>
+  </div>
+<script src="../version.js"></script>
+</body>
+</html>
