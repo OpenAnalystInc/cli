@@ -12,10 +12,10 @@
     <nav class="sidebar">
       <div class="sidebar-logo">
         <a href="../index.html">
-          <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
+          <img src="../assets/openanalyst-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
-        <span data-version-prefix="Documentation v">Documentation v2.0.26</span>
+        <span data-version-prefix="Documentation v">Documentation v2.0.30</span>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Documentation</div>
@@ -36,6 +36,7 @@
         <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
         <a href="configuration.html" class="sidebar-link">Configuration</a>
         <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="server-api.html" class="sidebar-link">Server API</a>
         <a href="architecture.html" class="sidebar-link active">Architecture</a>
       </div>
     </nav>
@@ -99,8 +100,158 @@ GET  /sessions/{id}/events</code></pre>
         </tbody>
       </table>
 
+      <!-- ========== Provider Failover Chain ========== -->
+      <h2 id="failover">Automatic Provider Failover</h2>
+      <p>When a provider fails due to a rate limit, timeout, or unexpected error, the engine automatically attempts the next configured provider. This happens transparently &mdash; the caller never sees a provider-level failure unless every configured provider is exhausted.</p>
+
+      <ul>
+        <li>Each provider is only attempted if its API key is configured</li>
+        <li>Retries use intelligent backoff to avoid overwhelming providers</li>
+        <li>The chain resets on the next request &mdash; a previously-failed provider is tried again</li>
+        <li>Result: automatic high availability as long as at least one provider is healthy</li>
+      </ul>
+
+      <p>All 8 supported providers participate in the failover chain: <strong>OpenAnalyst</strong>, <strong>Anthropic</strong>, <strong>OpenAI</strong>, <strong>xAI</strong>, <strong>OpenRouter</strong>, <strong>Bedrock</strong>, <strong>Gemini</strong>, and <strong>Ollama</strong> (local). The engine determines the optimal order based on your configuration and availability.</p>
+
+      <div class="callout callout-tip">
+        <div class="callout-title">Tip</div>
+        Configure multiple provider keys for maximum resilience. The failover chain costs nothing when the primary provider is healthy &mdash; backup providers are only contacted on failure.
+      </div>
+
+      <!-- ========== Session Isolation ========== -->
+      <h2 id="isolation">Session Isolation</h2>
+      <p>Every session is fully isolated per user. The persistent store enforces strict boundaries &mdash; cross-tenant data access is impossible by design.</p>
+
+      <ul>
+        <li><strong>Per-user scoping</strong> &mdash; all data is partitioned by user identity, ensuring no tenant can see another tenant's sessions or conversations</li>
+        <li><strong>Concurrent access</strong> &mdash; the engine handles multiple simultaneous sessions safely without data corruption</li>
+        <li><strong>Clean deletion</strong> &mdash; removing a session automatically cleans up all related data (conversations, messages, metadata)</li>
+        <li><strong>Duplicate protection</strong> &mdash; the engine prevents race conditions when multiple requests target the same session simultaneously</li>
+      </ul>
+
+      <p>Each session carries the following information:</p>
+      <ul>
+        <li><code>session_id</code> &mdash; stable handle for the running agent session</li>
+        <li><code>conversation_id</code> &mdash; tracks the conversation thread across turns and resume events</li>
+        <li><code>user_id</code> &mdash; identifies the owning user or tenant</li>
+        <li><code>timestamps</code> &mdash; creation, update, and resume timing</li>
+        <li><code>configuration</code> &mdash; model, provider, permission mode, and runtime settings</li>
+      </ul>
+
+      <!-- ========== Tenant Architecture ========== -->
+      <h2 id="tenants">Tenant Architecture</h2>
+      <p>The server supports two tenant modes. Choose single-tenant for personal use and development, or multi-tenant when deploying for teams and enterprises.</p>
+
+      <h3>Single-Tenant (Default)</h3>
+      <ul>
+        <li>No authentication required &mdash; all requests default to the "owner" user</li>
+        <li>One user, one server &mdash; the simplest deployment model</li>
+        <li>Tools operate in the server's working directory</li>
+        <li>Ideal for personal use, local development, and CI/CD pipelines</li>
+      </ul>
+
+      <h3>Multi-Tenant (Enterprise)</h3>
+      <ul>
+        <li>Pass <code>X-Tenant-ID</code> header on every request to identify the tenant</li>
+        <li>Each tenant gets isolated sessions, conversations, and workspace</li>
+        <li>Tenant workspaces are created at <code>~/.openanalyst/server/workspaces/{tenant_id}/</code></li>
+        <li>No authentication baked in &mdash; wrap with your own auth layer (IAM, OAuth, API gateway)</li>
+        <li>Designed so enterprises can add their own rate limiting, billing, and access control</li>
+      </ul>
+
+      <div class="code-title">Tenant routing</div>
+      <pre><code>Single-Tenant:
+  Client &rarr; Server (owner) &rarr; AI Engine &rarr; Tools (server CWD)
+
+Multi-Tenant:
+  Client A [X-Tenant-ID: alpha] &rarr; Server &rarr; AI Engine &rarr; Tools (workspaces/alpha/)
+  Client B [X-Tenant-ID: beta]  &rarr; Server &rarr; AI Engine &rarr; Tools (workspaces/beta/)</code></pre>
+
+      <div class="callout callout-info">
+        <div class="callout-title">Enterprise Deployment</div>
+        Multi-tenant mode does not include authentication. Place a reverse proxy or API gateway in front of the server to handle auth, then pass the resolved tenant identity via the <code>X-Tenant-ID</code> header.
+      </div>
+
+      <!-- ========== Sandbox Model ========== -->
+      <h2 id="sandbox">Sandbox Model</h2>
+      <p>Tool execution is sandboxed to prevent unintended access to the host system. Every tool call runs within the boundaries of the tenant's workspace directory.</p>
+
+      <ul>
+        <li><strong>Workspace-scoped writes</strong> &mdash; tools can read and write within the tenant's workspace, but nothing outside it</li>
+        <li><strong>Protected paths</strong> &mdash; server files, system files, and other tenants' directories are blocked at the engine level</li>
+        <li><strong>Directory jail</strong> &mdash; each tenant's tool execution is confined to their workspace directory</li>
+        <li><strong>Code execution sandbox</strong> &mdash; the ExecuteCode tool runs in a sandboxed subprocess with configurable timeout and path protection</li>
+        <li><strong>Self-contained</strong> &mdash; complete workspace isolation built into the engine, no third-party sandbox dependency required</li>
+      </ul>
+
+      <div class="callout callout-warning">
+        <div class="callout-title">Security Note</div>
+        The sandbox prevents accidental cross-tenant file access, but it is not a hardened security boundary. For high-security deployments, combine the sandbox with OS-level isolation (containers, VMs) and network segmentation.
+      </div>
+
+      <!-- ========== SSE Streaming ========== -->
+      <h2 id="sse">SSE Streaming</h2>
+      <p>The server uses Server-Sent Events (SSE) for real-time communication. The same event types are consumed by both the TUI and remote API clients, ensuring consistent behavior across interfaces.</p>
+
+      <table>
+        <thead><tr><th>Event Type</th><th>Description</th></tr></thead>
+        <tbody>
+          <tr><td><code>snapshot</code></td><td>Full session state on initial connection</td></tr>
+          <tr><td><code>message</code></td><td>Complete message (user or assistant)</td></tr>
+          <tr><td><code>assistant_delta</code></td><td>Incremental text chunk from the model</td></tr>
+          <tr><td><code>tool_call</code></td><td>Tool invocation with name and arguments</td></tr>
+          <tr><td><code>tool_result</code></td><td>Tool execution output</td></tr>
+          <tr><td><code>usage</code></td><td>Token counts and cost tracking</td></tr>
+          <tr><td><code>state</code></td><td>Session state transitions (thinking, tool_use, idle)</td></tr>
+          <tr><td><code>error</code></td><td>Error events with message and code</td></tr>
+        </tbody>
+      </table>
+
+      <ul>
+        <li><strong>Broadcast channel per session</strong> &mdash; multiple clients can subscribe to the same session's event stream</li>
+        <li><strong>Immediate flush</strong> &mdash; events are sent as they occur, with no buffering</li>
+        <li><strong>Disconnect detection</strong> &mdash; the server detects dropped connections via stream timeout</li>
+      </ul>
+
+      <div class="code-title">Subscribing to events</div>
+      <pre><code>GET /sessions/{id}/events
+Accept: text/event-stream
+
+data: {"type":"assistant_delta","content":"Hello"}
+data: {"type":"tool_call","name":"ReadFile","args":{"path":"src/main.rs"}}
+data: {"type":"tool_result","output":"fn main() { ... }"}
+data: {"type":"usage","input_tokens":1024,"output_tokens":256}</code></pre>
+
+      <!-- ========== Auto-Configuration ========== -->
+      <h2 id="autoconfig">Auto-Configuration</h2>
+      <p>On startup, the server scans the environment for API keys and automatically configures every provider that has a valid key. No manual provider setup is required.</p>
+
+      <table>
+        <thead><tr><th>Environment Variable</th><th>Provider</th></tr></thead>
+        <tbody>
+          <tr><td><code>OPENANALYST_API_KEY</code></td><td>OpenAnalyst</td></tr>
+          <tr><td><code>ANTHROPIC_API_KEY</code></td><td>Anthropic</td></tr>
+          <tr><td><code>OPENAI_API_KEY</code></td><td>OpenAI</td></tr>
+          <tr><td><code>XAI_API_KEY</code></td><td>xAI</td></tr>
+          <tr><td><code>OPENROUTER_API_KEY</code></td><td>OpenRouter</td></tr>
+          <tr><td><code>AWS_ACCESS_KEY_ID</code></td><td>Bedrock</td></tr>
+          <tr><td><code>GOOGLE_API_KEY</code> / <code>GEMINI_API_KEY</code></td><td>Gemini</td></tr>
+        </tbody>
+      </table>
+
+      <p>If environment variables are not set, the server also checks these fallback locations:</p>
+      <ul>
+        <li><code>~/.openanalyst/.env</code> &mdash; dotenv-style key-value file</li>
+        <li><code>~/.openanalyst/credentials.json</code> &mdash; structured credentials file</li>
+      </ul>
+
+      <div class="callout callout-info">
+        <div class="callout-title">CORS</div>
+        The server enables CORS for browser-based API clients by default &mdash; all origins and all methods are permitted. For production deployments, restrict allowed origins via a reverse proxy.
+      </div>
+
       <div class="page-footer">
-        <a href="mcp.html">&larr; MCP Integration</a>
+        <a href="server-api.html">&larr; Server API</a>
         <span></span>
       </div>
     </main>

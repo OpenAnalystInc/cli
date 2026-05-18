@@ -13,10 +13,10 @@
     <nav class="sidebar">
       <div class="sidebar-logo">
         <a href="../index.html">
-          <img src="https://openanalyst.com/images/new-logo.png" alt="OA" >
+          <img src="../assets/openanalyst-logo.png" alt="OA" >
           <h2>OpenAnalyst CLI</h2>
         </a>
-        <span data-version-prefix="Documentation v">Documentation v2.0.26</span>
+        <span data-version-prefix="Documentation v">Documentation v2.0.30</span>
       </div>
       <div class="sidebar-section">
         <div class="sidebar-section-title">Documentation</div>
@@ -38,6 +38,7 @@
         <a href="agents.html" class="sidebar-link">Multi-Agent System</a>
         <a href="configuration.html" class="sidebar-link">Configuration</a>
         <a href="mcp.html" class="sidebar-link">MCP Integration</a>
+        <a href="server-api.html" class="sidebar-link">Server API</a>
         <a href="architecture.html" class="sidebar-link">Architecture</a>
       </div>
     </nav>
@@ -47,7 +48,7 @@
       <div class="page-header">
         <span class="badge">Core Concepts</span>
         <h1>Built-in Tools</h1>
-        <p class="subtitle">21 tools available to the AI agent for file operations, code search, web access, and more. Each tool respects your permission mode.</p>
+        <p class="subtitle">22 tools available to the AI agent for file operations, code search, web access, and more. Each tool respects your permission mode.</p>
       </div>
 
       <h2 id="overview">Tool Overview</h2>
@@ -75,6 +76,8 @@
           <tr><td><code>sleep</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Pause execution for a duration</td></tr>
           <tr><td><code>send_user_message</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Send a notification to the user</td></tr>
           <tr><td><code>powershell</code></td><td><span class="badge-sm badge-purple">Varies</span></td><td>Execute PowerShell commands (Windows)</td></tr>
+          <tr><td><code>execute_code</code></td><td><span class="badge-sm badge-red">Full Access</span></td><td>Execute Python, JavaScript, or shell code in a sandboxed subprocess with timeout and path protection</td></tr>
+          <tr><td><code>knowledge</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Search the OpenAnalyst knowledge base (BGE-M3 embeddings, hybrid RAG)</td></tr>
         </tbody>
       </table>
 
@@ -177,6 +180,35 @@ grep_search { pattern: "fn\\s+\\w+", type: "python" }</code></pre>
 
       <h2 id="mcp-tools">MCP Tools</h2>
       <p>In addition to the 19 built-in tools, you can register <strong>unlimited additional tools</strong> via <a href="mcp.html">MCP servers</a>. These appear alongside built-in tools and are invoked the same way.</p>
+
+      <h2 id="server-tools">Tools in Server Mode</h2>
+      <p>When running as a headless API server via <code>openanalyst --serve</code>, the following tools are automatically available to all sessions:</p>
+
+      <table>
+        <thead><tr><th>Tool</th><th>Permission</th><th>Note</th></tr></thead>
+        <tbody>
+          <tr><td><code>read_file</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Reads within tenant workspace</td></tr>
+          <tr><td><code>write_file</code></td><td><span class="badge-sm badge-yellow">Workspace</span></td><td>Writes within tenant workspace only</td></tr>
+          <tr><td><code>edit_file</code></td><td><span class="badge-sm badge-yellow">Workspace</span></td><td>Edits within tenant workspace only</td></tr>
+          <tr><td><code>list_directory</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Lists within tenant workspace</td></tr>
+          <tr><td><code>grep_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Searches within tenant workspace</td></tr>
+          <tr><td><code>glob_search</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Finds files within tenant workspace</td></tr>
+          <tr><td><code>bash</code></td><td><span class="badge-sm badge-yellow">Workspace</span></td><td>Executes commands in tenant workspace CWD</td></tr>
+          <tr><td><code>WebFetch</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Fetches URLs (no file system access)</td></tr>
+          <tr><td><code>WebSearch</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Searches the web</td></tr>
+          <tr><td><code>Knowledge</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>RAG knowledge base search</td></tr>
+          <tr><td><code>Skill</code></td><td><span class="badge-sm badge-purple">Varies</span></td><td>Custom skill execution</td></tr>
+          <tr><td><code>Sleep</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Wait between operations</td></tr>
+          <tr><td><code>StructuredOutput</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Return structured JSON</td></tr>
+          <tr><td><code>ToolSearch</code></td><td><span class="badge-sm badge-green">Read Only</span></td><td>Discover tools by keyword</td></tr>
+          <tr><td><code>ExecuteCode</code></td><td><span class="badge-sm badge-red">Full Access</span></td><td>Sandboxed code execution (enabled by default, can be disabled via server configuration)</td></tr>
+        </tbody>
+      </table>
+
+      <div class="callout callout-info">
+        <div class="callout-title">Sandbox Protection</div>
+        In server mode, all file-related tools are sandboxed to the tenant's workspace directory. Server files, system files, and other tenants' directories cannot be accessed. Tools can read and write within the workspace but nothing outside it.
+      </div>
 
       <div class="page-footer">
         <a href="commands.html">&larr; Slash Commands</a>
