@@ -34,38 +34,118 @@ openanalyst --version
 
 ## Sign in
 
-You have three ways to give the CLI credentials. **We recommend signing in with an OpenAnalyst account** — you get one place to pay, one credit balance across every frontier model, plus the [10x.in](https://10x.in) skills & plugins catalog that turns the CLI into your team's dedicated workflow runner.
+You have three ways to give the CLI credentials. We recommend **signing in with an OpenAnalyst account** — one credit balance across every frontier model, the [10x.in](https://10x.in) skills & plugins catalog included, and no per-provider key management.
 
-**1. Sign in with your OpenAnalyst account (recommended).** Free to start. One command, no API key juggling:
+### 1. Sign in with your OpenAnalyst account (recommended)
+
+**Step 1 — create a free account at [10x.in](https://10x.in)** (30 seconds, just an email). New accounts get free credits to try out the CLI immediately.
+
+**Step 2 — sign in from your terminal:**
 
 ```bash
 openanalyst account login
 ```
 
-Don't have an account yet? Create one in 30 seconds at **[10x.in](https://10x.in)** — that's where you sign up, get free credits, manage plans, and grab an OpenAnalyst API key if you'd rather paste one in. The same login gives you:
+The CLI prompts for your email, sends a 6-digit code, you paste it back, and you're in. No browser, no long keys.
 
-- the full OpenAnalyst-routed model catalog — **Beta, Max, GPT-5.4, Claude Opus 4.7, Gemini 3 Pro** — through one balance, no per-provider keys.
-- the **skills marketplace** at [10x.in/skills](https://10x.in/skills) — install pre-built `/skills` like `/code-review`, `/release-notes`, `/security-audit` that run as first-class slash commands inside the CLI.
-- the **plugin catalog** at [10x.in/plugins](https://10x.in/plugins) — extend the CLI with custom tools (CRM connectors, internal-doc readers, deploy helpers) maintained by your team or the community.
-- usage analytics, team seats, and SSO at [10x.in/team](https://10x.in/team).
+```
+  OpenAnalyst CLI — Account sign in
 
-The CLI will prompt for your email, send a 6-digit code, you paste it back, and you're signed in. No browser, no copy-paste of long keys.
+  Email: you@example.com
+  Sent a verification code to y***@example.com.
+  Code: 123456
 
-```bash
-openanalyst account status   # see plan + credits left
-openanalyst account logout   # sign out
+  ✓ Signed in as you@example.com
+
+  You can now run:
+    openanalyst                 start the TUI
+    openanalyst "<prompt>"      one-shot prompt
+    openanalyst account status  show plan + credits
 ```
 
-**2. Paste an OpenAnalyst API key.** Already have an `sk-oa-v1-*` key from [10x.in](https://10x.in) → Dashboard → API Keys?
+**Step 3 — use it.** Just start the TUI and pick a model from the picker, or one-shot a prompt:
+
+```bash
+openanalyst                              # interactive TUI
+openanalyst "explain this codebase"      # one-shot
+openanalyst -m opus "review my diff"     # one-shot with explicit model
+openanalyst account status               # plan + credits left, anytime
+openanalyst account logout               # sign out
+```
+
+**What the account unlocks** (everything below, on one credit balance):
+
+- the **OpenAnalyst-routed model catalog** — see [Models](#models) below.
+- the **[10x.in/skills](https://10x.in/skills) marketplace** — `/code-review`, `/release-notes`, `/security-audit`, `/standup`, `/onboarding` and many more, installable as first-class slash commands.
+- the **[10x.in/plugins](https://10x.in/plugins) catalog** — CRM connectors, internal-doc readers, deploy helpers, custom MCP tool servers.
+- **usage analytics, team seats, and SSO** at [10x.in/team](https://10x.in/team).
+
+> **Token lifetime:** the CLI-issued access token expires after ~1 hour. The web console (`openanalyst --serve` → Settings → Account) refreshes it automatically. For the pure-CLI path, just re-run `openanalyst account login` if you see a 401 — it's a 10-second roundtrip.
+
+### 2. Paste an OpenAnalyst API key
+
+Prefer a long-lived key instead of the OTP flow? Go to [10x.in](https://10x.in) → **Dashboard → API Keys**, mint an `sk-oa-v1-…` key, and set it either as an env var:
 
 ```bash
 export OPENANALYST_API_KEY=sk-oa-v1-...
 openanalyst
 ```
 
-…or set it once in `~/.openanalyst/.env` and forget it.
+…or once in `~/.openanalyst/.env` (`OPENANALYST_API_KEY=sk-oa-v1-...`) so every shell picks it up. Same model catalog, same credits — just authenticated with a static key instead of a session.
 
-**3. Bring your own provider keys (BYOP).** Prefer to talk to Anthropic, OpenAI, Gemini, xAI, OpenRouter, or Bedrock directly with your own keys? Totally supported — drop them in `~/.openanalyst/.env` or paste them into the web console's Settings → Providers tab. The CLI auto-discovers what's available and shows only the models you can actually use. You can mix BYOP with an OpenAnalyst login; both work side-by-side and you pick which one inference uses per-session.
+### 3. Bring your own provider keys (BYOP)
+
+Already pay for Anthropic / OpenAI / Gemini / xAI / OpenRouter / Bedrock directly and want to use those keys? Fully supported.
+
+```bash
+# Either as env vars …
+export ANTHROPIC_API_KEY=sk-ant-...
+export OPENAI_API_KEY=sk-...
+export GEMINI_API_KEY=...
+openanalyst
+
+# … or persisted in the dotenv file once:
+echo "ANTHROPIC_API_KEY=sk-ant-..." >> ~/.openanalyst/.env
+```
+
+The CLI auto-discovers what's available and surfaces only the models you can actually use. You can **mix BYOP with an OpenAnalyst login** — both work side-by-side; pick per-session which one inference uses (CLI flag `--model`, web console Settings → Account → "Use account login / Use API key"). BYOP calls bill against your direct provider account; OpenAnalyst-routed calls bill against your OpenAnalyst credits.
+
+## Models
+
+There are two distinct ways to address a model — pick whichever matches how you're authenticated:
+
+### OpenAnalyst-routed models (when signed in / using an `sk-oa-v1-*` key)
+
+These route through `api.openanalyst.com` and bill against your OpenAnalyst credit balance. **One credential, every frontier model.** The exact catalog updates server-side as new models launch — run `openanalyst account status` or open Settings → Account in the web console to see the current list for your plan. As of 2.0.37:
+
+| Model name (CLI) | What it is | Best for |
+|---|---|---|
+| `openanalyst-beta` | OpenAnalyst's smart-routed default — picks the right frontier model for the task automatically | Daily use; let the gateway decide what to call |
+| `openanalyst-max` | Routed to the strongest available reasoning model | Hard problems, long contexts, complex coding |
+| `opus`, `sonnet`, `haiku` | Claude Opus / Sonnet / Haiku via the OpenAnalyst gateway | When you specifically want Anthropic models |
+| `gpt-5`, `gpt-4.1`, `o3`, `o4-mini` | GPT family via the OpenAnalyst gateway | When you specifically want OpenAI models |
+| `gemini-3-pro`, `gemini-3-flash` | Gemini via the OpenAnalyst gateway | Large contexts, multimodal, lower cost |
+| `grok-4`, `grok-4-fast` | xAI Grok via the OpenAnalyst gateway | When you specifically want xAI models |
+
+All of the above just work after `openanalyst account login` — no per-provider keys needed. Switch between them anytime with `-m <model>` or the in-TUI model picker (`/model <name>`).
+
+### Direct-provider models (BYOP — your own keys)
+
+When you set a provider's own env var (`ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, …), the CLI talks to that provider's API directly, billed against your account there. Same model names as the provider's docs — `claude-opus-4-6`, `gpt-4.1`, `gemini-3-pro`, `grok-4`, etc.
+
+**OpenAnalyst-routed vs direct — what's the difference?**
+
+|  | OpenAnalyst-routed | Direct (BYOP) |
+|---|---|---|
+| Credential | OAuth (`account login`) or one `sk-oa-v1-*` key | One key per provider |
+| Billing | OpenAnalyst credits, single invoice | Each provider bills separately |
+| Model name | Curated aliases (`openanalyst-beta`, `opus`, `gpt-5`) | Provider's exact name (`claude-opus-4-6`, `gpt-4.1`) |
+| Setup | 30 seconds — one login | Sign up for each provider, mint keys, manage rotation |
+| Catalog | Grows automatically as 10x.in adds new models | What you've subscribed to with each provider |
+| Account features | Credits, usage analytics, team seats, skills, plugins | None — bare API access |
+| Failover | Automatic across providers in the route | Manual |
+
+Both paths work, neither is locked in, and you can mix them session-by-session.
 
 ## Three ways to use it
 
@@ -116,29 +196,46 @@ This is admin-controlled. The end user using the web console cannot disable the 
 
 ## Providers
 
-OpenAnalyst CLI routes to any of these — pick whichever you want, mix and match:
+The full list of authentication slots the CLI recognizes. Set as env vars, drop in `~/.openanalyst/.env`, or paste in the web console's Settings → Providers tab — keys are encrypted on disk.
 
-- **OpenAnalyst (recommended)** — sign in with `openanalyst account login` or paste an `sk-oa-v1-*` key from [10x.in](https://10x.in). One credit balance, every frontier model: Beta, Max, GPT-5.4, Claude Opus 4.7, Gemini 3 Pro. Free credits on sign-up.
-- **Anthropic / Claude** — `ANTHROPIC_API_KEY` (Claude Opus, Sonnet, Haiku).
-- **OpenAI / GPT / Codex** — `OPENAI_API_KEY`.
-- **Google Gemini** — `GEMINI_API_KEY`.
-- **xAI / Grok** — `XAI_API_KEY`.
-- **OpenRouter** — `OPENROUTER_API_KEY` (350+ models behind one key).
-- **Amazon Bedrock** — `BEDROCK_API_KEY` (Bedrock-hosted Claude).
-- **Stability AI / Gemini Imagen / OpenAI Images** — image generation via `/image`.
-- **Brave Search / Tavily / Serper / Exa** — web search for `/scrape` and the WebSearch tool.
+**Chat / language models:**
 
-Set any of these as environment variables, drop them in `~/.openanalyst/.env`, or paste them in the web console's Settings → Providers tab. They're stored encrypted on disk.
+| Provider | Credential | Env var | How to authenticate |
+|---|---|---|---|
+| **OpenAnalyst** (recommended) | account login OR `sk-oa-v1-*` key | `OPENANALYST_API_KEY` / `OPENANALYST_AUTH_TOKEN` | `openanalyst account login` or [10x.in](https://10x.in) → Dashboard → API Keys |
+| Anthropic / Claude | API key | `ANTHROPIC_API_KEY` | [console.anthropic.com](https://console.anthropic.com) |
+| OpenAI / GPT / Codex | API key | `OPENAI_API_KEY` | [platform.openai.com](https://platform.openai.com) |
+| Google Gemini | API key | `GEMINI_API_KEY` | [aistudio.google.com](https://aistudio.google.com) |
+| xAI / Grok | API key | `XAI_API_KEY` | [console.x.ai](https://console.x.ai) |
+| OpenRouter | API key (one key, 350+ models) | `OPENROUTER_API_KEY` | [openrouter.ai](https://openrouter.ai) |
+| Amazon Bedrock | API key | `BEDROCK_API_KEY` | AWS Bedrock console |
+
+**Image generation** (used by the `/image` slash command):
+
+| Provider | Env var |
+|---|---|
+| Stability AI (SDXL, SD3) | `STABILITY_API_KEY` |
+| Google Imagen (via Gemini) | `GEMINI_IMAGE_API_KEY` (can reuse `GEMINI_API_KEY`) |
+| OpenAI Images (DALL·E / gpt-image) | `OPENAI_IMAGE_API_KEY` (can reuse `OPENAI_API_KEY`) |
+
+**Web search** (used by `/scrape` and the `WebSearch` tool — the CLI picks the first one available):
+
+| Provider | Env var |
+|---|---|
+| Brave Search (independent index) | `BRAVE_SEARCH_API_KEY` |
+| Tavily (RAG-tuned) | `TAVILY_API_KEY` |
+| Serper (Google SERP) | `SERPER_API_KEY` |
+| Exa (semantic web) | `EXA_API_KEY` |
 
 ## Skills & plugins (10x.in)
 
-Beyond the model providers, the CLI installs **skills** (typed slash commands) and **plugins** (custom tools) from the [10x.in](https://10x.in) catalog. Signed-in users get access to:
+The CLI extends beyond raw model calls with **skills** (typed slash commands like `/code-review`) and **plugins** (custom tools like a CRM connector). Both are pulled from the [10x.in](https://10x.in) catalog once you're signed in.
 
-- **[10x.in/skills](https://10x.in/skills)** — curated skills like `/code-review`, `/release-notes`, `/security-audit`, `/standup`, `/onboarding`. Install with `openanalyst skills install <name>` and they show up in the slash-command palette instantly.
-- **[10x.in/plugins](https://10x.in/plugins)** — first-party + community plugins: CRM connectors, internal-doc readers, deploy helpers, custom tool servers. `openanalyst extension install <plugin>` to add one.
-- **Skill authoring** — write your own skill at [10x.in/skills/new](https://10x.in/skills/new), share it with your team (private) or the world (public). The `/skills` directory inside the CLI honors both local and remote sources.
+- **[10x.in/skills](https://10x.in/skills)** — browse and install curated skills. Examples: `/code-review`, `/release-notes`, `/security-audit`, `/standup`, `/onboarding`. Install with `openanalyst skills install <name>` — they appear in the slash-command palette instantly.
+- **[10x.in/plugins](https://10x.in/plugins)** — first-party + community plugins that add tools to the agent: CRM connectors, internal-doc readers, deploy helpers, MCP servers. `openanalyst extension install <plugin>` to add.
+- **Author your own** — write a skill at [10x.in/skills/new](https://10x.in/skills/new), publish it to your team (private) or the world (public). Local skills under `.openanalyst/skills/` work too.
 
-The skills & plugins index is fetched at startup using your account credentials, so they "just work" once you've run `openanalyst account login`.
+You can also create custom **agents** (named personas with their own system prompts, tools, and default models) — define them in `~/.openanalyst/agents/` and invoke with `/agent <name>` or list them with `openanalyst agents`.
 
 ## Docs
 
