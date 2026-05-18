@@ -253,3 +253,7 @@ This repository is intentionally limited to public release assets:
 - npm package metadata
 
 Source development for the private release pipeline happens separately.
+
+## License
+
+OpenAnalyst CLI is licensed under the [Apache License, Version 2.0](https://www.apache.org/licenses/LICENSE-2.0). See [`LICENSE`](./LICENSE) for the full text.
