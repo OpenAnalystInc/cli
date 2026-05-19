@@ -133,7 +133,7 @@ There are two distinct ways to address a model — pick whichever matches how yo
 
 ### OpenAnalyst-routed models (when signed in / using an `sk-oa-v1-*` key)
 
-These route through `api.openanalyst.com` and bill against your OpenAnalyst credit balance. **One credential, every frontier model.** The exact catalog updates server-side as new models launch — run `openanalyst account status` or open Settings → Account in the web console to see the current list for your plan. As of 2.0.39:
+These route through `api.openanalyst.com` and bill against your OpenAnalyst credit balance. **One credential, every frontier model.** The exact catalog updates server-side as new models launch — run `openanalyst account status` or open Settings → Account in the web console to see the current list for your plan. As of 2.0.40:
 
 | Model name (CLI) | What it is | Best for |
 |---|---|---|

@@ -11,7 +11,7 @@
  */
 (function () {
   var REPO = 'OpenAnalystInc/cli';
-  var DEFAULT_VERSION = 'v2.0.39';
+  var DEFAULT_VERSION = 'v2.0.40';
   var CACHE_KEY = 'oa_cli_version';
   var CACHE_TTL = 300000;
   var ICON_URL = 'https://openanalyst.com/images/new-logo.png';
