@@ -61,7 +61,7 @@
           <tr><td><strong>OS</strong></td><td>macOS 12+, Linux (glibc 2.31+), Windows 10/11</td></tr>
           <tr><td><strong>Terminal</strong></td><td>Any terminal with UTF-8 and 256-color support</td></tr>
           <tr><td><strong>Disk</strong></td><td>~25 MB (single binary)</td></tr>
-          <tr><td><strong>Runtime</strong></td><td>None &mdash; native binary, no Node/Python required</td></tr>
+          <tr><td><strong>Runtime</strong></td><td>Node.js 18+ for the npm wrapper; no Rust or Python required</td></tr>
         </tbody>
       </table>
 
@@ -76,7 +76,7 @@
         <div id="tab-mac" class="tab-content active">
           <p>Run the install script:</p>
           <pre><code>curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh | bash</code></pre>
-          <p>This downloads the latest release binary and places it in <code>/usr/local/bin/openanalyst</code>.</p>
+          <p>This installs the npm wrapper globally and downloads the native engine on first run.</p>
 
           <div class="callout callout-tip">
             <div class="callout-title">Tip</div>
@@ -87,12 +87,16 @@
         <div id="tab-win" class="tab-content">
           <p>Open PowerShell as Administrator:</p>
           <pre><code>irm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex</code></pre>
-          <p>The binary is placed in your user PATH automatically.</p>
+          <p>The <code>openanalyst</code> command is added to your user PATH automatically.</p>
+          <div class="callout callout-info">
+            <div class="callout-title">Upgrade repair</div>
+            The installer repairs stale OpenAnalyst global shims before reinstalling, which fixes older Windows installs that fail with <code>EEXIST: file already exists ... openanalyst</code>.
+          </div>
         </div>
 
         <div id="tab-source" class="tab-content">
           <p>Backend-only deployment:</p>
-          <pre><code>npm install -g @openanalystinc/openanalyst-cli
+          <pre><code>npm install -g @openanalystinc/openanalyst-cli@latest
 openanalyst --notui
 openanalyst --serve 8080</code></pre>
           <p>Use this when you want the hosted session API on a server without launching the TUI.</p>
@@ -107,7 +111,7 @@ openanalyst --serve 8080</code></pre>
       <h2 id="verify">Verify Installation</h2>
       <pre><code><span class="token-comment"># Check the version</span>
 openanalyst --version
-                  <span class="token-comment"># Output: OpenAnalyst CLI v<span class="oa-version">2.0.30</span></span>
+                  <span class="token-comment"># Output: OpenAnalyst CLI v<span class="oa-version">2.0.39</span></span>
 
 <span class="token-comment"># Check logged-in providers</span>
 openanalyst whoami</code></pre>
@@ -126,10 +130,16 @@ curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh 
 <span class="token-comment"># Windows</span>
 irm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex</code></pre>
 
+      <h2 id="troubleshooting">Troubleshooting npm Installs</h2>
+      <p>If npm reports <code>EEXIST: file already exists ... openanalyst</code>, an older global shim is blocking the new package. The install scripts above repair that automatically. For manual npm recovery, run:</p>
+      <pre><code>npm uninstall -g @openanalyst/cli @openanalystinc/openanalyst-cli
+npm install -g @openanalystinc/openanalyst-cli@latest</code></pre>
+      <p>On Windows, close terminals running <code>openanalyst</code> before reinstalling. If npm reports <code>EPERM</code>, retry in an Administrator PowerShell.</p>
+
       <h2 id="uninstall">Uninstalling</h2>
-      <p>Remove the binary and optionally clean up config:</p>
-      <pre><code><span class="token-comment"># Remove binary</span>
-rm /usr/local/bin/openanalyst
+      <p>Remove the global package and optionally clean up config:</p>
+      <pre><code><span class="token-comment"># Remove package</span>
+npm uninstall -g @openanalystinc/openanalyst-cli
 
 <span class="token-comment"># Remove config (optional)</span>
 rm -rf ~/.openanalyst</code></pre>

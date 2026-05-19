@@ -6,13 +6,7 @@ OpenAnalyst is a single, focused AI development tool you can use three ways with
 
 ## Install
 
-The fastest path on any OS:
-
-```bash
-npm install -g @openanalystinc/openanalyst-cli
-```
-
-That gives you the `openanalyst` (and short `oa`) binary on your `$PATH`. If you prefer not to use npm:
+Recommended installers:
 
 **macOS / Linux:**
 
@@ -26,11 +20,34 @@ curl -fsSL https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.sh 
 irm https://raw.githubusercontent.com/OpenAnalystInc/cli/main/install.ps1 | iex
 ```
 
+These installers repair stale global OpenAnalyst shims before installing, which matters when upgrading from early package names.
+
+Fresh npm install:
+
+```bash
+npm install -g @openanalystinc/openanalyst-cli@latest
+```
+
+That gives you the `openanalyst` binary on your `$PATH`.
+
 Verify it installed:
 
 ```bash
 openanalyst --version
 ```
+
+### Repair a stale global install
+
+If npm reports `EEXIST: file already exists ... openanalyst`, you likely have a stale global shim from an early package name. Direct `npm install -g` can fail before the new package gets a chance to run, so re-run the OS installer above or clean the old package first.
+
+Manual recovery:
+
+```bash
+npm uninstall -g @openanalyst/cli @openanalystinc/openanalyst-cli
+npm install -g @openanalystinc/openanalyst-cli@latest
+```
+
+On Windows, close any terminals running `openanalyst` first. If npm still reports `EPERM`, run PowerShell as Administrator and retry the same two commands.
 
 ## Sign in
 
@@ -116,7 +133,7 @@ There are two distinct ways to address a model — pick whichever matches how yo
 
 ### OpenAnalyst-routed models (when signed in / using an `sk-oa-v1-*` key)
 
-These route through `api.openanalyst.com` and bill against your OpenAnalyst credit balance. **One credential, every frontier model.** The exact catalog updates server-side as new models launch — run `openanalyst account status` or open Settings → Account in the web console to see the current list for your plan. As of 2.0.37:
+These route through `api.openanalyst.com` and bill against your OpenAnalyst credit balance. **One credential, every frontier model.** The exact catalog updates server-side as new models launch — run `openanalyst account status` or open Settings → Account in the web console to see the current list for your plan. As of 2.0.39:
 
 | Model name (CLI) | What it is | Best for |
 |---|---|---|
