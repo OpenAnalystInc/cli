@@ -283,10 +283,10 @@ jobs:
           const pack = JSON.parse(fs.readFileSync('/tmp/npm-pack.json', 'utf8'));
           const files = (pack[0]?.files ?? []).map(f => f.path);
           const forbidden = files.filter(f => {
-            // Public npm gets only the package-facing managed README.
             // Private hosted deployments can add managed skills/config
-            // from the private repo or server filesystem.
-            if (f.startsWith('managed/') && f !== 'managed/README.md') return true;
+            // from the private repo or server filesystem. Public npm
+            // must not ship any managed server docs or files.
+            if (f.startsWith('managed/')) return true;
             // Only the minimal public README ships. CHANGELOG and
             // any internal docs stay private. Anything else markdown
             // is treated as a leak â€” including any `*.internal.md`
