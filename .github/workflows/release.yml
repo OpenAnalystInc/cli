@@ -1,3 +1,18 @@
+# =============================================================
+# ARCHIVAL MIRROR ONLY - DO NOT RUN FROM THE PRIVATE REPO
+# =============================================================
+# The live release workflow runs on the public repo at
+#   https://github.com/OpenAnalystInc/cli/.github/workflows/release.yml
+# This copy is kept under version control here so the private
+# repo always has a synced record of the CI pipeline that ships
+# its source. To keep this from auto-triggering on tag pushes
+# and burning Actions minutes against the private repo, the
+# workflow is disabled at the GitHub Actions level
+# (`gh workflow disable release.yml -R OpenAnalystInc/openanalyst-cli`).
+# If you ever edit this file, mirror the change to the public
+# repo with the same diff so the two stay byte-identical.
+# =============================================================
+
 name: Release
 
 # This workflow runs ON the public repo (OpenAnalystInc/cli) so it
@@ -6,13 +21,13 @@ name: Release
 # clones it into the runner's ephemeral filesystem with a PAT
 # (PRIVATE_REPO_TOKEN secret), builds, attaches binaries to a
 # release here, and publishes to npm. Source never persists in the
-# public repo — the runner is destroyed after each job.
+# public repo â€” the runner is destroyed after each job.
 #
 # Trigger options:
-#   1. `workflow_dispatch` from the Actions tab — supply the version
+#   1. `workflow_dispatch` from the Actions tab â€” supply the version
 #      manually. Use this for the first publish, or any time you
 #      want to rebuild a specific tag.
-#   2. Push a `v*` tag to this public repo — re-runs the same flow
+#   2. Push a `v*` tag to this public repo â€” re-runs the same flow
 #      for that tag.
 
 on:
@@ -88,7 +103,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       # Clone the private repo (the source of truth). The PAT lives
-      # in PRIVATE_REPO_TOKEN — set it once at repo-secret level on
+      # in PRIVATE_REPO_TOKEN â€” set it once at repo-secret level on
       # this public repo.
       - uses: actions/checkout@v4
         with:
@@ -165,7 +180,7 @@ jobs:
             echo "$LEAKS"
             exit 1
           fi
-          echo "OK — only binary artifacts present."
+          echo "OK â€” only binary artifacts present."
 
           # Defense-in-depth: docs and Markdown must never reach the
           # public release. The Package step only copies binaries
@@ -177,7 +192,7 @@ jobs:
             echo "$DOC_LEAKS"
             exit 1
           fi
-          echo "OK — no docs in release artifacts."
+          echo "OK â€” no docs in release artifacts."
 
           # Belt-and-suspenders: scan every staged file for literal
           # API-key shapes. The CLI never embeds credentials, but if
@@ -194,7 +209,7 @@ jobs:
             echo "$SECRETS" | head -20
             exit 1
           fi
-          echo "OK — no API-key shapes in release artifacts."
+          echo "OK â€” no API-key shapes in release artifacts."
 
       - name: Create or update the release on this (public) repo
         env:
@@ -229,13 +244,26 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           registry-url: https://registry.npmjs.org/
 
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
       - name: Install dependencies
         working-directory: source
-        run: npm ci
+        run: npm ci --omit=optional
 
       - name: Build Ink TUI
         working-directory: source
         run: npm run build --prefix ink-tui
+
+      - name: Sync platform optional dependencies
+        working-directory: source
+        run: node scripts/sync-platform-optional-deps.js
+
+      - name: Stage platform npm packages
+        working-directory: source
+        run: node scripts/stage-npm-platform-packages.js --artifacts ../artifacts --out ../platform-npm
 
       # Hard guard: parse `npm pack --dry-run --json` and fail the
       # workflow before `npm publish` if any file in the tarball
@@ -255,14 +283,13 @@ jobs:
           const pack = JSON.parse(fs.readFileSync('/tmp/npm-pack.json', 'utf8'));
           const files = (pack[0]?.files ?? []).map(f => f.path);
           const forbidden = files.filter(f => {
-            // Allow-list: managed/ is the user-facing skill
-            // catalog (e.g. managed/skills/.../*.py helpers
-            // that ship as runnable skill artifacts, NOT CLI
-            // source). Never flag anything under managed/.
-            if (f.startsWith('managed/')) return false;
+            // Public npm gets only the package-facing managed README.
+            // Private hosted deployments can add managed skills/config
+            // from the private repo or server filesystem.
+            if (f.startsWith('managed/') && f !== 'managed/README.md') return true;
             // Only the minimal public README ships. CHANGELOG and
             // any internal docs stay private. Anything else markdown
-            // is treated as a leak — including any `*.internal.md`
+            // is treated as a leak â€” including any `*.internal.md`
             // file regardless of name.
             const isAllowedMd = f === 'README.md';
             const isDocLeak = (f.endsWith('.md') && !isAllowedMd)
@@ -292,7 +319,7 @@ jobs:
             forbidden.forEach(f => console.error('  ' + f));
             process.exit(1);
           }
-          console.log('OK — no source files in tarball.');
+          console.log('OK â€” no source files in tarball.');
           EOF
 
           # Secret-scan: build the real tarball, untar to a temp dir,
@@ -315,7 +342,31 @@ jobs:
             exit 1
           fi
           rm -rf /tmp/pkg-scan "$PKG_TARBALL"
-          echo "OK — no API-key shapes in tarball."
+          echo "OK â€” no API-key shapes in tarball."
+
+      - name: Publish platform npm packages
+        shell: bash
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+        run: |
+          set -euo pipefail
+          shopt -s nullglob
+          for tarball in platform-npm/*.tgz; do
+            echo "Publishing $tarball"
+            set +e
+            output="$(npm publish "$tarball" --access public 2>&1)"
+            status=$?
+            set -e
+            echo "$output"
+            if [ "$status" -eq 0 ]; then
+              continue
+            fi
+            if grep -qiE "previously published|cannot publish over|version already exists" <<< "$output"; then
+              echo "Skipping already-published platform package: $tarball"
+              continue
+            fi
+            exit "$status"
+          done
 
       - name: Publish to npm
         working-directory: source
