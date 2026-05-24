@@ -257,13 +257,9 @@ jobs:
         working-directory: source
         run: npm run build --prefix ink-tui
 
-      - name: Sync platform optional dependencies
+      - name: Stage root native binaries
         working-directory: source
-        run: node scripts/sync-platform-optional-deps.js
-
-      - name: Stage platform npm packages
-        working-directory: source
-        run: node scripts/stage-npm-platform-packages.js --artifacts ../artifacts --out ../platform-npm
+        run: node scripts/stage-root-vendor-binaries.js --artifacts ../artifacts
 
       # Hard guard: parse `npm pack --dry-run --json` and fail the
       # workflow before `npm publish` if any file in the tarball
@@ -343,30 +339,6 @@ jobs:
           fi
           rm -rf /tmp/pkg-scan "$PKG_TARBALL"
           echo "OK â€” no API-key shapes in tarball."
-
-      - name: Publish platform npm packages
-        shell: bash
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-        run: |
-          set -euo pipefail
-          shopt -s nullglob
-          for tarball in platform-npm/*.tgz; do
-            echo "Publishing $tarball"
-            set +e
-            output="$(npm publish "./$tarball" --access public 2>&1)"
-            status=$?
-            set -e
-            echo "$output"
-            if [ "$status" -eq 0 ]; then
-              continue
-            fi
-            if grep -qiE "previously published|cannot publish over|version already exists" <<< "$output"; then
-              echo "Skipping already-published platform package: $tarball"
-              continue
-            fi
-            exit "$status"
-          done
 
       - name: Publish to npm
         working-directory: source
