@@ -354,7 +354,7 @@ jobs:
           for tarball in platform-npm/*.tgz; do
             echo "Publishing $tarball"
             set +e
-            output="$(npm publish "$tarball" --access public 2>&1)"
+            output="$(npm publish "./$tarball" --access public 2>&1)"
             status=$?
             set -e
             echo "$output"
