@@ -59,6 +59,7 @@ env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: "20"
   PRIVATE_REPO: OpenAnalystInc/openanalyst-cli
+  RELEASE_TRIGGER_VERSION: "2.0.43"
 
 jobs:
   resolve:
@@ -73,7 +74,7 @@ jobs:
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             echo "version=${{ github.event.client_payload.version }}" >> "$GITHUB_OUTPUT"
           elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "branch" ]; then
-            echo "version=2.0.43" >> "$GITHUB_OUTPUT"
+            echo "version=${RELEASE_TRIGGER_VERSION}" >> "$GITHUB_OUTPUT"
           elif [ -n "${{ inputs.version }}" ]; then
             echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           else
