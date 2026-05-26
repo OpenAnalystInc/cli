@@ -31,6 +31,9 @@ name: Release
 #      for that tag.
 
 on:
+  repository_dispatch:
+    types:
+      - release-openanalyst
   workflow_dispatch:
     inputs:
       version:
@@ -63,13 +66,17 @@ jobs:
       - id: pick
         shell: bash
         run: |
-          if [ -n "${{ inputs.version }}" ]; then
+          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
+            echo "version=${{ github.event.client_payload.version }}" >> "$GITHUB_OUTPUT"
+          elif [ -n "${{ inputs.version }}" ]; then
             echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           else
             TAG="${GITHUB_REF_NAME}"
             echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
           fi
-          if [ "${{ inputs.publish_npm }}" = "false" ]; then
+          if [ "${{ github.event_name }}" = "repository_dispatch" ] && [ "${{ github.event.client_payload.publish_npm }}" = "false" ]; then
+            echo "publish_npm=false" >> "$GITHUB_OUTPUT"
+          elif [ "${{ inputs.publish_npm }}" = "false" ]; then
             echo "publish_npm=false" >> "$GITHUB_OUTPUT"
           else
             echo "publish_npm=true" >> "$GITHUB_OUTPUT"
