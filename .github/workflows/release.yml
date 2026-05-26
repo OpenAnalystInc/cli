@@ -45,8 +45,12 @@ on:
         default: true
         required: false
   push:
+    branches:
+      - main
     tags:
       - 'v*'
+    paths:
+      - '.github/workflows/release.yml'
 
 permissions:
   contents: write
@@ -68,6 +72,8 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
             echo "version=${{ github.event.client_payload.version }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "branch" ]; then
+            echo "version=2.0.43" >> "$GITHUB_OUTPUT"
           elif [ -n "${{ inputs.version }}" ]; then
             echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           else
