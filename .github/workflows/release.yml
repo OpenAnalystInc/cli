@@ -31,9 +31,6 @@ name: Release
 #      for that tag.
 
 on:
-  repository_dispatch:
-    types:
-      - release-openanalyst
   workflow_dispatch:
     inputs:
       version:
@@ -45,12 +42,8 @@ on:
         default: true
         required: false
   push:
-    branches:
-      - main
     tags:
       - 'v*'
-    paths:
-      - '.github/workflows/release.yml'
 
 permissions:
   contents: write
@@ -59,7 +52,6 @@ env:
   CARGO_TERM_COLOR: always
   NODE_VERSION: "20"
   PRIVATE_REPO: OpenAnalystInc/openanalyst-cli
-  RELEASE_TRIGGER_VERSION: "2.0.43"
 
 jobs:
   resolve:
@@ -71,19 +63,13 @@ jobs:
       - id: pick
         shell: bash
         run: |
-          if [ "${{ github.event_name }}" = "repository_dispatch" ]; then
-            echo "version=${{ github.event.client_payload.version }}" >> "$GITHUB_OUTPUT"
-          elif [ "${{ github.event_name }}" = "push" ] && [ "${{ github.ref_type }}" = "branch" ]; then
-            echo "version=${RELEASE_TRIGGER_VERSION}" >> "$GITHUB_OUTPUT"
-          elif [ -n "${{ inputs.version }}" ]; then
+          if [ -n "${{ inputs.version }}" ]; then
             echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
           else
             TAG="${GITHUB_REF_NAME}"
             echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
           fi
-          if [ "${{ github.event_name }}" = "repository_dispatch" ] && [ "${{ github.event.client_payload.publish_npm }}" = "false" ]; then
-            echo "publish_npm=false" >> "$GITHUB_OUTPUT"
-          elif [ "${{ inputs.publish_npm }}" = "false" ]; then
+          if [ "${{ inputs.publish_npm }}" = "false" ]; then
             echo "publish_npm=false" >> "$GITHUB_OUTPUT"
           else
             echo "publish_npm=true" >> "$GITHUB_OUTPUT"
